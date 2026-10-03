@@ -1,0 +1,8 @@
+# Supabase CLI und GitHub-Integration.
+# Die Migrationen in supabase/migrations/ werden von der GitHub-Integration
+# angewendet, sobald sie im Produktions-Branch landen.
+project_id = "salonplattform"
+
+[db]
+# Muss zur Postgres-Version des Supabase-Projekts passen (Project Settings → Infrastructure).
+major_version = 17

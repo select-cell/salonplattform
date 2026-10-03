@@ -1,0 +1,918 @@
+/* ==========================================================================
+   Basis, Layout und Komponenten. Mobil zuerst, Erweiterungen ab 640 / 960 px.
+   ========================================================================== */
+
+/* ---- Reset ------------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--cream);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+ul,
+ol,
+figure {
+  margin: 0;
+}
+
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--accent-h);
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  color: var(--accent-dark);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-h);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.005em;
+}
+
+h1 {
+  font-size: clamp(1.9rem, 5vw + 0.6rem, 3rem);
+}
+
+h2 {
+  font-size: clamp(1.45rem, 2.4vw + 0.8rem, 2rem);
+}
+
+h3 {
+  font-size: 1.25rem;
+}
+
+/* ---- Hilfsklassen ------------------------------------------------------- */
+.container {
+  width: 100%;
+  max-width: var(--content-w);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.stack > * + * {
+  margin-top: var(--stack, 16px);
+}
+
+.stack-l {
+  --stack: 28px;
+}
+
+.stack-s {
+  --stack: 8px;
+}
+
+.muted {
+  color: var(--text2);
+}
+
+.klein {
+  font-size: 0.875rem;
+}
+
+.nur-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.overline {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-h);
+}
+
+/* ---- Schaltflächen ------------------------------------------------------ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 20px;
+  border: 1.5px solid transparent;
+  border-radius: var(--r-m);
+  background: var(--accent-h);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.975rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    transform 0.15s,
+    box-shadow 0.15s;
+}
+
+.btn:hover {
+  background: var(--accent-dark);
+  color: #fff;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:disabled,
+.btn[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn--ghost {
+  background: transparent;
+  border-color: var(--cream-deep);
+  color: var(--text);
+}
+
+.btn--ghost:hover {
+  background: var(--cream-mid);
+  border-color: var(--muted);
+  color: var(--text);
+}
+
+.btn--gross {
+  min-height: 52px;
+  padding-inline: 28px;
+  font-size: 1.05rem;
+}
+
+.btn--block {
+  width: 100%;
+}
+
+/* ---- Formulare ---------------------------------------------------------- */
+.feld {
+  display: grid;
+  gap: 6px;
+}
+
+.feld__label {
+  font-weight: 600;
+  font-size: 0.925rem;
+}
+
+.feld__eingabe {
+  width: 100%;
+  min-height: 48px;
+  padding: 11px 14px;
+  border: 1.5px solid var(--cream-deep);
+  border-radius: var(--r-m);
+  background: var(--surface);
+  font-size: 1rem; /* mind. 16 px, sonst zoomt iOS beim Fokus */
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.feld__eingabe::placeholder {
+  color: var(--muted);
+}
+
+.feld__eingabe:hover {
+  border-color: var(--muted);
+}
+
+.feld__eingabe:focus {
+  outline: none;
+  border-color: var(--accent-h);
+  box-shadow: 0 0 0 3px rgba(196, 132, 90, 0.28);
+}
+
+/* ---- Karten ------------------------------------------------------------- */
+.karte {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-l);
+  background: var(--surface);
+  box-shadow: var(--shadow-s);
+}
+
+@media (min-width: 640px) {
+  .karte {
+    padding: 28px;
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow);
+  }
+}
+
+.karte--creme {
+  background: var(--cream-mid);
+  border-color: var(--cream-deep);
+  box-shadow: none;
+}
+
+.karte__kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* ---- Badges und Hinweise ------------------------------------------------ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--cream-mid);
+  color: var(--text2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge--gruen {
+  background: var(--gbg);
+  color: var(--green);
+}
+
+.badge--gelb {
+  background: var(--ybg);
+  color: var(--yel);
+}
+
+.badge--rot {
+  background: var(--rbg);
+  color: var(--red);
+}
+
+.badge--akzent {
+  background: #f6e7dc;
+  color: var(--accent-dark);
+}
+
+.hinweis {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--r-m);
+  background: var(--ybg);
+  color: var(--yel);
+  font-size: 0.925rem;
+}
+
+.hinweis--fehler {
+  background: var(--rbg);
+  color: var(--red);
+}
+
+.hinweis--ok {
+  background: var(--gbg);
+  color: var(--green);
+}
+
+.hinweis svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+/* ---- Ladeanzeige -------------------------------------------------------- */
+.lade {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+  color: var(--text2);
+}
+
+.spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid var(--cream-deep);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: drehen 0.8s linear infinite;
+}
+
+@keyframes drehen {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- Marke -------------------------------------------------------------- */
+.marke {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.marke:hover {
+  color: var(--text);
+}
+
+.marke__zeichen {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--cream);
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  line-height: 1;
+  padding-bottom: 2px;
+}
+
+.marke__text {
+  display: grid;
+  line-height: 1.1;
+}
+
+.marke__name {
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+}
+
+.marke__zusatz {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text2);
+}
+
+/* ---- Kopfzeile und Navigation ------------------------------------------- */
+.kopf {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid var(--line);
+  background: rgba(250, 248, 243, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.kopf__innen {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: var(--header-h);
+}
+
+.kopf__rechts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav {
+  display: none;
+}
+
+.nav__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--r-s);
+  color: var(--text2);
+  font-weight: 500;
+  font-size: 0.95rem;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+
+.nav__link:hover {
+  background: var(--cream-mid);
+  color: var(--text);
+}
+
+.nav__link.aktiv {
+  background: var(--cream-mid);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.nutzer {
+  display: none;
+  text-align: right;
+  line-height: 1.2;
+}
+
+.nutzer__name {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.nutzer__rolle {
+  font-size: 0.75rem;
+  color: var(--text2);
+}
+
+.icon-btn {
+  display: inline-grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-m);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.icon-btn:hover {
+  background: var(--cream-mid);
+}
+
+.nav-mobil {
+  border-top: 1px solid var(--line);
+  background: var(--cream);
+  padding: 12px var(--gutter) 20px;
+}
+
+.nav-mobil .nav__link {
+  display: flex;
+  padding: 14px 12px;
+  font-size: 1.025rem;
+}
+
+.nav-mobil__fuss {
+  margin-top: 12px;
+  padding: 14px 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+@media (min-width: 960px) {
+  .nav {
+    display: flex;
+    flex: 1;
+    gap: 2px;
+    margin-left: 12px;
+  }
+
+  /* Auf dem Desktop reichen Text-Links; die Icons bleiben dem Handy-Menü. */
+  .nav .nav__link {
+    padding-inline: 11px;
+  }
+
+  .nav .nav__link svg {
+    display: none;
+  }
+
+  .menu-btn,
+  .nav-mobil {
+    display: none;
+  }
+}
+
+@media (min-width: 1180px) {
+  .nutzer {
+    display: block;
+  }
+}
+
+/* ---- Seitengerüst ------------------------------------------------------- */
+.seite {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+}
+
+.seite__inhalt {
+  flex: 1;
+  padding-block: 28px 56px;
+}
+
+@media (min-width: 640px) {
+  .seite__inhalt {
+    padding-block: 44px 72px;
+  }
+}
+
+.seitenkopf {
+  margin-bottom: 28px;
+}
+
+.seitenkopf p {
+  margin-top: 8px;
+  max-width: 60ch;
+  color: var(--text2);
+}
+
+.fuss {
+  padding-block: 24px;
+  border-top: 1px solid var(--line);
+  color: var(--text2);
+  font-size: 0.85rem;
+}
+
+.fuss__innen {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 24px;
+}
+
+/* ---- Startseite --------------------------------------------------------- */
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding-block: 48px 56px;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: -180px;
+  right: -140px;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #f3dcc9 0%, rgba(243, 220, 201, 0) 68%);
+}
+
+.hero__text {
+  max-width: 640px;
+}
+
+.hero h1 {
+  margin-top: 14px;
+}
+
+.hero h1 em {
+  font-style: italic;
+  color: var(--accent-h);
+}
+
+.hero__lead {
+  margin-top: 18px;
+  font-size: 1.125rem;
+  color: var(--text2);
+  max-width: 54ch;
+}
+
+.hero__aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 20px;
+  margin-top: 30px;
+}
+
+@media (min-width: 960px) {
+  .hero {
+    padding-block: 88px 96px;
+  }
+}
+
+.merkmale {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 760px) {
+  .merkmale {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+}
+
+.merkmal__icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  margin-bottom: 14px;
+  border-radius: var(--r-m);
+  background: #f6e7dc;
+  color: var(--accent-dark);
+}
+
+.merkmal h3 {
+  margin-bottom: 6px;
+}
+
+.merkmal p {
+  color: var(--text2);
+  font-size: 0.95rem;
+}
+
+/* ---- Login -------------------------------------------------------------- */
+.zentriert {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  padding: 32px var(--gutter) 64px;
+}
+
+.zentriert__box {
+  width: 100%;
+  max-width: 440px;
+}
+
+.login-kopf {
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.login-kopf p {
+  margin-top: 10px;
+  color: var(--text2);
+}
+
+.erfolg {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.erfolg__icon {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--gbg);
+  color: var(--green);
+}
+
+/* ---- Dashboard ---------------------------------------------------------- */
+.begruessung h1 em {
+  font-style: italic;
+  color: var(--accent-h);
+}
+
+.abschnitt-titel {
+  margin-bottom: 14px;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text2);
+}
+
+.umfrage-karte {
+  display: grid;
+  gap: 18px;
+  border-color: #e9cfba;
+  background: linear-gradient(135deg, #fffaf5 0%, #fdf1e6 100%);
+}
+
+.umfrage-karte__titel {
+  margin-top: 6px;
+}
+
+.umfrage-karte__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin-top: 12px;
+}
+
+@media (min-width: 760px) {
+  .umfrage-karte {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 32px;
+  }
+}
+
+.kacheln {
+  display: grid;
+  gap: 12px;
+}
+
+@media (min-width: 560px) {
+  .kacheln {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+}
+
+@media (min-width: 960px) {
+  .kacheln {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.kachel {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 4px 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-l);
+  background: var(--surface);
+  box-shadow: var(--shadow-s);
+  color: var(--text);
+  text-decoration: none;
+  transition:
+    transform 0.18s,
+    box-shadow 0.18s,
+    border-color 0.18s;
+}
+
+.kachel:hover {
+  transform: translateY(-2px);
+  border-color: var(--cream-deep);
+  box-shadow: var(--shadow-h);
+  color: var(--text);
+}
+
+.kachel__icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  grid-row: span 3;
+  place-items: center;
+  border-radius: var(--r-m);
+  background: var(--cream-mid);
+  color: var(--accent-dark);
+}
+
+.kachel__badge {
+  justify-self: start;
+  margin-top: 6px;
+}
+
+.kachel__titel {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.kachel__text {
+  color: var(--text2);
+  font-size: 0.9rem;
+}
+
+.statuszeilen {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.statuszeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 16px;
+  padding: 12px 14px;
+  border-radius: var(--r-m);
+  background: var(--cream-mid);
+  font-size: 0.925rem;
+}
+
+/* ---- Platzhalterseiten -------------------------------------------------- */
+.platzhalter {
+  display: grid;
+  justify-items: start;
+  gap: 18px;
+  max-width: 640px;
+}
+
+.platzhalter__liste {
+  display: grid;
+  gap: 8px;
+  color: var(--text2);
+}
+
+.platzhalter__liste li {
+  position: relative;
+  padding-left: 22px;
+}
+
+.platzhalter__liste li::before {
+  content: '';
+  position: absolute;
+  top: 0.62em;
+  left: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.schritte {
+  counter-reset: schritt;
+  display: grid;
+  gap: 12px;
+}
+
+.schritte li {
+  counter-increment: schritt;
+  position: relative;
+  padding-left: 38px;
+  min-height: 26px;
+}
+
+.schritte li::before {
+  content: counter(schritt);
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-h);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.leer {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 56px 16px;
+  text-align: center;
+}
+
+.leer__zahl {
+  font-family: var(--font-serif);
+  font-size: clamp(4rem, 14vw, 7rem);
+  line-height: 1;
+  color: var(--accent);
+}
+
+.link-zeile {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* ---- Bewegung reduzieren ------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

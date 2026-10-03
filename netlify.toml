@@ -1,0 +1,22 @@
+# Netlify baut bei jedem Push automatisch (Weg B im Plan, §7.5).
+# Die Variablen VITE_SUPABASE_URL und VITE_SUPABASE_ANON_KEY werden in den
+# Netlify-Einstellungen hinterlegt (Site configuration → Environment variables).
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
