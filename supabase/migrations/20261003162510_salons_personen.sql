@@ -168,7 +168,6 @@ begin
 end
 $$;
 
-drop trigger if exists auth_user_verknuepfen on auth.users;
 create trigger auth_user_verknuepfen
   after insert or update of email on auth.users
   for each row execute function private.auth_user_verknuepfen();

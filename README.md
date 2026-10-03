@@ -10,7 +10,7 @@ Die vollständige Bauanleitung steht in [`docs/plattform-architektur.md`](docs/p
 
 | Phase | Inhalt | Stand |
 |---|---|---|
-| 1 | Fundament: Design, Login per Magic Link, Rollen, geschützte Routen, Dashboards, Platzhalter-Seiten, Tabellen `salons`/`personen`, Inhalts-Tabellen | **fertig** |
+| 1 | Fundament: Design, Login per Magic Link, Rollen, geschützte Routen, Dashboards, Platzhalter-Seiten, Tabellen `salons`/`personen`, Inhalts-Tabellen | **fertig, Tabellen in Supabase installiert** |
 | 2 | Monatsumfrage in der Plattform | wartet auf Referenzdateien (siehe unten) |
 | 3 | Auswertungen | folgt nach Phase 2 |
 | 4 | Abgabe-Status und Reminder | folgt nach Phase 2 |
@@ -54,17 +54,18 @@ In die `.env` gehört **nur** der öffentliche anon-/publishable-Key. Den `servi
 
 ## Supabase einrichten
 
-### 1. Tabellen über die GitHub-Integration anlegen
+### 1. Tabellen (bereits installiert)
 
-1. Supabase-Dashboard → **Project Settings → Integrations → GitHub**: Repo `select-cell/salonplattform` verbinden.
-2. Als **Supabase directory** `supabase` eintragen und **Deploy to production** aktivieren. Als Produktions-Branch den Branch wählen, in den dieses Repo gemerged wird (üblicherweise `main`).
-3. Sobald der Branch gemerged ist, wendet Supabase alle neuen Dateien aus `supabase/migrations/` automatisch an. Das sind aktuell:
-   - `…_salons_personen.sql`: Salons, Personen, automatische Verknüpfung mit dem Login, Zugriffsschutz, Funktion `ich()`, Salon „Dawiid“
-   - `…_inhalte_tabellen.sql`: Tabellen für Verhalten, Bewertungsstufen, Rituale und Ritual-Fragen (noch leer)
+Die beiden Migrationen aus `supabase/migrations/` sind am 3. Oktober 2026 im Projekt `hgtvlcucxzksvmvgvbgo` angewendet worden und dort als Version `20261003162510` und `20261003162527` verbucht:
+
+- `…_salons_personen.sql`: Salons, Personen, automatische Verknüpfung mit dem Login, Zugriffsschutz, Funktion `ich()`, Salon „Dawiid“
+- `…_inhalte_tabellen.sql`: Tabellen für Verhalten, Bewertungsstufen, Rituale und Ritual-Fragen (noch leer)
+
+Die Dateinamen entsprechen den verbuchten Versionen. Das ist wichtig: Die GitHub-Integration (Supabase → **Project Settings → Integrations → GitHub**, Supabase directory `supabase`, **Deploy to production**) vergleicht Versionen und führt nur neue Dateien aus. Würden Datei und Datenbank abweichen, liefe dieselbe Migration ein zweites Mal und scheiterte an „already exists“.
+
+Für künftige Änderungen: neue Datei mit neuerem Zeitstempel in `supabase/migrations/` anlegen und pushen. Die Integration wendet sie nach dem Merge in den Produktions-Branch an. Wird eine Migration stattdessen direkt angewendet, muss der Dateiname danach zur verbuchten Version passen (`list_migrations` bzw. Tabelle `supabase_migrations.schema_migrations`).
 
 Die Migrationen fassen die bestehenden Umfrage-Tabellen (`umfrage_*`) nicht an. Die alte HTML-Umfrage läuft unverändert weiter.
-
-> Entweder die Integration **oder** den SQL-Editor verwenden, nicht beides. Hat jemand die Dateien von Hand im SQL-Editor ausgeführt, schlägt dieselbe Migration über die Integration mit „already exists“ fehl.
 
 ### 2. Auth-Einstellungen (Plan §4.3)
 
