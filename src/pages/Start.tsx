@@ -42,7 +42,7 @@ export default function Start() {
               <Link to="/login" className="btn btn--gross">
                 Anmelden <Icon name="pfeil" groesse={20} />
               </Link>
-              <span className="klein muted">Du bekommst einen Link per E-Mail. Ein Passwort brauchst du nicht.</span>
+              <span className="klein muted">Melde dich mit der E-Mail-Adresse und dem Passwort an, das du vom Salon bekommen hast.</span>
             </div>
           </div>
         </div>

@@ -6,24 +6,25 @@ import { supabase } from '../lib/supabase'
 
 const WARTEZEIT_SEKUNDEN = 60
 
+type AuthFehler = { code?: string; message: string; status?: number }
+
 /**
  * Supabase meldet bei unbekannten E-Mail-Adressen (shouldCreateUser: false) einen Fehler.
  * Den zeigen wir nicht an, sonst könnte man herausfinden, wer im Salon einen Zugang hat.
  */
-function istUnbekannteAdresse(fehler: { code?: string; message: string; status?: number }): boolean {
+function istUnbekannteAdresse(fehler: AuthFehler): boolean {
   return fehler.code === 'otp_disabled' || /signups? not allowed/i.test(fehler.message)
 }
 
-function fehlertext(fehler: { code?: string; message: string; status?: number }): string {
-  if (fehler.code === 'over_email_send_rate_limit' || fehler.code === 'over_request_rate_limit' || fehler.status === 429) {
-    return 'Du hast gerade schon einen Link angefordert. Bitte warte eine Minute und versuche es dann noch einmal.'
-  }
-  return 'Das hat leider nicht geklappt. Bitte versuche es gleich noch einmal.'
+function limit(fehler: AuthFehler): boolean {
+  return fehler.code === 'over_email_send_rate_limit' || fehler.code === 'over_request_rate_limit' || fehler.status === 429
 }
 
 export default function Login() {
   const { laedt, sitzung, person } = useAuth()
+  const [modus, setModus] = useState<'passwort' | 'link'>('passwort')
   const [email, setEmail] = useState('')
+  const [passwort, setPasswort] = useState('')
   const [sendet, setSendet] = useState(false)
   const [gesendetAn, setGesendetAn] = useState<string | null>(null)
   const [fehler, setFehler] = useState<string | null>(null)
@@ -37,13 +38,27 @@ export default function Login() {
 
   if (!laedt && sitzung && person?.aktiv) return <Navigate to="/app" replace />
 
-  async function absenden(e: FormEvent) {
+  const adresse = email.trim().toLowerCase()
+
+  async function mitPasswort(e: FormEvent) {
     e.preventDefault()
-    const adresse = email.trim().toLowerCase()
+    if (!adresse || !passwort || sendet) return
+    setSendet(true)
+    setFehler(null)
+    const { error } = await supabase.auth.signInWithPassword({ email: adresse, password: passwort })
+    setSendet(false)
+    if (!error) return // AuthProvider übernimmt, dann leitet diese Seite weiter
+    setPasswort('')
+    if (limit(error)) setFehler('Zu viele Versuche. Bitte warte kurz und versuche es dann noch einmal.')
+    else if (error.code === 'invalid_credentials' || error.status === 400) setFehler('E-Mail oder Passwort stimmt nicht.')
+    else setFehler('Das hat leider nicht geklappt. Bitte versuche es gleich noch einmal.')
+  }
+
+  async function mitLink(e: FormEvent) {
+    e.preventDefault()
     if (!adresse || sendet || warten > 0) return
     setSendet(true)
     setFehler(null)
-
     const { error } = await supabase.auth.signInWithOtp({
       email: adresse,
       options: {
@@ -51,10 +66,13 @@ export default function Login() {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     })
-
     setSendet(false)
     if (error && !istUnbekannteAdresse(error)) {
-      setFehler(fehlertext(error))
+      setFehler(
+        limit(error)
+          ? 'Du hast gerade schon einen Link angefordert. Bitte warte eine Minute und versuche es dann noch einmal.'
+          : 'Der Link konnte nicht gesendet werden. Melde dich stattdessen mit deinem Passwort an.',
+      )
       return
     }
     setGesendetAn(adresse)
@@ -75,15 +93,11 @@ export default function Login() {
               Anmelden geschickt. Er ist nur kurz gültig.
             </p>
             <p className="klein muted">Nichts angekommen? Schau auch im Spam-Ordner nach.</p>
-            {fehler && <p className="hinweis hinweis--fehler">{fehler}</p>}
             <button
               type="button"
               className="btn btn--ghost btn--block"
               disabled={warten > 0 || sendet}
-              onClick={() => {
-                setGesendetAn(null)
-                setFehler(null)
-              }}
+              onClick={() => setGesendetAn(null)}
             >
               {warten > 0 ? `Erneut senden in ${warten} s` : 'Link erneut senden'}
             </button>
@@ -93,15 +107,17 @@ export default function Login() {
     )
   }
 
+  const istPasswort = modus === 'passwort'
+
   return (
     <main className="zentriert">
       <div className="zentriert__box">
         <div className="login-kopf">
           <h1>Willkommen zurück</h1>
-          <p>Gib deine E-Mail-Adresse ein. Wir schicken dir einen Link zum Anmelden.</p>
+          <p>{istPasswort ? 'Melde dich mit deiner E-Mail-Adresse und deinem Passwort an.' : 'Gib deine E-Mail-Adresse ein. Wir schicken dir einen Link zum Anmelden.'}</p>
         </div>
 
-        <form className="karte stack" onSubmit={absenden} noValidate>
+        <form className="karte stack" onSubmit={istPasswort ? mitPasswort : mitLink} noValidate>
           <div className="feld">
             <label className="feld__label" htmlFor="email">
               E-Mail-Adresse
@@ -112,7 +128,7 @@ export default function Login() {
               type="email"
               name="email"
               inputMode="email"
-              autoComplete="email"
+              autoComplete="username"
               autoCapitalize="none"
               spellCheck={false}
               placeholder="name@beispiel.de"
@@ -123,6 +139,24 @@ export default function Login() {
             />
           </div>
 
+          {istPasswort && (
+            <div className="feld">
+              <label className="feld__label" htmlFor="passwort">
+                Passwort
+              </label>
+              <input
+                id="passwort"
+                className="feld__eingabe"
+                type="password"
+                name="password"
+                autoComplete="current-password"
+                required
+                value={passwort}
+                onChange={(e) => setPasswort(e.target.value)}
+              />
+            </div>
+          )}
+
           {fehler && (
             <p className="hinweis hinweis--fehler" role="alert">
               <Icon name="achtung" groesse={18} />
@@ -130,9 +164,26 @@ export default function Login() {
             </p>
           )}
 
-          <button type="submit" className="btn btn--block" disabled={sendet || !email.includes('@')}>
-            {sendet ? 'Wird gesendet …' : 'Link per E-Mail senden'}
+          <button
+            type="submit"
+            className="btn btn--block"
+            disabled={sendet || !email.includes('@') || (istPasswort && !passwort)}
+          >
+            {sendet ? 'Einen Moment …' : istPasswort ? 'Anmelden' : 'Link per E-Mail senden'}
           </button>
+
+          <button
+            type="button"
+            className="textlink"
+            style={{ justifySelf: 'center' }}
+            onClick={() => {
+              setModus(istPasswort ? 'link' : 'passwort')
+              setFehler(null)
+            }}
+          >
+            {istPasswort ? 'Stattdessen Link per E-Mail senden' : 'Mit Passwort anmelden'}
+          </button>
+
           <p className="klein muted" style={{ textAlign: 'center' }}>
             Nur für eingeladene Personen. Noch keinen Zugang? Sprich mit dem Salon.
           </p>

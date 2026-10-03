@@ -86,11 +86,10 @@ function AdminKarte() {
           In der Tabelle <strong>personen</strong> eine Zeile anlegen: Name, E-Mail, Rolle und Teilnahme.
         </li>
         <li>
-          Unter <strong>Authentication → Users</strong> dieselbe E-Mail einladen. Die Verknüpfung passiert automatisch.
+          Unter <strong>Authentication → Users → Add user → Create new user</strong> dieselbe E-Mail mit einem Passwort anlegen
+          und <strong>Auto Confirm User</strong> ankreuzen. Die Verknüpfung passiert automatisch.
         </li>
-        <li>
-          Die Person öffnet die Plattform und meldet sich mit ihrer E-Mail-Adresse an. Ein Passwort gibt es nicht.
-        </li>
+        <li>Der Person die E-Mail-Adresse und das Passwort weitergeben. Sie meldet sich damit auf der Startseite an.</li>
       </ol>
       {basis && (
         <div className="link-zeile">
@@ -98,7 +97,7 @@ function AdminKarte() {
             Tabelle personen öffnen
           </a>
           <a className="btn btn--ghost" href={`${basis}/auth/users`} target="_blank" rel="noreferrer noopener">
-            Nutzer einladen
+            Nutzer anlegen
           </a>
         </div>
       )}

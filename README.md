@@ -87,7 +87,7 @@ Supabase → **Authentication**:
 - **Sign In / Providers → Email:** aktiv. **„Allow new users to sign up“ ausschalten**, damit sich niemand selbst registriert.
 - **Emails → Templates:** Inhalt aus [`supabase/email-vorlagen/`](supabase/email-vorlagen) einfügen (Magic link und Invite user). Die Betreffzeilen stehen jeweils im Kommentar am Dateianfang.
 
-### 3. Eigener E-Mail-Versand (Pflicht)
+### 3. Eigener E-Mail-Versand (nur für den Login per E-Mail-Link)
 
 Der eingebaute Supabase-Versand stellt nur an Mitglieder des Supabase-Teams zu und ist auf etwa 2 Mails pro Stunde begrenzt. Ohne eigenen Versand kommen die Magic Links bei den Mitarbeiterinnen nicht an.
 
@@ -117,9 +117,9 @@ insert into public.personen (salon_id, name, email, rolle, nimmt_an_teamumfrage)
 values (null, 'Name Admin', 'admin@beispiel.de', 'admin', false);
 ```
 
-**b) Einladen:** Supabase → **Authentication → Users → Invite user** mit derselben E-Mail-Adresse.
+**b) Zugang mit Passwort anlegen:** Supabase → **Authentication → Users → Add user → Create new user**. Dieselbe E-Mail-Adresse, ein Passwort, und **Auto Confirm User** ankreuzen. Es wird keine Mail verschickt, das Passwort gibst du der Person direkt weiter.
 
-Danach öffnet die Person den Einladungslink oder meldet sich unter `/login` an und landet im passenden Bereich.
+Danach meldet sich die Person auf der Startseite mit E-Mail und Passwort an. Der Login per E-Mail-Link bleibt als Alternative, braucht aber den eigenen Mail-Versand (Schritt 3).
 
 Zugang pausieren: `update public.personen set aktiv = false where email = '…';`
 
