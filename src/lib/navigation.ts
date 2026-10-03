@@ -52,7 +52,7 @@ export const BEREICHE: readonly Bereich[] = [
     icon: 'ergebnisse',
     rollen: ALLE,
     nurTeilnehmer: true,
-    live: false,
+    live: true,
     geplant: [
       'Kennzahlen: Selbstbild, Fremdbild und Abweichung',
       'Top und Flop 4 deiner Verhalten',
@@ -67,7 +67,7 @@ export const BEREICHE: readonly Bereich[] = [
     kurz: 'Wie steht das Team insgesamt da?',
     icon: 'team',
     rollen: MITARBEITER,
-    live: false,
+    live: true,
     geplant: [
       'Durchschnittswerte des Teams für Selbst- und Fremdbild',
       'Top und Flop 4 im Team',
@@ -82,7 +82,7 @@ export const BEREICHE: readonly Bereich[] = [
     kurz: 'Rangliste, Heatmap und Selbst- gegen Fremdbild.',
     icon: 'team',
     rollen: LEITUNG,
-    live: false,
+    live: true,
     geplant: [
       'Umschalter Team ↔ Person und Kennzahl-Kacheln',
       'Rangliste, Selbstbild gegen Fremdbild und Differenz pro Person',
@@ -97,7 +97,7 @@ export const BEREICHE: readonly Bereich[] = [
     kurz: 'Jede Person im Detail, mit Abgabe-Status.',
     icon: 'mitglieder',
     rollen: LEITUNG,
-    live: false,
+    live: true,
     geplant: [
       'Liste aller Mitarbeiterinnen mit Fremdbild, Differenz und Abgabe-Status',
       'Individuelle Auswertung mit Verlauf über alle Monate',

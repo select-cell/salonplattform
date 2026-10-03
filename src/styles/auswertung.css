@@ -1,0 +1,580 @@
+/* ==========================================================================
+   Auswertungen: Kennzahlen, Diagramme, Tabellen, Heatmap, Rangliste, Popup
+   ========================================================================== */
+
+.ausw-titel {
+  font-size: 1.35rem;
+}
+
+.ausw-person {
+  font-size: clamp(1.5rem, 3vw + 0.6rem, 2rem);
+}
+
+.ausw-leer {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  max-width: 560px;
+}
+
+.ausw-kopfzeile {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 760px) {
+  .ausw-kopfzeile {
+    grid-template-columns: 240px 1fr;
+    align-items: end;
+  }
+}
+
+.ausw-monat {
+  max-width: 280px;
+}
+
+.ausw-sort {
+  min-width: 170px;
+}
+
+.ausw-werkzeuge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px 20px;
+}
+
+.ausw-zweispaltig {
+  display: grid;
+  gap: 20px;
+}
+
+@media (min-width: 960px) {
+  .ausw-zweispaltig {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+/* ---- Umschalter Team ↔ Person ------------------------------------------- */
+.umschalter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  min-height: 40px;
+  padding: 6px 16px;
+  border: 1.5px solid var(--cream-deep);
+  border-radius: 999px;
+  background: var(--surface);
+  font-weight: 600;
+  font-size: 0.925rem;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.chip:hover {
+  border-color: var(--muted);
+}
+
+.chip.aktiv {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--cream);
+}
+
+/* ---- Kennzahlen ------------------------------------------------------------ */
+.kennzahlen {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 760px) {
+  .kennzahlen {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+}
+
+.kennzahl {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-top-width: 4px;
+  border-radius: var(--r-m);
+  background: var(--surface);
+  box-shadow: var(--shadow-s);
+}
+
+.kennzahl--sb {
+  border-top-color: var(--accent);
+}
+
+.kennzahl--fb {
+  border-top-color: var(--fb);
+}
+
+.kennzahl--gruen {
+  border-top-color: var(--green);
+}
+
+.kennzahl--rot {
+  border-top-color: var(--red);
+}
+
+.kennzahl__label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text2);
+}
+
+.kennzahl__wert {
+  font-family: var(--font-serif);
+  font-size: clamp(1.8rem, 3vw + 0.8rem, 2.4rem);
+  line-height: 1.1;
+}
+
+.kennzahl__zusatz {
+  font-size: 0.8rem;
+  color: var(--text2);
+}
+
+/* ---- Diagramme --------------------------------------------------------------- */
+.diagramm {
+  width: 100%;
+  height: 280px;
+}
+
+@media (min-width: 760px) {
+  .diagramm {
+    height: 320px;
+  }
+}
+
+/* ---- Tabs -------------------------------------------------------------------- */
+.tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--r-m);
+  background: var(--cream-mid);
+}
+
+.tabs__tab {
+  min-height: 40px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: var(--r-s);
+  background: transparent;
+  color: var(--text2);
+  font-weight: 600;
+  font-size: 0.925rem;
+  cursor: pointer;
+}
+
+.tabs__tab.aktiv {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-s);
+}
+
+/* ---- Tabellen ------------------------------------------------------------------ */
+.tabelle-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  background: var(--surface);
+  -webkit-overflow-scrolling: touch;
+}
+
+.tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.925rem;
+}
+
+.tabelle th,
+.tabelle td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.tabelle thead th {
+  position: sticky;
+  top: 0;
+  background: var(--cream-mid);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tabelle tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.tabelle td:first-child {
+  min-width: 240px;
+}
+
+.tabelle .zahl {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabelle .hervor {
+  background: #fdf3ea;
+}
+
+.tabelle thead th.hervor {
+  background: #f6e7dc;
+}
+
+.tabelle .gruppe th {
+  background: var(--cream);
+  color: var(--accent-dark);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.verhalten-nr {
+  display: inline-grid;
+  min-width: 24px;
+  height: 22px;
+  margin-right: 4px;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--cream-mid);
+  color: var(--text2);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.wert {
+  display: inline-block;
+  min-width: 42px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.wert--hoch {
+  background: var(--gbg);
+  color: var(--green);
+}
+
+.wert--mittel {
+  background: var(--ybg);
+  color: var(--yel);
+}
+
+.wert--niedrig {
+  background: var(--rbg);
+  color: var(--red);
+}
+
+.diff {
+  font-weight: 700;
+}
+
+.diff--gruen {
+  color: var(--green);
+}
+
+.diff--rot {
+  color: var(--red);
+}
+
+.diff--neutral {
+  color: var(--text2);
+}
+
+.heatmap td.heat {
+  text-align: center;
+  font-weight: 700;
+}
+
+.heat--hoch {
+  background: #cfe3b8;
+  color: #264a0a;
+}
+
+.heat--mittel {
+  background: #f3dfb4;
+  color: #6b4208;
+}
+
+.heat--niedrig {
+  background: #f1c4c4;
+  color: #7c1f1f;
+}
+
+.heat--leer {
+  color: var(--muted);
+}
+
+/* ---- Top / Flop ------------------------------------------------------------------ */
+.topflop-paar {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 760px) {
+  .topflop-paar {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.topflop {
+  padding: 16px;
+  border-radius: var(--r-m);
+  background: var(--cream-mid);
+}
+
+.topflop--top {
+  border-left: 4px solid var(--green);
+}
+
+.topflop--flop {
+  border-left: 4px solid var(--red);
+}
+
+.topflop__titel {
+  margin-bottom: 10px;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.topflop__liste {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+}
+
+.topflop__liste li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+
+.topflop__text {
+  display: block;
+}
+
+.topflop__saeule {
+  display: block;
+  margin-top: 2px;
+  color: var(--text2);
+  font-size: 0.78rem;
+}
+
+/* ---- Rangliste ---------------------------------------------------------------------- */
+.rangliste {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+}
+
+.rang {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1.5px solid transparent;
+  border-radius: var(--r-m);
+  background: var(--cream-mid);
+}
+
+.rang.aktiv {
+  border-color: var(--text);
+}
+
+.rang__platz {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface);
+  font-weight: 700;
+}
+
+.rang--1 .rang__platz {
+  background: #f4d77a;
+}
+
+.rang--2 .rang__platz {
+  background: #dcdcdc;
+}
+
+.rang--3 .rang__platz {
+  background: #e3b48c;
+}
+
+.rang__name {
+  font-weight: 600;
+  text-align: left;
+  font-size: 1rem;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.rang__name:hover {
+  text-decoration: underline;
+}
+
+/* ---- Kommentare ----------------------------------------------------------------------- */
+.kommentare {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+}
+
+.kommentar-gruppe__titel {
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.kommentar-gruppe ul {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+}
+
+.kommentar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-s);
+  background: var(--cream-mid);
+}
+
+/* ---- Mitglieder-Liste ------------------------------------------------------------------ */
+.mitglieder {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+}
+
+.mitglied {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-l);
+  background: var(--surface);
+  box-shadow: var(--shadow-s);
+  color: var(--text);
+  text-decoration: none;
+  transition: transform 0.18s, box-shadow 0.18s;
+}
+
+.mitglied:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-h);
+  color: var(--text);
+}
+
+.mitglied__name {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.mitglied__werte,
+.mitglied__status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  grid-column: 1;
+  font-size: 0.9rem;
+}
+
+.mitglied > svg {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+}
+
+.mitglied__label {
+  color: var(--text2);
+}
+
+@media (min-width: 760px) {
+  .mitglied {
+    grid-template-columns: 220px 1fr auto auto;
+  }
+
+  .mitglied__werte,
+  .mitglied__status {
+    grid-column: auto;
+  }
+
+  .mitglied > svg {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}
+
+/* ---- Reminder-Popup ------------------------------------------------------------------------ */
+.statuszeile--rot {
+  background: var(--rbg);
+}
+
+.popup {
+  width: min(520px, calc(100vw - 32px));
+  padding: 24px;
+  border: 0;
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 20px 60px rgba(26, 18, 8, 0.3);
+}
+
+.popup::backdrop {
+  background: rgba(26, 18, 8, 0.45);
+}
+
+.popup__kopf {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.popup__kopf .merkmal__icon {
+  margin: 0;
+  background: var(--ybg);
+  color: var(--yel);
+}
+
+.popup__liste {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  margin-bottom: 20px;
+}
+
+.popup__aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}

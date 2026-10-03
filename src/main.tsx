@@ -6,6 +6,7 @@ import '@fontsource-variable/dm-sans'
 import './styles/tokens.css'
 import './styles/base.css'
 import './styles/umfrage.css'
+import './styles/auswertung.css'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'

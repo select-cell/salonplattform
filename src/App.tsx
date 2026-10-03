@@ -1,7 +1,9 @@
+import { lazy, Suspense } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthProvider'
 import { RequireAuth, RequireRolle, RequireTeilnahme } from './auth/Guards'
 import { AppLayout } from './components/AppLayout'
+import { Ladeanzeige } from './components/Ladeanzeige'
 import { OeffentlichLayout } from './components/OeffentlichLayout'
 import Callback from './pages/Callback'
 import GaesteUmfrage from './pages/GaesteUmfrage'
@@ -12,9 +14,16 @@ import Dashboard from './pages/app/Dashboard'
 import Platzhalter from './pages/app/Platzhalter'
 import UmfrageSeite from './pages/app/UmfrageSeite'
 
+// Die Auswertungen bringen die Diagramm-Bibliothek mit und werden erst bei Bedarf geladen.
+const ErgebnissePage = lazy(() => import('./pages/app/ErgebnissePage'))
+const TeamSeite = lazy(() => import('./pages/app/TeamSeite'))
+const MitgliederSeite = lazy(() => import('./pages/app/MitgliederSeite'))
+const MitgliedSeite = lazy(() => import('./pages/app/MitgliedSeite'))
+
 export default function App() {
   return (
     <AuthProvider>
+      <Suspense fallback={<Ladeanzeige text="Wird geladen …" />}>
       <Routes>
         {/* öffentlich */}
         <Route element={<OeffentlichLayout />}>
@@ -33,28 +42,16 @@ export default function App() {
             <Route element={<RequireTeilnahme />}>
               <Route path="umfrage" element={<UmfrageSeite />} />
               <Route path="umfrage/:monat" element={<UmfrageSeite />} />
-              <Route path="ergebnisse" element={<Platzhalter />} />
+              <Route path="ergebnisse" element={<ErgebnissePage />} />
             </Route>
 
-            <Route path="team" element={<Platzhalter />} />
+            <Route path="team" element={<TeamSeite />} />
             <Route path="chefumfrage" element={<Platzhalter />} />
             <Route path="coaching" element={<Platzhalter />} />
 
             <Route element={<RequireRolle rollen={['verantwortlicher', 'admin']} />}>
-              <Route path="mitglieder" element={<Platzhalter />} />
-              <Route
-                path="mitglieder/:id"
-                element={
-                  <Platzhalter
-                    titel="Individuelle Auswertung"
-                    geplant={[
-                      'Verlauf über alle Monate und Monats-Tabs',
-                      'Score und Kommentar je Verhalten',
-                      'Wer wie bewertet hat',
-                    ]}
-                  />
-                }
-              />
+              <Route path="mitglieder" element={<MitgliederSeite />} />
+              <Route path="mitglieder/:id" element={<MitgliedSeite />} />
               <Route path="gaeste" element={<Platzhalter />} />
               <Route path="meine-umfrage" element={<Platzhalter />} />
             </Route>
@@ -63,6 +60,7 @@ export default function App() {
           </Route>
         </Route>
       </Routes>
+      </Suspense>
     </AuthProvider>
   )
 }

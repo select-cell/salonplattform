@@ -7,6 +7,7 @@ import { aktuellerMonat, fristFuer, fristText, monatLabel, tageszeitGruss, tagLa
 import { bereicheFuer } from '../../lib/navigation'
 import { ROLLEN_LABEL, istLeitung } from '../../lib/types'
 import { useMeineMonate } from '../../lib/useMeineMonate'
+import { StatusKarte } from '../../components/StatusKarte'
 
 /** Begrüßungsbereich (Plan §3). Der Inhalt hängt von der Rolle ab. */
 export default function Dashboard() {
@@ -14,8 +15,6 @@ export default function Dashboard() {
   const leitung = istLeitung(person)
   const vorname = person.name.split(/\s+/)[0]
 
-  const monat = aktuellerMonat()
-  const frist = fristFuer(monat)
   const bereiche = bereicheFuer(person)
   const umfrage = bereiche.some((b) => b.schluessel === 'umfrage')
   const kacheln = bereiche.filter((b) => b.schluessel !== 'umfrage')
@@ -34,23 +33,7 @@ export default function Dashboard() {
 
       {umfrage && <UmfrageKarte />}
 
-      {leitung && (
-        <section className="karte" aria-labelledby="status-titel">
-          <div className="karte__kopf">
-            <div>
-              <p className="overline">Abgabe-Status</p>
-              <h2 id="status-titel" style={{ marginTop: 6 }}>
-                {monatLabel(monat)}
-              </h2>
-            </div>
-            <span className="badge badge--akzent">Kommt bald</span>
-          </div>
-          <p className="muted" style={{ marginTop: 10 }}>
-            Sobald die Monatsumfrage freigeschaltet ist, siehst du hier, wer schon abgegeben hat. Du wirst erinnert, wenn
-            jemand überfällig ist (Frist: {frist.label}).
-          </p>
-        </section>
-      )}
+      {leitung && <StatusKarte />}
 
       <section aria-labelledby="bereiche-titel">
         <h2 id="bereiche-titel" className="abschnitt-titel">

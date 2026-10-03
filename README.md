@@ -12,10 +12,10 @@ Die vollständige Bauanleitung steht in [`docs/plattform-architektur.md`](docs/p
 |---|---|---|
 | 1 | Fundament: Design, Login per Magic Link, Rollen, geschützte Routen, Dashboards, Platzhalter-Seiten | **fertig** |
 | 2 | Monatsumfrage in der Plattform | **fertig, Datenbank in Supabase installiert**. Bewertungsstufen, Videos und die Phasen-Frage fehlen noch (siehe unten) |
-| 3 | Auswertungen | folgt |
-| 4 | Abgabe-Status und Reminder | folgt |
-| 5 | Chef-, Gäste- und Verantwortlichen-Umfrage | Inhalte folgen |
-| 6 | Jarvis | folgt |
+| 3 | Auswertungen: Kennzahlen, Diagramme, Rangliste, Heatmap, Top/Flop 4, Verlauf, Einzelbewertungen | **fertig, in Supabase installiert** |
+| 4 | Abgabe-Status und Reminder-Popup | **fertig, in Supabase installiert** |
+| 5 | Chef-, Gäste- und Verantwortlichen-Umfrage | offen: die Fragen fehlen noch (Seiten sind als „Kommt bald“ vorbereitet) |
+| 6 | Jarvis | offen: braucht die n8n-Webhook-URL (Seite ist als „Kommt bald“ vorbereitet) |
 
 ### Was in der Umfrage noch fehlt
 
@@ -70,6 +70,8 @@ Alle Migrationen aus `supabase/migrations/` sind am 3. Oktober 2026 im Projekt `
 | `…_umfrage_personen_ids` | Personen-IDs an den Umfrage-Tabellen, Nachtragen der Altdaten |
 | `…_umfrage_funktionen` | `umfrage_inhalt`, `meine_monate`, `meine_offenen_monate`, `umfrage_einreichen_v2` |
 | `…_seed_dawiid_inhalte` | 20 Verhalten und 2 Rituale mit 9 Fragen |
+| `…_auswertungen` | `meine_ergebnisse`, `team_ergebnisse`, `person_ergebnisse`, `team_dashboard` |
+| `…_abgabe_status_reminder` | `abgabe_status`, `ueberfaellige_abgaben` (Reminder ab dem 4. Tag nach Fristende) |
 
 Die Dateinamen entsprechen den verbuchten Versionen. Das ist wichtig: Die GitHub-Integration (Supabase → **Project Settings → Integrations → GitHub**, Supabase directory `supabase`, **Deploy to production**) vergleicht Versionen und führt nur neue Dateien aus. Würden Datei und Datenbank abweichen, liefe dieselbe Migration ein zweites Mal und scheiterte an „already exists“.
 
@@ -161,6 +163,12 @@ revoke execute on function public.umfrage_einreichen(jsonb) from anon, authentic
 
 Danach ist nur noch `umfrage_einreichen_v2` (nur eingeloggt) erreichbar. Der Test `02_umfrage.test.sql` prüft bis dahin bewusst, dass die alte Funktion offen ist. Beim Abschalten die Zeile „Alte HTML-Umfrage“ am Ende der Datei anpassen.
 
+### Wer sieht was in den Auswertungen?
+
+- **Mitarbeiterin:** eigenes Selbstbild und Fremdbild, Kommentare der Kolleginnen **ohne Absender**, das Team nur als Durchschnitt.
+- **Verantwortlicher und Admin:** Rangliste, Heatmap, jede Person im Detail, Einzelbewertungen **mit Absender**, Abgabe-Status und das Reminder-Popup.
+- Alle Kennzahlen werden in der Datenbank gerechnet (Selbstbild = eigene Note, Fremdbild = Schnitt der Kolleginnen, Differenz = Selbstbild − Fremdbild). Die Schwellen (0,3 / 2,5 / 3,5) stehen in der Tabelle `salons`.
+
 ### Wer sieht was?
 
 | Rolle | Rechte |
@@ -173,7 +181,7 @@ Die Rechte stecken in Row Level Security und Datenbank-Funktionen. Die Routen-Sp
 
 ## Tests
 
-Die Datenbank ist mit pgTAP getestet (98 Tests): Verknüpfung von Login und Person, Constraints, wer was lesen darf, und die komplette Monatsumfrage (Monate, Fristen, Abgabe, alle Ablehnungsfälle, Nachtragen der Altdaten):
+Die Datenbank ist mit pgTAP getestet (151 Tests): Verknüpfung von Login und Person, Constraints, wer was lesen darf, und die komplette Monatsumfrage (Monate, Fristen, Abgabe, alle Ablehnungsfälle, Nachtragen der Altdaten), die Auswertungen (inklusive Abgleich mit den Views und Anonymität der Kommentare) und der Reminder:
 
 ```bash
 supabase start && supabase test db
