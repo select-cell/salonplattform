@@ -3,7 +3,7 @@ import type { Schwellen, Sortierung, VerhaltenZeile } from '../../lib/auswertung
 import { einordnung, niveau, sortiere, vorzeichen, zahl } from '../../lib/auswertung'
 import { EinordnungBadge, Tabs } from './Bausteine'
 
-type Basis = 'sb' | 'fb' | 'rituale'
+type Basis = 'sb' | 'fb'
 
 const SORTIERUNGEN: { id: Sortierung; label: string }[] = [
   { id: 'standard', label: 'Standard' },
@@ -40,21 +40,19 @@ function gruppenKopf(z: { grundpfeiler: string | null; saeule: string | null }, 
 }
 
 // ---------------------------------------------------------------------------------
-// Personen-Sicht: Selbstbild · Fremdbild · Differenz, dazu die Rituale
+// Personen-Sicht: Selbstbild · Fremdbild · Differenz
 // ---------------------------------------------------------------------------------
 export function PersonenTabelle({
   zeilen,
-  rituale,
   schwellen,
 }: {
   zeilen: VerhaltenZeile[]
-  rituale: { ritual: string; frage_nr: number; frage: string; antwort: number }[]
   schwellen: Schwellen
 }) {
   const [basis, setBasis] = useState<Basis>('fb')
   const [modus, setModus] = useState<Sortierung>('standard')
 
-  const sortiert = sortiere(zeilen, (z) => (basis === 'sb' ? z.sb : z.fb), basis === 'rituale' ? 'standard' : modus)
+  const sortiert = sortiere(zeilen, (z) => (basis === 'sb' ? z.sb : z.fb), modus)
 
   return (
     <div className="stack">
@@ -66,40 +64,11 @@ export function PersonenTabelle({
           tabs={[
             { id: 'sb', label: 'Selbstbild' },
             { id: 'fb', label: 'Fremdbild' },
-            { id: 'rituale', label: 'Rituale' },
           ]}
         />
-        {basis !== 'rituale' && <SortWahl wert={modus} onChange={setModus} />}
+        <SortWahl wert={modus} onChange={setModus} />
       </div>
 
-      {basis === 'rituale' ? (
-        rituale.length === 0 ? (
-          <p className="muted">Zu diesem Monat gibt es keine Ritual-Antworten.</p>
-        ) : (
-          <div className="tabelle-scroll">
-            <table className="tabelle">
-              <thead>
-                <tr>
-                  <th>Ritual</th>
-                  <th>Frage</th>
-                  <th className="zahl">Antwort</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rituale.map((r) => (
-                  <tr key={`${r.ritual}-${r.frage_nr}`}>
-                    <td>{r.ritual}</td>
-                    <td>{r.frage}</td>
-                    <td className="zahl">
-                      <Wert wert={r.antwort} schwellen={schwellen} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-      ) : (
         <div className="tabelle-scroll">
           <table className="tabelle">
             <thead>
@@ -134,7 +103,6 @@ export function PersonenTabelle({
             </tbody>
           </table>
         </div>
-      )}
     </div>
   )
 }
@@ -159,13 +127,11 @@ export function TeamTabelle({
   verhalten,
   matrix,
   personen,
-  rituale,
   schwellen,
 }: {
   verhalten: { nr: number; grundpfeiler: string | null; saeule: string | null; titel: string; sb: number | null; fb: number | null }[]
   matrix: { nr: number; person_id: string; sb: number | null; fb: number | null }[]
   personen: { id: string; name: string }[]
-  rituale: { ritual: string; frage_nr: number; frage: string; schnitt: number; anzahl: number }[]
   schwellen: Schwellen
 }) {
   const [basis, setBasis] = useState<Basis>('fb')
@@ -184,42 +150,11 @@ export function TeamTabelle({
           tabs={[
             { id: 'sb', label: 'Selbstbild' },
             { id: 'fb', label: 'Fremdbild' },
-            { id: 'rituale', label: 'Rituale' },
           ]}
         />
-        {basis !== 'rituale' && <SortWahl wert={modus} onChange={setModus} />}
+        <SortWahl wert={modus} onChange={setModus} />
       </div>
 
-      {basis === 'rituale' ? (
-        rituale.length === 0 ? (
-          <p className="muted">Zu diesem Monat gibt es keine Ritual-Antworten.</p>
-        ) : (
-          <div className="tabelle-scroll">
-            <table className="tabelle">
-              <thead>
-                <tr>
-                  <th>Ritual</th>
-                  <th>Frage</th>
-                  <th className="zahl">Ø Team</th>
-                  <th className="zahl">Antworten</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rituale.map((r) => (
-                  <tr key={`${r.ritual}-${r.frage_nr}`}>
-                    <td>{r.ritual}</td>
-                    <td>{r.frage}</td>
-                    <td className="zahl">
-                      <Wert wert={r.schnitt} schwellen={schwellen} />
-                    </td>
-                    <td className="zahl">{r.anzahl}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-      ) : (
         <div className="tabelle-scroll">
           <table className="tabelle">
             <thead>
@@ -258,7 +193,6 @@ export function TeamTabelle({
             </tbody>
           </table>
         </div>
-      )}
     </div>
   )
 }

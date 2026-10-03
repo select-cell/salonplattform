@@ -40,7 +40,7 @@ export const BEREICHE: readonly Bereich[] = [
     geplant: [
       'Selbstbild und Fremdbild der Kolleginnen in einem Durchgang',
       'Videos und Bewertungsstufen pro Verhalten',
-      'Rituale und Entwicklung des Monats',
+      'Entwicklung des Monats als erste Frage',
     ],
   },
   {

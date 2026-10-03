@@ -387,3 +387,17 @@
     gap: 10px;
   }
 }
+
+.skala__label {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.video--platzhalter .fortschritt {
+  width: 100%;
+  max-width: 260px;
+}

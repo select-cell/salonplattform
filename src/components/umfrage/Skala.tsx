@@ -12,13 +12,15 @@ interface Props {
   beschreibung?: (note: number) => string | null
   /** Beschriftung unter den Enden der Skala, falls vorhanden */
   labels?: (string | null)[] | null
+  /** Beschriftung direkt unter jedem Feld (Selbstbild) */
+  feldLabels?: readonly string[]
   children?: ReactNode
 }
 
 const NOTEN = [1, 2, 3, 4, 5] as const
 
 /** Fünf Felder für die Noten 1 bis 5, als echte Radio-Buttons (Tastatur und Screenreader inklusive). */
-export function Skala({ name, legende, wert, onChange, variante = 'neutral', beschreibung, labels, children }: Props) {
+export function Skala({ name, legende, wert, onChange, variante = 'neutral', beschreibung, labels, feldLabels, children }: Props) {
   const text = wert ? (beschreibung?.(wert) ?? labels?.[wert - 1] ?? null) : null
 
   return (
@@ -37,6 +39,7 @@ export function Skala({ name, legende, wert, onChange, variante = 'neutral', bes
             />
             <span aria-hidden="true">{note}</span>
             <span className="nur-sr">Note {note}</span>
+            {feldLabels && <span className="skala__label">{feldLabels[note - 1]}</span>}
           </label>
         ))}
       </div>

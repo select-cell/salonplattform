@@ -33,7 +33,6 @@ export function PersonenAnsicht({ daten, monat, onMonat, mitAbsender }: Props) {
   const dauer = daten.dauer.find((d) => d.monat === monat)?.minuten ?? null
   const { top, flop } = topFlop(zeilen, (z) => z.fb)
   const saeulen = saeulenSchnitte(zeilen)
-  const ritualeMonat = daten.rituale.filter((r) => r.monat === monat)
 
   const verlauf: VerlaufDaten[] = [...daten.monate].reverse().map((m) => {
     const z = daten.verhalten.filter((x) => x.monat === m)
@@ -41,7 +40,6 @@ export function PersonenAnsicht({ daten, monat, onMonat, mitAbsender }: Props) {
       monat: m,
       sb: mittel(z.map((x) => x.sb)),
       fb: mittel(z.map((x) => x.fb)),
-      rituale: mittel(daten.rituale.filter((r) => r.monat === m).map((r) => r.antwort)),
     }
   })
 
@@ -78,7 +76,7 @@ export function PersonenAnsicht({ daten, monat, onMonat, mitAbsender }: Props) {
           </Abschnitt>
 
           <Abschnitt titel="Alle Verhalten im Detail">
-            <PersonenTabelle zeilen={zeilen} rituale={ritualeMonat} schwellen={schwellen} />
+            <PersonenTabelle zeilen={zeilen} schwellen={schwellen} />
           </Abschnitt>
 
           <Abschnitt titel="Verlauf" kurz="Durchschnitt über alle Monate.">

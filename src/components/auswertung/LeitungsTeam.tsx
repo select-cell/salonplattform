@@ -90,7 +90,6 @@ function TeamDashboard({ d, verlauf, onPerson }: { d: Dashboard; verlauf: TeamAu
           monat: m,
           sb: mittel(z.map((x) => x.sb)),
           fb: mittel(z.map((x) => x.fb)),
-          rituale: mittel(verlauf.rituale_skalen.filter((r) => r.monat === m).map((r) => r.schnitt)),
         }
       })
     : []
@@ -133,11 +132,11 @@ function TeamDashboard({ d, verlauf, onPerson }: { d: Dashboard; verlauf: TeamAu
       </Abschnitt>
 
       <Abschnitt titel="Alle Verhalten im Detail">
-        <TeamTabelle verhalten={d.verhalten} matrix={d.matrix} personen={d.personen} rituale={d.rituale_skalen} schwellen={schwellen} />
+        <TeamTabelle verhalten={d.verhalten} matrix={d.matrix} personen={d.personen} schwellen={schwellen} />
       </Abschnitt>
 
-      {(d.entwicklung.length > 0 || d.rituale_phasen.length > 0) && (
-        <Abschnitt titel="Entwicklung des Monats und Rituale">
+      {(d.entwicklung.length > 0) && (
+        <Abschnitt titel="Entwicklung des Monats">
           {d.entwicklung.map((n) => (
             <div key={n.person} className="karte karte--creme stack-s">
               <p>
@@ -150,11 +149,6 @@ function TeamDashboard({ d, verlauf, onPerson }: { d: Dashboard; verlauf: TeamAu
               ))}
             </div>
           ))}
-          {d.rituale_phasen.length > 0 && (
-            <p className="klein muted">
-              Am wenigsten stabile Phase: {d.rituale_phasen.map((p) => `${p.ritual}: ${p.phase} (${p.nennungen}×)`).join(' · ')}
-            </p>
-          )}
         </Abschnitt>
       )}
 

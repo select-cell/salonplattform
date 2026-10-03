@@ -34,24 +34,6 @@ export interface Verhalten {
   kriterien: Kriterium[]
 }
 
-export type FrageTyp = 'skala' | 'auswahl' | 'text'
-
-export interface RitualFrage {
-  nr: number
-  typ: FrageTyp
-  frage: string
-  optionen: string[] | null
-  labels: string[] | null
-  pflicht: boolean
-}
-
-export interface Ritual {
-  nr: number
-  titel: string
-  video_url: string | null
-  fragen: RitualFrage[]
-}
-
 export interface Kollegin {
   id: string
   name: string
@@ -61,7 +43,6 @@ export interface UmfrageInhalt {
   salon: { id: string; name: string }
   person: { id: string; name: string }
   verhalten: Verhalten[]
-  rituale: Ritual[]
   kolleginnen: Kollegin[]
 }
 
@@ -76,10 +57,8 @@ export interface Entwurf {
   /** `${verhaltenNr}:${personId}` → Note 1–5 */
   noten: Record<string, number>
   kommentare: Record<string, string>
-  /** `v${nr}` bzw. `r${nr}` → Video bis zum Ende gesehen */
+  /** `v${nr}` → Video bis zum Ende gesehen */
   videos: Record<string, true>
-  /** `${ritualNr}:${frageNr}` → Antwort als Text (Skala: '3') */
-  ritual: Record<string, string>
   entwicklung: { personId: string | null; begruendung: string }
 }
 
@@ -92,7 +71,6 @@ export function neuerEntwurf(monat: string, jetzt: Date = new Date()): Entwurf {
     noten: {},
     kommentare: {},
     videos: {},
-    ritual: {},
     entwicklung: { personId: null, begruendung: '' },
   }
 }
@@ -132,15 +110,14 @@ export function loescheEntwurf(userId: string, monat: string): void {
 export type Schritt =
   | { art: 'start' }
   | { art: 'verhalten'; verhalten: Verhalten; index: number }
-  | { art: 'ritual'; ritual: Ritual }
   | { art: 'entwicklung' }
   | { art: 'zusammenfassung' }
 
 export function baueSchritte(inhalt: UmfrageInhalt): Schritt[] {
+  // Reihenfolge wie in der bisherigen Umfrage: zuerst die Entwicklung des Monats, dann die Verhalten
   const schritte: Schritt[] = [{ art: 'start' }]
-  inhalt.verhalten.forEach((verhalten, index) => schritte.push({ art: 'verhalten', verhalten, index }))
-  inhalt.rituale.forEach((ritual) => schritte.push({ art: 'ritual', ritual }))
   if (inhalt.kolleginnen.length > 0) schritte.push({ art: 'entwicklung' })
+  inhalt.verhalten.forEach((verhalten, index) => schritte.push({ art: 'verhalten', verhalten, index }))
   schritte.push({ art: 'zusammenfassung' })
   return schritte
 }
@@ -160,19 +137,31 @@ export function bewertete(inhalt: UmfrageInhalt): Bewertete[] {
 }
 
 export const notenSchluessel = (verhaltenNr: number, personId: string) => `${verhaltenNr}:${personId}`
-export const ritualSchluessel = (ritualNr: number, frageNr: number) => `${ritualNr}:${frageNr}`
 
 /** Ab dieser Note ist ein Kommentar Pflicht (Plan §1, Datenbank: bewertungen_kommentar_ab_4). */
 export const KOMMENTAR_PFLICHT_AB = 4
 
-export function brauchtVideo(url: string | null): boolean {
-  return !!url && url.trim() !== ''
+/** Beschriftung der Noten 1–5 beim Selbstbild (wie in der bisherigen Umfrage). */
+export const SELBSTBILD_LABELS = ['Nicht sichtbar', 'Selten sichtbar', 'Oft sichtbar', 'Immer sichtbar', 'Vorbildlich'] as const
+
+/** Mindestdauer des Platzhalter-Videos, solange noch kein echtes Video hinterlegt ist. */
+export const PLATZHALTER_VIDEO_SEKUNDEN = 8
+
+/** Jedes Verhalten hat eine Video-Sperre: echtes Video bis zum Ende, sonst der Platzhalter. */
+export function brauchtVideo(_url: string | null): boolean {
+  return true
 }
 
 // ---- Prüfungen -------------------------------------------------------------------
 
 /** Meldung, was an diesem Schritt noch fehlt, oder null, wenn man weiter darf. */
 export function schrittFehler(schritt: Schritt, entwurf: Entwurf, inhalt: UmfrageInhalt): string | null {
+  if (schritt.art === 'entwicklung') {
+    if (!entwurf.entwicklung.personId) return 'Bitte wähle eine Kollegin für die Entwicklung des Monats aus.'
+    if (!entwurf.entwicklung.begruendung.trim()) return 'Bitte begründe deine Wahl bei der Entwicklung des Monats.'
+    return null
+  }
+
   if (schritt.art === 'verhalten') {
     const { verhalten } = schritt
     if (brauchtVideo(verhalten.video_url) && !entwurf.videos[`v${verhalten.nr}`]) {
@@ -188,19 +177,6 @@ export function schrittFehler(schritt: Schritt, entwurf: Entwurf, inhalt: Umfrag
       }
       if (note >= KOMMENTAR_PFLICHT_AB && !(entwurf.kommentare[schluessel] ?? '').trim()) {
         return `Ab Note ${KOMMENTAR_PFLICHT_AB} brauchen wir einen Kommentar${person.selbst ? ' zu dir' : ` zu ${person.name}`}.`
-      }
-    }
-    return null
-  }
-
-  if (schritt.art === 'ritual') {
-    const { ritual } = schritt
-    if (brauchtVideo(ritual.video_url) && !entwurf.videos[`r${ritual.nr}`]) {
-      return 'Bitte schau dir zuerst das Video bis zum Ende an.'
-    }
-    for (const frage of ritual.fragen) {
-      if (frage.pflicht && !(entwurf.ritual[ritualSchluessel(ritual.nr, frage.nr)] ?? '').trim()) {
-        return 'Bitte beantworte alle Pflichtfragen.'
       }
     }
     return null
@@ -226,7 +202,6 @@ export interface UmfrageNutzdaten {
   zeitpunkt: string
   version: string
   bewertungen: { verhalten_nr: number; bewertete_person_id: string; note: number; kommentar: string }[]
-  rituale: { ritual_nr: number; frage_nr: number; antwort: string | number }[]
   entwicklung: { person_id: string | null; begruendung: string }
 }
 
@@ -245,14 +220,6 @@ export function baueNutzdaten(inhalt: UmfrageInhalt, entwurf: Entwurf, jetzt: Da
     }),
   )
 
-  const rituale = inhalt.rituale.flatMap((r) =>
-    r.fragen.flatMap((f) => {
-      const antwort = (entwurf.ritual[ritualSchluessel(r.nr, f.nr)] ?? '').trim()
-      if (!antwort) return []
-      return [{ ritual_nr: r.nr, frage_nr: f.nr, antwort: f.typ === 'skala' ? Number(antwort) : antwort }]
-    }),
-  )
-
   const nenntPerson = entwurf.entwicklung.personId !== null
   return {
     monat: entwurf.monat,
@@ -260,7 +227,6 @@ export function baueNutzdaten(inhalt: UmfrageInhalt, entwurf: Entwurf, jetzt: Da
     zeitpunkt: jetzt.toISOString(),
     version: 'plattform-1',
     bewertungen,
-    rituale,
     entwicklung: {
       person_id: entwurf.entwicklung.personId,
       begruendung: nenntPerson ? entwurf.entwicklung.begruendung.trim() : '',

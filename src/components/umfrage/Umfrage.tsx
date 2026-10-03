@@ -14,7 +14,6 @@ import {
 } from '../../lib/umfrage'
 import { Icon } from '../Icon'
 import { EntwicklungSchritt } from './EntwicklungSchritt'
-import { RitualSchritt } from './RitualSchritt'
 import { VerhaltenSchritt } from './VerhaltenSchritt'
 import { Zusammenfassung } from './Zusammenfassung'
 
@@ -25,7 +24,7 @@ interface Props {
   userId: string
 }
 
-/** Der Ablauf der Monatsumfrage: Start, Verhalten, Rituale, Entwicklung, Zusammenfassung (Plan §7.3). */
+/** Der Ablauf der Monatsumfrage: Start, Entwicklung, Verhalten, Zusammenfassung (Plan §7.3). */
 export function Umfrage({ inhalt, monat, userId }: Props) {
   const schritte = useMemo(() => baueSchritte(inhalt), [inhalt])
   const [gespeichert] = useState(() => ladeEntwurf(userId, monat))
@@ -84,13 +83,11 @@ export function Umfrage({ inhalt, monat, userId }: Props) {
   const titelFuerScreenreader =
     schritt.art === 'verhalten'
       ? `Verhalten ${schritt.index + 1} von ${inhalt.verhalten.length}`
-      : schritt.art === 'ritual'
-        ? `Ritual ${schritt.ritual.titel}`
-        : schritt.art === 'entwicklung'
-          ? 'Entwicklung des Monats'
-          : schritt.art === 'zusammenfassung'
-            ? 'Zusammenfassung'
-            : 'Start'
+      : schritt.art === 'entwicklung'
+        ? 'Entwicklung des Monats'
+        : schritt.art === 'zusammenfassung'
+          ? 'Zusammenfassung'
+          : 'Start'
 
   return (
     <div className="umfrage">
@@ -134,21 +131,6 @@ export function Umfrage({ inhalt, monat, userId }: Props) {
             onVideoGesehen={() => {
               setFehler(null)
               setEntwurf((e) => ({ ...e, videos: { ...e.videos, [`v${schritt.verhalten.nr}`]: true } }))
-            }}
-          />
-        )}
-        {schritt.art === 'ritual' && (
-          <RitualSchritt
-            key={schritt.ritual.nr}
-            ritual={schritt.ritual}
-            entwurf={entwurf}
-            onAntwort={(k, antwort) => {
-              setFehler(null)
-              setEntwurf((e) => ({ ...e, ritual: { ...e.ritual, [k]: antwort } }))
-            }}
-            onVideoGesehen={() => {
-              setFehler(null)
-              setEntwurf((e) => ({ ...e, videos: { ...e.videos, [`r${schritt.ritual.nr}`]: true } }))
             }}
           />
         )}
@@ -228,12 +210,9 @@ function StartSchritt({
 
       <ul className="platzhalter__liste">
         <li>
-          {inhalt.verhalten.length} Verhalten, jeweils mit Note 1 bis 5. Ab Note 4 brauchen wir einen Kommentar.
+          {inhalt.verhalten.length} Verhalten, jeweils mit Video und Note 1 bis 5. Ab Note 4 brauchen wir einen Kommentar.
         </li>
-        {inhalt.rituale.length > 0 && (
-          <li>{inhalt.rituale.length === 1 ? 'Ein Ritual' : `${inhalt.rituale.length} Rituale`} mit ein paar Fragen.</li>
-        )}
-        {kolleginnen > 0 && <li>Zum Schluss die Entwicklung des Monats (freiwillig).</li>}
+        {kolleginnen > 0 && <li>Vorab eine Frage zur Entwicklung des Monats.</li>}
         <li>Dein Zwischenstand wird auf diesem Gerät gespeichert. Du kannst jederzeit später weitermachen.</li>
       </ul>
 

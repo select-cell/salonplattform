@@ -1,5 +1,5 @@
 import type { Entwurf, UmfrageInhalt, Verhalten } from '../../lib/umfrage'
-import { KOMMENTAR_PFLICHT_AB, bewertete, brauchtVideo, notenSchluessel } from '../../lib/umfrage'
+import { KOMMENTAR_PFLICHT_AB, SELBSTBILD_LABELS, bewertete, brauchtVideo, notenSchluessel } from '../../lib/umfrage'
 import { Skala } from './Skala'
 import { VideoSperre } from './VideoSperre'
 
@@ -83,7 +83,7 @@ export function VerhaltenSchritt({
 
       {gesperrt ? (
         <p className="hinweis">
-          <span>Sobald du das Video bis zum Ende gesehen hast, kannst du bewerten.</span>
+          <span>Sobald das Video zu Ende ist, kannst du bewerten.</span>
         </p>
       ) : (
         <div className="stack">
@@ -105,6 +105,7 @@ export function VerhaltenSchritt({
                 wert={note}
                 onChange={(n) => onNote(schluessel, n)}
                 beschreibung={beschreibung}
+                feldLabels={person.selbst ? SELBSTBILD_LABELS : undefined}
               >
                 {note && (
                   <div className="feld">

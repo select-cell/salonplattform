@@ -7,7 +7,7 @@ interface Props {
   onBegruendung: (text: string) => void
 }
 
-/** „Entwicklung des Monats“: wer hat sich besonders weiterentwickelt? Freiwillig. */
+/** „Entwicklung des Monats“: erste Frage der Umfrage, Person und Begründung sind Pflicht. */
 export function EntwicklungSchritt({ inhalt, entwurf, onWahl, onBegruendung }: Props) {
   const gewaehlt = entwurf.entwicklung.personId
 
@@ -16,9 +16,9 @@ export function EntwicklungSchritt({ inhalt, entwurf, onWahl, onBegruendung }: P
       <header className="stack-s">
         <span className="badge badge--gruen">Entwicklung des Monats</span>
         <h2 id="schritt-titel" className="umfrage__titel">
-          Wer hat sich in diesem Monat besonders entwickelt?
+          Bei welcher Kollegin hast du im letzten Monat eine besonders positive Entwicklung im Verhalten beobachtet?
         </h2>
-        <p className="muted">Du kannst eine Kollegin nennen. Das ist freiwillig.</p>
+        <p className="muted">Du kannst dich selbst nicht auswählen.</p>
       </header>
 
       <fieldset className="bewertung bewertung--neutral">
@@ -36,23 +36,22 @@ export function EntwicklungSchritt({ inhalt, entwurf, onWahl, onBegruendung }: P
               <span>{k.name}</span>
             </label>
           ))}
-          <label className="auswahl__option">
-            <input type="radio" name="entwicklung" value="" checked={gewaehlt === null} onChange={() => onWahl(null)} />
-            <span>Niemanden nennen</span>
-          </label>
         </div>
       </fieldset>
 
       {gewaehlt && (
         <div className="feld">
           <label className="feld__label" htmlFor="entwicklung-begruendung">
-            Woran hast du das gemerkt? <span className="muted">(freiwillig)</span>
+            Warum hast du so entschieden?
           </label>
           <textarea
             id="entwicklung-begruendung"
             className="feld__eingabe"
             rows={4}
+            placeholder="Begründung…"
             value={entwurf.entwicklung.begruendung}
+            required
+            aria-required
             onChange={(e) => onBegruendung(e.target.value)}
           />
         </div>

@@ -85,7 +85,6 @@ export interface Ueberfaellig {
 
 export const FARBE_SB = '#C4845A'
 export const FARBE_FB = '#4A7FA5'
-export const FARBE_RITUALE = '#4CAF50'
 
 // ---- Rechnen und Einordnen --------------------------------------------------------
 

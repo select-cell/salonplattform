@@ -20,8 +20,6 @@ export function TeamAnsicht({ daten, monat, onMonat }: { daten: TeamAuswertung; 
   const dauer = daten.dauer.find((d) => d.monat === monat)
   const { top, flop } = topFlop(zeilen, (z) => z.fb)
   const saeulen = saeulenSchnitte(zeilen)
-  const skalen = daten.rituale_skalen.filter((r) => r.monat === monat)
-  const phasen = daten.rituale_phasen.filter((r) => r.monat === monat)
   const genannt = daten.entwicklung.filter((n) => n.monat === monat)
 
   const verlauf: VerlaufDaten[] = [...daten.monate].reverse().map((m) => {
@@ -30,7 +28,6 @@ export function TeamAnsicht({ daten, monat, onMonat }: { daten: TeamAuswertung; 
       monat: m,
       sb: mittel(z.map((x) => x.sb)),
       fb: mittel(z.map((x) => x.fb)),
-      rituale: mittel(daten.rituale_skalen.filter((r) => r.monat === m).map((r) => r.schnitt)),
     }
   })
 
@@ -67,38 +64,6 @@ export function TeamAnsicht({ daten, monat, onMonat }: { daten: TeamAuswertung; 
           <Abschnitt titel="Alle Verhalten im Team-Schnitt">
             <SchnittTabelle zeilen={zeilen} schwellen={schwellen} />
           </Abschnitt>
-
-          {(skalen.length > 0 || phasen.length > 0) && (
-            <Abschnitt titel="Rituale">
-              {skalen.length > 0 && (
-                <div className="tabelle-scroll">
-                  <table className="tabelle">
-                    <thead>
-                      <tr>
-                        <th>Ritual</th>
-                        <th>Frage</th>
-                        <th className="zahl">Ø Team</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {skalen.map((r) => (
-                        <tr key={`${r.ritual}-${r.frage_nr}`}>
-                          <td>{r.ritual}</td>
-                          <td>{r.frage}</td>
-                          <td className="zahl">{zahl(r.schnitt)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {phasen.length > 0 && (
-                <p className="klein muted">
-                  Am wenigsten stabile Phase: {phasen.map((p) => `${p.ritual}: ${p.phase} (${p.nennungen}×)`).join(' · ')}
-                </p>
-              )}
-            </Abschnitt>
-          )}
 
           {genannt.length > 0 && (
             <Abschnitt titel="Entwicklung des Monats" kurz="Wie oft jemand genannt wurde.">

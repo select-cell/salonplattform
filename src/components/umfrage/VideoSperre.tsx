@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { PLATZHALTER_VIDEO_SEKUNDEN } from '../../lib/umfrage'
 import { klassifiziere } from '../../lib/videoQuelle'
 import { Icon } from '../Icon'
 
@@ -14,10 +15,12 @@ const AUSWEG_NACH_MS = 20_000
 
 /**
  * Video mit Pflicht (Plan §1): Die Bewertung wird erst frei, wenn das Video bis zum Ende
- * gelaufen ist. Ohne Video-Link (Platzhalter) gibt es keine Sperre.
+ * gelaufen ist; Vorspulen ist gesperrt. Ohne Video-Link läuft ein Platzhalter von
+ * PLATZHALTER_VIDEO_SEKUNDEN Sekunden, danach geht es weiter.
  */
 export function VideoSperre({ url, titel, gesehen, onGesehen }: Props) {
   const [auswegSichtbar, setAuswegSichtbar] = useState(false)
+  const weiteste = useRef(0)
   const onGesehenRef = useRef(onGesehen)
   useEffect(() => {
     onGesehenRef.current = onGesehen
@@ -29,14 +32,7 @@ export function VideoSperre({ url, titel, gesehen, onGesehen }: Props) {
     return () => window.clearTimeout(timer)
   }, [gesehen, url])
 
-  if (!url) {
-    return (
-      <div className="video video--platzhalter" role="note">
-        <Icon name="umfrage" groesse={26} />
-        <span>Das Video folgt.</span>
-      </div>
-    )
-  }
+  if (!url) return <PlatzhalterVideo gesehen={gesehen} onGesehen={() => onGesehenRef.current()} />
 
   const quelle = klassifiziere(url)
 
@@ -52,6 +48,14 @@ export function VideoSperre({ url, titel, gesehen, onGesehen }: Props) {
             controlsList="nodownload"
             aria-label={titel}
             onEnded={() => onGesehenRef.current()}
+            onTimeUpdate={(e) => {
+              const v = e.currentTarget
+              if (!v.seeking && v.currentTime > weiteste.current) weiteste.current = v.currentTime
+            }}
+            onSeeking={(e) => {
+              const v = e.currentTarget
+              if (!gesehen && v.currentTime > weiteste.current + 0.5) v.currentTime = weiteste.current
+            }}
           />
         )}
         {quelle.art === 'vimeo' && <VimeoVideo src={quelle.src} titel={titel} onEnde={() => onGesehenRef.current()} />}
@@ -97,6 +101,14 @@ function VimeoVideo({ src, titel, onEnde }: { src: string; titel: string; onEnde
       if (beendet || !rahmen.current) return
       const p = new Player(rahmen.current)
       p.on('ended', () => onEndeRef.current())
+      // Vorspulen sperren: Springt jemand über die weiteste gesehene Stelle hinaus, geht es dorthin zurück
+      let weiteste = 0
+      p.on('timeupdate', (d: { seconds: number }) => {
+        if (d.seconds > weiteste && d.seconds - weiteste < 2) weiteste = d.seconds
+      })
+      p.on('seeked', (d: { seconds: number }) => {
+        if (d.seconds > weiteste + 1) void p.setCurrentTime(weiteste).catch(() => undefined)
+      })
       spieler = p
     })
     return () => {
@@ -114,5 +126,44 @@ function VimeoVideo({ src, titel, onEnde }: { src: string; titel: string; onEnde
       allowFullScreen
       loading="lazy"
     />
+  )
+}
+
+function PlatzhalterVideo({ gesehen, onGesehen }: { gesehen: boolean; onGesehen: () => void }) {
+  const [rest, setRest] = useState(PLATZHALTER_VIDEO_SEKUNDEN)
+  const onGesehenRef = useRef(onGesehen)
+  useEffect(() => {
+    onGesehenRef.current = onGesehen
+  })
+
+  useEffect(() => {
+    if (gesehen) return
+    const timer = window.setInterval(() => setRest((r) => Math.max(0, r - 1)), 1000)
+    return () => window.clearInterval(timer)
+  }, [gesehen])
+
+  useEffect(() => {
+    if (!gesehen && rest === 0) onGesehenRef.current()
+  }, [rest, gesehen])
+
+  const fortschritt = gesehen ? 100 : ((PLATZHALTER_VIDEO_SEKUNDEN - rest) / PLATZHALTER_VIDEO_SEKUNDEN) * 100
+
+  return (
+    <div className="video video--platzhalter" role="note">
+      <Icon name="umfrage" groesse={26} />
+      <span>Das Video folgt. Bitte nimm dir kurz einen Moment, bevor du bewertest.</span>
+      <div className="fortschritt" aria-hidden="true">
+        <div className="fortschritt__balken" style={{ width: `${fortschritt}%` }} />
+      </div>
+      {gesehen ? (
+        <span className="badge badge--gruen">
+          <Icon name="haken" groesse={14} /> Weiter geht’s
+        </span>
+      ) : (
+        <span className="badge badge--gelb" aria-live="off">
+          Noch {rest} Sekunden
+        </span>
+      )}
+    </div>
   )
 }

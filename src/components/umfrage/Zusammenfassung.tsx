@@ -1,6 +1,6 @@
 import { Icon } from '../Icon'
 import type { Entwurf, Schritt, UmfrageInhalt } from '../../lib/umfrage'
-import { durchschnitte, ersterUnvollstaendigerSchritt, ritualSchluessel, schrittFehler } from '../../lib/umfrage'
+import { durchschnitte, ersterUnvollstaendigerSchritt, schrittFehler } from '../../lib/umfrage'
 
 interface Props {
   schritte: Schritt[]
@@ -18,8 +18,6 @@ export function Zusammenfassung({ schritte, inhalt, entwurf, sendet, fehler, onS
   const offen = ersterUnvollstaendigerSchritt(schritte, entwurf, inhalt)
   const schnitte = durchschnitte(inhalt, entwurf)
 
-  const ritualFragen = inhalt.rituale.flatMap((r) => r.fragen.map((f) => ({ r, f })))
-  const beantwortet = ritualFragen.filter(({ r, f }) => (entwurf.ritual[ritualSchluessel(r.nr, f.nr)] ?? '').trim()).length
   const genannt = inhalt.kolleginnen.find((k) => k.id === entwurf.entwicklung.personId)
 
   return (
@@ -50,19 +48,15 @@ export function Zusammenfassung({ schritte, inhalt, entwurf, sendet, fehler, onS
         <p className="klein muted">{inhalt.verhalten.length} Verhalten bewertet</p>
       </section>
 
-      {ritualFragen.length > 0 && (
-        <section className="karte karte--creme stack-s" aria-label="Rituale">
-          <h3 className="abschnitt-titel">Rituale</h3>
-          <p>
-            {beantwortet} von {ritualFragen.length} Fragen beantwortet
-          </p>
-        </section>
-      )}
-
       {inhalt.kolleginnen.length > 0 && (
         <section className="karte karte--creme stack-s" aria-label="Entwicklung des Monats">
           <h3 className="abschnitt-titel">Entwicklung des Monats</h3>
-          <p>{genannt ? genannt.name : 'Niemand genannt'}</p>
+          <p>
+            {genannt ? genannt.name : 'Niemand genannt'}
+            {genannt && entwurf.entwicklung.begruendung.trim() && (
+              <span className="muted"> – {entwurf.entwicklung.begruendung.trim()}</span>
+            )}
+          </p>
         </section>
       )}
 

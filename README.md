@@ -22,10 +22,10 @@ Die vollständige Bauanleitung steht in [`docs/plattform-architektur.md`](docs/p
 Die Umfrage läuft vollständig, sobald Personen angelegt sind. Diese Inhalte sind aus der bestehenden Abgabe nicht ablesbar und kommen aus `referenz/umfrage-dawiid.html`:
 
 - **Bewertungsstufen 1 bis 5** je Verhalten (Bezeichnung, Prozent, Leitsatz, Punkte). Ohne sie gibt es nur die Noten.
-- **Videos** je Verhalten und Ritual. Ohne Link zeigt die Umfrage „Das Video folgt“ und sperrt nichts.
-- **Die Auswahl-Frage „Welche Phase war am wenigsten stabil?“** je Ritual mit ihren Optionen.
+- **Videos** je Verhalten. Ohne Link läuft ein Platzhalter von 8 Sekunden (`PLATZHALTER_VIDEO_SEKUNDEN` in `src/lib/umfrage.ts`), danach wird die Bewertung frei. Vorspulen ist gesperrt.
+- **Rituale** gehören nicht in die Plattform: Sie sind in der Datenbank deaktiviert (`rituale.aktiv = false`), die Tabellen und alten Antworten bleiben erhalten.
 
-Das Nachtragen geht ohne Code, siehe „Inhalte der Umfrage pflegen“. Außerdem zu klären (Plan §9): Die Ritual-Fragen sagen noch „im vergangenen Monat“, obwohl die Umfrage für Monat M bis Ende M läuft. Aktuell steht `start_monat` auf **Oktober 2026**.
+Das Nachtragen geht ohne Code, siehe „Inhalte der Umfrage pflegen“. Außerdem zu klären (Plan §9): Die Fragen sagen noch „im letzten Monat“, obwohl die Umfrage für Monat M bis Ende M läuft. Aktuell steht `start_monat` auf **Oktober 2026**.
 
 ## Aufbau
 
@@ -70,6 +70,9 @@ Alle Migrationen aus `supabase/migrations/` sind am 3. Oktober 2026 im Projekt `
 | `…_umfrage_personen_ids` | Personen-IDs an den Umfrage-Tabellen, Nachtragen der Altdaten |
 | `…_umfrage_funktionen` | `umfrage_inhalt`, `meine_monate`, `meine_offenen_monate`, `umfrage_einreichen_v2` |
 | `…_seed_dawiid_inhalte` | 20 Verhalten und 2 Rituale mit 9 Fragen |
+| `…_seed_dawiid_kriterien` | 100 Bewertungsstufen (5 je Verhalten) aus der bisherigen Umfrage |
+| `…_rituale_deaktivieren` | Rituale ausblenden (umkehrbar) |
+| `…_umfrage_entwicklung_pflicht` | Entwicklung des Monats mit Begründung ist Pflicht |
 | `…_auswertungen` | `meine_ergebnisse`, `team_ergebnisse`, `person_ergebnisse`, `team_dashboard` |
 | `…_abgabe_status_reminder` | `abgabe_status`, `ueberfaellige_abgaben` (Reminder ab dem 4. Tag nach Fristende) |
 

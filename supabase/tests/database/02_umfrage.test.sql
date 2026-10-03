@@ -1,7 +1,7 @@
 -- pgTAP-Tests für Phase 2: Monatsumfrage in der Plattform.
 -- Ausführen: `supabase test db`
 begin;
-select plan(65);
+select plan(69);
 
 -- ---------------------------------------------------------------------------
 -- Hilfsfunktionen
@@ -130,6 +130,13 @@ select is((select count(*) from public.ritual_fragen f
              join public.salons s on s.id = r.salon_id where s.name = 'Dawiid'),
           9::bigint, 'Seed: 9 Ritual-Fragen für Dawiid');
 
+select is((select count(*) from public.verhalten_kriterien k join public.verhalten v on v.id = k.verhalten_id
+             join public.salons s on s.id = v.salon_id where s.name = 'Dawiid'),
+          100::bigint, 'Seed: 5 Bewertungsstufen für jedes der 20 Verhalten');
+select is((select count(*) from public.rituale r join public.salons s on s.id = r.salon_id
+            where s.name = 'Dawiid' and r.aktiv),
+          0::bigint, 'Rituale sind deaktiviert (nicht Teil der Plattform)');
+
 -- ---------------------------------------------------------------------------
 -- Anna: Monate und Inhalte
 -- ---------------------------------------------------------------------------
@@ -200,6 +207,12 @@ select throws_ok($$ select public.umfrage_einreichen_v2(
 select throws_ok($$ select public.umfrage_einreichen_v2(
     jsonb_set(pg_temp.payload(pg_temp.mkey(-1)), '{entwicklung,person_id}', '"11111111-0000-0000-0000-00000000000f"')) $$,
   '22023', 'Für die Entwicklung des Monats kannst du eine andere Person aus dem Team wählen.', 'Entwicklung: nicht aus fremdem Salon');
+select throws_ok($$ select public.umfrage_einreichen_v2(
+    pg_temp.payload(pg_temp.mkey(-1)) #- '{entwicklung,person_id}') $$,
+  '22023', 'Bitte wähle bei der Entwicklung des Monats eine Kollegin aus.', 'Entwicklung des Monats ist Pflicht');
+select throws_ok($$ select public.umfrage_einreichen_v2(
+    pg_temp.payload(pg_temp.mkey(-1)) #- '{entwicklung,begruendung}') $$,
+  '22023', 'Bitte begründe deine Wahl bei der Entwicklung des Monats.', 'Begründung der Entwicklung ist Pflicht');
 select throws_ok($$ select public.umfrage_einreichen_v2(
     jsonb_set(pg_temp.payload(pg_temp.mkey(-1)), '{rituale}', '[]')) $$,
   '22023', 'Bitte beantworte alle Pflichtfragen bei den Ritualen.', 'Pflichtfrage der Rituale fehlt');
@@ -272,16 +285,16 @@ reset role;
 select pg_temp.anmelden('22222222-0000-0000-0000-00000000000b');
 set local role authenticated;
 select lives_ok($$ select public.umfrage_einreichen_v2(
-    jsonb_set(pg_temp.payload(pg_temp.mkey(0)), '{gestartet_am}', to_jsonb((now() - interval '20 seconds')::text))
-    #- '{entwicklung,person_id}') $$,
-  'Abgabe ohne Entwicklung und mit unplausibler Dauer wird angenommen');
+    jsonb_set(jsonb_set(pg_temp.payload(pg_temp.mkey(0)), '{gestartet_am}', to_jsonb((now() - interval '20 seconds')::text)),
+              '{entwicklung,person_id}', '"11111111-0000-0000-0000-00000000000a"')) $$,
+  'Abgabe mit unplausibler Dauer wird angenommen');
 reset role;
 select is((select ausfuelldauer_sek from public.umfrage_abgaben
             where feedbackgeber_id = '11111111-0000-0000-0000-00000000000b'), null,
           'Unter einer Minute: keine Ausfülldauer');
 select is((select entwicklung_person from public.umfrage_abgaben
-            where feedbackgeber_id = '11111111-0000-0000-0000-00000000000b'), null,
-          'Entwicklung des Monats ist optional');
+            where feedbackgeber_id = '11111111-0000-0000-0000-00000000000b'), 'Anna Test',
+          'Entwicklung des Monats wird gespeichert');
 
 -- ---------------------------------------------------------------------------
 -- Verantwortlicher: nimmt nicht teil
