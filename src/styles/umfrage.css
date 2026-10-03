@@ -1,0 +1,389 @@
+/* ==========================================================================
+   Monatsumfrage: Ablauf, Notenfelder, Video, Bewertungsstufen
+   ========================================================================== */
+
+.umfrage-seite {
+  max-width: 720px;
+  margin-inline: auto;
+}
+
+.umfrage-seite__kopf {
+  margin-top: 14px;
+}
+
+.umfrage-seite__kopf h1 {
+  font-size: clamp(1.7rem, 4vw + 0.5rem, 2.4rem);
+}
+
+.textlink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-h);
+  font: inherit;
+  font-size: 0.925rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.textlink:hover {
+  color: var(--accent-dark);
+}
+
+/* ---- Fortschritt ---------------------------------------------------------- */
+.umfrage__fortschritt {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.fortschritt {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--cream-deep);
+}
+
+.fortschritt__balken {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.umfrage__inhalt {
+  outline: none;
+}
+
+.umfrage__titel {
+  font-size: clamp(1.4rem, 3vw + 0.7rem, 1.9rem);
+  line-height: 1.25;
+}
+
+.umfrage__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.umfrage__fehler {
+  margin-top: 20px;
+}
+
+/* Zurück/Weiter bleibt am unteren Rand erreichbar, auch auf langen Seiten */
+.umfrage__aktionen {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+  padding: 14px 0 calc(14px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--cream) 72%, rgba(250, 248, 243, 0));
+}
+
+.umfrage__aktionen .btn {
+  min-width: 120px;
+}
+
+/* ---- Video ------------------------------------------------------------------ */
+.video {
+  display: grid;
+  gap: 10px;
+}
+
+.video__rahmen {
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--r-l);
+  background: #1a1208;
+}
+
+.video__rahmen iframe,
+.video__rahmen video {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.video__status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+.video--platzhalter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 96px;
+  border: 1.5px dashed var(--cream-deep);
+  border-radius: var(--r-l);
+  background: var(--cream-mid);
+  color: var(--text2);
+}
+
+/* ---- Bewertungsstufen ------------------------------------------------------- */
+.stufen {
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  background: var(--surface);
+}
+
+.stufen > summary,
+.stufe > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.stufen > summary::-webkit-details-marker,
+.stufe > summary::-webkit-details-marker {
+  display: none;
+}
+
+.stufen > summary::after,
+.stufe > summary::after {
+  content: '+';
+  margin-left: auto;
+  color: var(--accent-h);
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.stufen[open] > summary::after,
+.stufe[open] > summary::after {
+  content: '–';
+}
+
+.stufen__liste {
+  display: grid;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.stufe {
+  border-radius: var(--r-s);
+  background: var(--cream-mid);
+}
+
+.stufe > summary {
+  font-weight: 500;
+}
+
+.stufe__inhalt {
+  display: grid;
+  gap: 8px;
+  padding: 0 14px 14px;
+  color: var(--text2);
+  font-size: 0.925rem;
+}
+
+/* ---- Bewertung -------------------------------------------------------------- */
+.bewertung {
+  margin-inline: 0;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  border-radius: var(--r-m);
+  background: var(--surface);
+}
+
+.bewertung--selbst {
+  border-left-color: var(--accent);
+}
+
+.bewertung--fremd {
+  border-left-color: var(--fb);
+}
+
+.bewertung--neutral {
+  border-left-color: var(--cream-deep);
+}
+
+/* Browser setzen <legend> sonst auf die Rahmenlinie. Als Float liegt sie im Kasten. */
+.bewertung__legende {
+  float: left;
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.bewertung__legende + * {
+  clear: both;
+}
+
+.bewertung__name {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.bewertung__art {
+  float: right;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.bewertung--selbst .bewertung__art {
+  background: #f6e7dc;
+  color: var(--accent-dark);
+}
+
+.bewertung--fremd .bewertung__art {
+  background: var(--fbbg);
+  color: var(--fb-dark);
+}
+
+.bewertung__frage {
+  font-weight: 600;
+}
+
+.bewertung__text {
+  margin-top: 10px;
+  color: var(--text2);
+  font-size: 0.925rem;
+}
+
+.bewertung .feld {
+  margin-top: 14px;
+}
+
+.skala {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.skala__feld {
+  position: relative;
+  display: block;
+  cursor: pointer;
+}
+
+.skala__feld > span[aria-hidden] {
+  display: grid;
+  min-height: 52px;
+  place-items: center;
+  border: 1.5px solid var(--cream-deep);
+  border-radius: var(--r-m);
+  background: var(--surface);
+  font-size: 1.2rem;
+  font-weight: 700;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s,
+    transform 0.12s;
+}
+
+.skala__feld:hover > span[aria-hidden] {
+  border-color: var(--muted);
+}
+
+.skala__feld input:focus-visible + span {
+  outline: 2px solid var(--accent-h);
+  outline-offset: 2px;
+}
+
+.skala__feld input:checked + span {
+  border-color: var(--accent-h);
+  background: var(--accent-h);
+  color: #fff;
+  transform: scale(1.03);
+}
+
+.bewertung--fremd .skala__feld input:checked + span {
+  border-color: var(--fb-dark);
+  background: var(--fb-dark);
+}
+
+.bewertung--neutral .skala__feld input:checked + span {
+  border-color: var(--text);
+  background: var(--text);
+}
+
+/* ---- Auswahl ---------------------------------------------------------------- */
+.auswahl {
+  display: grid;
+  gap: 8px;
+}
+
+.auswahl__option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--cream-deep);
+  border-radius: var(--r-m);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.auswahl__option:hover {
+  border-color: var(--muted);
+}
+
+.auswahl__option input {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  accent-color: var(--accent-h);
+}
+
+.auswahl__option:has(input:checked) {
+  border-color: var(--accent-h);
+  background: #fdf3ea;
+}
+
+/* ---- Zusammenfassung und Listen --------------------------------------------- */
+.zeilen {
+  display: grid;
+  gap: 8px;
+}
+
+.zeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 10px 12px;
+  border-radius: var(--r-s);
+  background: var(--surface);
+}
+
+.badge--blau {
+  background: var(--fbbg);
+  color: var(--fb-dark);
+}
+
+.umfrage-karte--erledigt {
+  border-color: #cfe3b8;
+  background: linear-gradient(135deg, #fbfdf8 0%, #eef6e3 100%);
+}
+
+.lade--kompakt {
+  min-height: 40vh;
+}
+
+@media (min-width: 640px) {
+  .bewertung {
+    padding: 20px;
+  }
+
+  .skala {
+    gap: 10px;
+  }
+}

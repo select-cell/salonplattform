@@ -20,6 +20,7 @@
   --ybg: #faeeda;
   --fb: #4a7fa5; /* Fremdbild */
   --fbbg: #e6eff6;
+  --fb-dark: #36678a; /* Fremdbild als Fläche mit weißem Text (Kontrast ≥ 4,5) */
 
   --surface: #ffffff;
   --line: #e8e0d0;

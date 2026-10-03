@@ -89,3 +89,18 @@ export function tageszeitGruss(jetzt: Date = new Date()): string {
   if (stunde < 18) return 'Guten Tag'
   return 'Guten Abend'
 }
+
+/** „31. Oktober 2026“ aus einem Datum im Format 2026-10-31 */
+export function tagLabel(isoDatum: string): string {
+  const [jahr, monat, tag] = isoDatum.slice(0, 10).split('-').map(Number)
+  return new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
+    new Date(Date.UTC(jahr, monat - 1, tag)),
+  )
+}
+
+/** „3. Oktober 2026“ aus einem Zeitstempel, in Berliner Zeit */
+export function zeitpunktLabel(iso: string): string {
+  return new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'long', year: 'numeric', timeZone: ZEITZONE }).format(
+    new Date(iso),
+  )
+}

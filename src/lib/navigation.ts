@@ -36,7 +36,7 @@ export const BEREICHE: readonly Bereich[] = [
     icon: 'umfrage',
     rollen: ALLE,
     nurTeilnehmer: true,
-    live: false,
+    live: true,
     geplant: [
       'Selbstbild und Fremdbild der Kolleginnen in einem Durchgang',
       'Videos und Bewertungsstufen pro Verhalten',

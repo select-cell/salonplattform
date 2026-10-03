@@ -5,6 +5,7 @@ import '@fontsource/dm-serif-display/latin-400.css'
 import '@fontsource-variable/dm-sans'
 import './styles/tokens.css'
 import './styles/base.css'
+import './styles/umfrage.css'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'

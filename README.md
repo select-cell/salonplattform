@@ -10,25 +10,29 @@ Die vollständige Bauanleitung steht in [`docs/plattform-architektur.md`](docs/p
 
 | Phase | Inhalt | Stand |
 |---|---|---|
-| 1 | Fundament: Design, Login per Magic Link, Rollen, geschützte Routen, Dashboards, Platzhalter-Seiten, Tabellen `salons`/`personen`, Inhalts-Tabellen | **fertig, Tabellen in Supabase installiert** |
-| 2 | Monatsumfrage in der Plattform | wartet auf Referenzdateien (siehe unten) |
-| 3 | Auswertungen | folgt nach Phase 2 |
-| 4 | Abgabe-Status und Reminder | folgt nach Phase 2 |
+| 1 | Fundament: Design, Login per Magic Link, Rollen, geschützte Routen, Dashboards, Platzhalter-Seiten | **fertig** |
+| 2 | Monatsumfrage in der Plattform | **fertig, Datenbank in Supabase installiert**. Bewertungsstufen, Videos und die Phasen-Frage fehlen noch (siehe unten) |
+| 3 | Auswertungen | folgt |
+| 4 | Abgabe-Status und Reminder | folgt |
 | 5 | Chef-, Gäste- und Verantwortlichen-Umfrage | Inhalte folgen |
 | 6 | Jarvis | folgt |
 
-**Für Phase 2 fehlt im Repo** (Plan §10.1), bitte ablegen:
+### Was in der Umfrage noch fehlt
 
-- `referenz/umfrage-dawiid.html`: liefert die 20 Verhalten mit Bewertungsstufen und die 2 Rituale für den Seed sowie die Vorlage der Umfrage
-- `supabase/umfrage_schema.sql` und `supabase/ausfuelldauer.sql`: der Ist-Stand der bestehenden Umfrage-Tabellen, damit sie korrekt erweitert werden
-- `referenz/dashboard-alt.html`: Vorlage für die Auswertungen (Phase 3)
+Die Umfrage läuft vollständig, sobald Personen angelegt sind. Diese Inhalte sind aus der bestehenden Abgabe nicht ablesbar und kommen aus `referenz/umfrage-dawiid.html`:
 
-Außerdem zu klären (Plan §9): Fragetexte „in diesem Monat“ statt „im letzten Monat“, und der Start-Monat der Plattform. Aktuell steht `start_monat` auf **Oktober 2026**.
+- **Bewertungsstufen 1 bis 5** je Verhalten (Bezeichnung, Prozent, Leitsatz, Punkte). Ohne sie gibt es nur die Noten.
+- **Videos** je Verhalten und Ritual. Ohne Link zeigt die Umfrage „Das Video folgt“ und sperrt nichts.
+- **Die Auswahl-Frage „Welche Phase war am wenigsten stabil?“** je Ritual mit ihren Optionen.
+
+Das Nachtragen geht ohne Code, siehe „Inhalte der Umfrage pflegen“. Außerdem zu klären (Plan §9): Die Ritual-Fragen sagen noch „im vergangenen Monat“, obwohl die Umfrage für Monat M bis Ende M läuft. Aktuell steht `start_monat` auf **Oktober 2026**.
 
 ## Aufbau
 
 ```
 src/                  React-App (pages, components, auth, lib, styles)
+  components/umfrage/ Ablauf der Monatsumfrage (Schritte, Video-Pflicht, Notenskala)
+  lib/umfrage.ts      Ablauf, Prüfungen und Payload der Umfrage (ohne Oberfläche)
 supabase/
   migrations/         SQL-Migrationen, werden von der GitHub-Integration angewendet
   tests/database/     pgTAP-Tests für Rechte und Verknüpfung (supabase test db)
@@ -56,16 +60,22 @@ In die `.env` gehört **nur** der öffentliche anon-/publishable-Key. Den `servi
 
 ### 1. Tabellen (bereits installiert)
 
-Die beiden Migrationen aus `supabase/migrations/` sind am 3. Oktober 2026 im Projekt `hgtvlcucxzksvmvgvbgo` angewendet worden und dort als Version `20261003162510` und `20261003162527` verbucht:
+Alle Migrationen aus `supabase/migrations/` sind am 3. Oktober 2026 im Projekt `hgtvlcucxzksvmvgvbgo` angewendet und dort unter denselben Versionsnummern verbucht wie die Dateinamen:
 
-- `…_salons_personen.sql`: Salons, Personen, automatische Verknüpfung mit dem Login, Zugriffsschutz, Funktion `ich()`, Salon „Dawiid“
-- `…_inhalte_tabellen.sql`: Tabellen für Verhalten, Bewertungsstufen, Rituale und Ritual-Fragen (noch leer)
+| Migration | Inhalt |
+|---|---|
+| `…_salons_personen` | Salons, Personen, automatische Verknüpfung mit dem Login, Zugriffsschutz, `ich()`, Salon „Dawiid“ |
+| `…_inhalte_tabellen` | Verhalten, Bewertungsstufen, Rituale und Ritual-Fragen |
+| `…_umfrage_basis` | Bildet die bestehenden Umfrage-Tabellen für frische Datenbanken ab. Im Projekt ohne Wirkung |
+| `…_umfrage_personen_ids` | Personen-IDs an den Umfrage-Tabellen, Nachtragen der Altdaten |
+| `…_umfrage_funktionen` | `umfrage_inhalt`, `meine_monate`, `meine_offenen_monate`, `umfrage_einreichen_v2` |
+| `…_seed_dawiid_inhalte` | 20 Verhalten und 2 Rituale mit 9 Fragen |
 
 Die Dateinamen entsprechen den verbuchten Versionen. Das ist wichtig: Die GitHub-Integration (Supabase → **Project Settings → Integrations → GitHub**, Supabase directory `supabase`, **Deploy to production**) vergleicht Versionen und führt nur neue Dateien aus. Würden Datei und Datenbank abweichen, liefe dieselbe Migration ein zweites Mal und scheiterte an „already exists“.
 
 Für künftige Änderungen: neue Datei mit neuerem Zeitstempel in `supabase/migrations/` anlegen und pushen. Die Integration wendet sie nach dem Merge in den Produktions-Branch an. Wird eine Migration stattdessen direkt angewendet, muss der Dateiname danach zur verbuchten Version passen (`list_migrations` bzw. Tabelle `supabase_migrations.schema_migrations`).
 
-Die Migrationen fassen die bestehenden Umfrage-Tabellen (`umfrage_*`) nicht an. Die alte HTML-Umfrage läuft unverändert weiter.
+Die bestehenden Umfrage-Tabellen (`umfrage_*`) wurden nur um optionale ID-Spalten ergänzt, die alte HTML-Umfrage läuft unverändert weiter.
 
 ### 2. Auth-Einstellungen (Plan §4.3)
 
@@ -113,6 +123,44 @@ Danach öffnet die Person den Einladungslink oder meldet sich unter `/login` an 
 
 Zugang pausieren: `update public.personen set aktiv = false where email = '…';`
 
+### Inhalte der Umfrage pflegen
+
+Alle Inhalte stehen in Tabellen und lassen sich im SQL-Editor oder Table Editor ändern, ohne neuen Build.
+
+```sql
+-- Video zu einem Verhalten (Vimeo-Link oder .mp4)
+update public.verhalten set video_url = 'https://vimeo.com/123456789'
+where nr = 1 and salon_id = (select id from public.salons where name = 'Dawiid');
+
+-- Bewertungsstufe zu einem Verhalten
+insert into public.verhalten_kriterien (verhalten_id, stufe, bezeichnung, prozent, leitsatz, punkte)
+select v.id, 1, '1 – Bewusstsein', '0–25%', 'Leitsatz …', array['Punkt A', 'Punkt B']
+from public.verhalten v
+where v.nr = 1 and v.salon_id = (select id from public.salons where name = 'Dawiid');
+
+-- Auswahl-Frage in einem Ritual
+insert into public.ritual_fragen (ritual_id, nr, typ, frage, optionen, pflicht)
+select r.id, 3, 'auswahl', 'Welche Phase war am wenigsten stabil?', array['Phase 1', 'Phase 2'], false
+from public.rituale r
+where r.nr = 1 and r.salon_id = (select id from public.salons where name = 'Dawiid');
+```
+
+Ein Verhalten ausblenden: `update public.verhalten set aktiv = false where nr = …;`. Die Umfrage verlangt immer genau die aktiven Verhalten, für jede aktive Teilnehmerin.
+
+**Video-Pflicht:** Mit Video-Link wird die Bewertung erst frei, wenn das Video bis zum Ende gelaufen ist. Das erkennt die Umfrage bei Vimeo-Links und direkten Videodateien (`.mp4`, `.webm`). Bei anderen Links bestätigt die Person selbst. Läuft ein Video nicht, erscheint nach 20 Sekunden ein Ausweg, damit niemand feststeckt.
+
+### Alte Abgaben und der Umstieg
+
+Die bisherigen Abgaben der HTML-Umfrage bekommen ihre Personen-IDs automatisch, sobald eine Person mit **genau demselben Namen** und Salon in `personen` angelegt wird. Die Schreibweise der Namen in `personen` muss also zu den bisherigen Abgaben passen („Oksana Serafyn“).
+
+Die alte HTML-Umfrage läuft parallel weiter, weil `anon` die Funktion `umfrage_einreichen` noch ausführen darf. **Erst wenn** die Plattform-Umfrage mit allen Personen getestet ist und die Inhalte vollständig sind, schaltest du sie ab:
+
+```sql
+revoke execute on function public.umfrage_einreichen(jsonb) from anon, authenticated;
+```
+
+Danach ist nur noch `umfrage_einreichen_v2` (nur eingeloggt) erreichbar. Der Test `02_umfrage.test.sql` prüft bis dahin bewusst, dass die alte Funktion offen ist. Beim Abschalten die Zeile „Alte HTML-Umfrage“ am Ende der Datei anpassen.
+
 ### Wer sieht was?
 
 | Rolle | Rechte |
@@ -125,7 +173,7 @@ Die Rechte stecken in Row Level Security und Datenbank-Funktionen. Die Routen-Sp
 
 ## Tests
 
-Die Datenbank-Rechte sind mit pgTAP getestet (Verknüpfung, Constraints, wer was lesen darf):
+Die Datenbank ist mit pgTAP getestet (98 Tests): Verknüpfung von Login und Person, Constraints, wer was lesen darf, und die komplette Monatsumfrage (Monate, Fristen, Abgabe, alle Ablehnungsfälle, Nachtragen der Altdaten):
 
 ```bash
 supabase start && supabase test db
