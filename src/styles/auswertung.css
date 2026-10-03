@@ -578,3 +578,17 @@
   flex-wrap: wrap;
   gap: 10px;
 }
+
+/* Heatmap: Säulen-Durchschnitt als eigene Zeile */
+.heatmap tr.gruppe--summe th {
+  text-align: left;
+}
+
+.heatmap .heat--summe {
+  font-size: 1.02em;
+  border-top: 1px solid var(--cream-deep);
+}
+
+.heatmap tr.gruppe--gesamt th {
+  border-top: 2px solid var(--cream-deep);
+}

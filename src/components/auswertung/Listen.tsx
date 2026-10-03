@@ -1,5 +1,5 @@
 import type { DashboardPerson, Schwellen } from '../../lib/auswertung'
-import { niveau, zahl } from '../../lib/auswertung'
+import { mittel, niveau, zahl } from '../../lib/auswertung'
 
 interface Eintrag {
   nr: number
@@ -68,7 +68,7 @@ export function Rangliste({
   )
 }
 
-/** Matrix Verhalten × Person im Fremdbild, Farbe nach Score-Niveau, Zeilen nach Säule gruppiert */
+/** Matrix Verhalten × Person im Fremdbild, Farbe nach Score-Niveau. Je Säule eine Zeile mit dem Durchschnitt, dazu Ø Team. */
 export function Heatmap({
   verhalten,
   matrix,
@@ -80,7 +80,27 @@ export function Heatmap({
   personen: { id: string; name: string }[]
   schwellen: Schwellen
 }) {
-  let letzte = ''
+  const wertVon = (nr: number, personId: string) => matrix.find((m) => m.nr === nr && m.person_id === personId)?.fb ?? null
+  const teamVon = (nrs: number[]) => mittel(nrs.flatMap((nr) => personen.map((p) => wertVon(nr, p.id))))
+  const personVon = (nrs: number[], personId: string) => mittel(nrs.map((nr) => wertVon(nr, personId)))
+
+  // Gruppen in der Reihenfolge der Verhalten (Grundpfeiler · Säule)
+  const gruppen: { name: string; verhalten: typeof verhalten }[] = []
+  for (const v of verhalten) {
+    const name = [v.grundpfeiler, v.saeule].filter(Boolean).join(' · ')
+    const letzte = gruppen[gruppen.length - 1]
+    if (letzte && letzte.name === name) letzte.verhalten.push(v)
+    else gruppen.push({ name, verhalten: [v] })
+  }
+
+  const zelle = (wert: number | null, key: string, fett = false) => (
+    <td key={key} className={`zahl heat heat--${niveau(wert, schwellen) ?? 'leer'}${fett ? ' heat--summe' : ''}`}>
+      {zahl(wert)}
+    </td>
+  )
+
+  const alle = verhalten.map((v) => v.nr)
+
   return (
     <div className="tabelle-scroll">
       <table className="tabelle heatmap">
@@ -92,44 +112,42 @@ export function Heatmap({
                 {p.name.split(' ')[0]}
               </th>
             ))}
+            <th className="zahl hervor">Ø Team</th>
           </tr>
         </thead>
         <tbody>
-          {verhalten.map((v) => {
-            const gruppe = [v.grundpfeiler, v.saeule].filter(Boolean).join(' · ')
-            const kopf = gruppe !== letzte ? gruppe : null
-            letzte = gruppe
+          {gruppen.map((g) => {
+            const nrs = g.verhalten.map((v) => v.nr)
             return (
-              <HeatZeile key={v.nr} kopf={kopf} spalten={personen.length + 1}>
-                <td>
-                  <span className="verhalten-nr">{v.nr}</span> {v.titel}
-                </td>
-                {personen.map((p) => {
-                  const wert = matrix.find((m) => m.nr === v.nr && m.person_id === p.id)?.fb ?? null
-                  return (
-                    <td key={p.id} className={`zahl heat heat--${niveau(wert, schwellen) ?? 'leer'}`}>
-                      {zahl(wert)}
+              <HeatGruppe key={g.name} name={g.name}>
+                <tr className="gruppe gruppe--summe">
+                  <th>{g.name || 'Ohne Säule'} · Ø</th>
+                  {personen.map((p) => zelle(personVon(nrs, p.id), p.id, true))}
+                  {zelle(teamVon(nrs), 'team', true)}
+                </tr>
+                {g.verhalten.map((v) => (
+                  <tr key={v.nr}>
+                    <td>
+                      <span className="verhalten-nr">{v.nr}</span> {v.titel}
                     </td>
-                  )
-                })}
-              </HeatZeile>
+                    {personen.map((p) => zelle(wertVon(v.nr, p.id), p.id))}
+                    {zelle(teamVon([v.nr]), 'team')}
+                  </tr>
+                ))}
+              </HeatGruppe>
             )
           })}
+          <tr className="gruppe gruppe--summe gruppe--gesamt">
+            <th>Gesamt · Ø alle Verhalten</th>
+            {personen.map((p) => zelle(personVon(alle, p.id), p.id, true))}
+            {zelle(teamVon(alle), 'team', true)}
+          </tr>
         </tbody>
       </table>
     </div>
   )
 }
 
-function HeatZeile({ kopf, spalten, children }: { kopf: string | null; spalten: number; children: React.ReactNode }) {
-  return (
-    <>
-      {kopf && (
-        <tr className="gruppe">
-          <th colSpan={spalten}>{kopf}</th>
-        </tr>
-      )}
-      <tr>{children}</tr>
-    </>
-  )
+function HeatGruppe({ children }: { name: string; children: React.ReactNode }) {
+  return <>{children}</>
 }
