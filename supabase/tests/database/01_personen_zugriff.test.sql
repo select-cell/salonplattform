@@ -154,7 +154,9 @@ select is((select count(*) from public.personen
 select is((select count(*) from public.salons
             where id in ('aaaaaaaa-0000-0000-0000-00000000000a', 'bbbbbbbb-0000-0000-0000-00000000000b')),
           2::bigint, 'Admin sieht alle Salons');
-select is((select count(*) from public.verhalten), 2::bigint, 'Admin sieht Inhalte aller Salons');
+select is((select count(*) from public.verhalten
+            where salon_id in ('aaaaaaaa-0000-0000-0000-00000000000a', 'bbbbbbbb-0000-0000-0000-00000000000b')),
+          2::bigint, 'Admin sieht Inhalte aller Salons');
 
 -- ---------------------------------------------------------------------------
 -- Gesperrte Person (aktiv = false)
