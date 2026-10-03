@@ -592,3 +592,12 @@
 .heatmap tr.gruppe--gesamt th {
   border-top: 2px solid var(--cream-deep);
 }
+
+.heat__saeule {
+  display: block;
+  font-weight: 600;
+}
+
+.heat__pfeiler {
+  display: block;
+}

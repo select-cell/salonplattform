@@ -68,7 +68,7 @@ export function Rangliste({
   )
 }
 
-/** Matrix Verhalten × Person im Fremdbild, Farbe nach Score-Niveau. Je Säule eine Zeile mit dem Durchschnitt, dazu Ø Team. */
+/** Matrix Säule × Person im Fremdbild (Durchschnitt aller Verhalten der Säule), Farbe nach Score-Niveau, dazu Ø Team. */
 export function Heatmap({
   verhalten,
   matrix,
@@ -85,12 +85,12 @@ export function Heatmap({
   const personVon = (nrs: number[], personId: string) => mittel(nrs.map((nr) => wertVon(nr, personId)))
 
   // Gruppen in der Reihenfolge der Verhalten (Grundpfeiler · Säule)
-  const gruppen: { name: string; verhalten: typeof verhalten }[] = []
+  const gruppen: { name: string; grundpfeiler: string | null; saeule: string | null; verhalten: typeof verhalten }[] = []
   for (const v of verhalten) {
     const name = [v.grundpfeiler, v.saeule].filter(Boolean).join(' · ')
     const letzte = gruppen[gruppen.length - 1]
     if (letzte && letzte.name === name) letzte.verhalten.push(v)
-    else gruppen.push({ name, verhalten: [v] })
+    else gruppen.push({ name, grundpfeiler: v.grundpfeiler, saeule: v.saeule, verhalten: [v] })
   }
 
   const zelle = (wert: number | null, key: string, fett = false) => (
@@ -106,7 +106,7 @@ export function Heatmap({
       <table className="tabelle heatmap">
         <thead>
           <tr>
-            <th>Verhalten</th>
+            <th>Säule</th>
             {personen.map((p) => (
               <th key={p.id} className="zahl">
                 {p.name.split(' ')[0]}
@@ -119,26 +119,18 @@ export function Heatmap({
           {gruppen.map((g) => {
             const nrs = g.verhalten.map((v) => v.nr)
             return (
-              <HeatGruppe key={g.name} name={g.name}>
-                <tr className="gruppe gruppe--summe">
-                  <th>{g.name || 'Ohne Säule'} · Ø</th>
-                  {personen.map((p) => zelle(personVon(nrs, p.id), p.id, true))}
-                  {zelle(teamVon(nrs), 'team', true)}
-                </tr>
-                {g.verhalten.map((v) => (
-                  <tr key={v.nr}>
-                    <td>
-                      <span className="verhalten-nr">{v.nr}</span> {v.titel}
-                    </td>
-                    {personen.map((p) => zelle(wertVon(v.nr, p.id), p.id))}
-                    {zelle(teamVon([v.nr]), 'team')}
-                  </tr>
-                ))}
-              </HeatGruppe>
+              <tr key={g.name}>
+                <td>
+                  <span className="heat__saeule">{g.saeule ?? 'Ohne Säule'}</span>
+                  {g.grundpfeiler && <span className="heat__pfeiler muted klein">{g.grundpfeiler}</span>}
+                </td>
+                {personen.map((p) => zelle(personVon(nrs, p.id), p.id))}
+                {zelle(teamVon(nrs), 'team', true)}
+              </tr>
             )
           })}
           <tr className="gruppe gruppe--summe gruppe--gesamt">
-            <th>Gesamt · Ø alle Verhalten</th>
+            <th>Gesamt (alle Säulen)</th>
             {personen.map((p) => zelle(personVon(alle, p.id), p.id, true))}
             {zelle(teamVon(alle), 'team', true)}
           </tr>
@@ -148,6 +140,3 @@ export function Heatmap({
   )
 }
 
-function HeatGruppe({ children }: { name: string; children: React.ReactNode }) {
-  return <>{children}</>
-}
