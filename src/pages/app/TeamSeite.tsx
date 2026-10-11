@@ -3,7 +3,7 @@ import { usePerson } from '../../auth/kontext'
 import { DatenZustand } from '../../components/auswertung/Bausteine'
 import { LeitungsTeam } from '../../components/auswertung/LeitungsTeam'
 import { TeamAnsicht } from '../../components/auswertung/TeamAnsicht'
-import { holeTeamErgebnisse } from '../../lib/api'
+import { holeTeamDashboard, holeTeamErgebnisse } from '../../lib/api'
 import { useDaten } from '../../lib/useDaten'
 import { istLeitung } from '../../lib/types'
 
@@ -20,7 +20,7 @@ export default function TeamSeite() {
         <p>
           {leitung
             ? 'Rangliste, Heatmap und der Vergleich von Selbst- und Fremdbild. Mit dem Umschalter wechselst du zu einzelnen Personen.'
-            : 'Durchschnittswerte des ganzen Teams. Einzelne Personen bleiben ungenannt.'}
+            : 'Durchschnittswerte des Teams, dazu Rangliste und Heatmap.'}
         </p>
       </header>
       {leitung ? <LeitungsTeam /> : <TeamFuerMitarbeiterin />}
@@ -32,9 +32,11 @@ function TeamFuerMitarbeiterin() {
   const { laedt, daten, fehler, neuLaden } = useDaten(holeTeamErgebnisse, [])
   const [gewaehlt, setGewaehlt] = useState<string | null>(null)
   const monat = daten && gewaehlt && daten.monate.includes(gewaehlt) ? gewaehlt : (daten?.monate[0] ?? '')
+  // Rangliste und Heatmap kommen aus dem Dashboard-Aufruf (für Mitarbeiterinnen ohne Dauer und Absender)
+  const uebersicht = useDaten(() => (monat ? holeTeamDashboard(monat) : Promise.resolve(null)), [monat])
   return (
     <DatenZustand laedt={laedt} fehler={fehler} onNeu={neuLaden}>
-      {daten && <TeamAnsicht daten={daten} monat={monat} onMonat={setGewaehlt} />}
+      {daten && <TeamAnsicht daten={daten} monat={monat} onMonat={setGewaehlt} uebersicht={uebersicht.daten} />}
     </DatenZustand>
   )
 }

@@ -51,16 +51,21 @@ export function Rangliste({
   personen: DashboardPerson[]
   aktivId: string | null
   schwellen: Schwellen
-  onWahl: (id: string) => void
+  /** Ohne onWahl sind die Namen nur Text (Mitarbeiterinnen haben keine Einzelansicht) */
+  onWahl?: (id: string) => void
 }) {
   return (
     <ol className="rangliste">
       {personen.map((p) => (
         <li key={p.id} className={`${p.rang !== null && p.rang <= 3 ? `rang rang--${p.rang}` : 'rang'}${aktivId === p.id ? ' aktiv' : ''}`}>
           <span className="rang__platz">{p.rang ?? '–'}</span>
-          <button type="button" className="rang__name textlink" onClick={() => onWahl(p.id)}>
-            {p.name}
-          </button>
+          {onWahl ? (
+            <button type="button" className="rang__name textlink" onClick={() => onWahl(p.id)}>
+              {p.name}
+            </button>
+          ) : (
+            <span className="rang__name">{p.name}</span>
+          )}
           <span className={`wert wert--${niveau(p.fb, schwellen) ?? 'mittel'}`}>{zahl(p.fb)}</span>
         </li>
       ))}

@@ -1,7 +1,7 @@
 -- pgTAP-Tests für Phase 3 (Auswertungen) und Phase 4 (Abgabe-Status, Reminder).
 -- Ausführen: `supabase test db`
 begin;
-select plan(53);
+select plan(57);
 
 create function pg_temp.anmelden(p_uid text) returns void
 language plpgsql as $$
@@ -114,7 +114,15 @@ select is((select j from e_team)->'dauer'->0->>'minuten', '15.0', 'team_ergebnis
 
 -- Alles andere ist gesperrt
 select throws_ok($$ select public.person_ergebnisse('11111111-0000-0000-0000-00000000000b') $$, '42501', null, 'Mitarbeiterin: kein person_ergebnisse');
-select throws_ok($$ select public.team_dashboard() $$, '42501', null, 'Mitarbeiterin: kein team_dashboard');
+-- team_dashboard: Mitarbeiterinnen sehen Rangliste und Heatmap mit Namen, aber ohne Dauer und Absender
+create temp table e_dash_ma as select public.team_dashboard() as j;
+grant all on e_dash_ma to public;
+select is(jsonb_array_length((select j from e_dash_ma)->'personen'), 3, 'Mitarbeiterin: team_dashboard zeigt alle 3 Personen');
+select ok((select bool_and(p->>'minuten' is null) from jsonb_array_elements((select j from e_dash_ma)->'personen') p),
+          'Mitarbeiterin: team_dashboard ohne Ausfülldauer je Person');
+select ok((select bool_and(jsonb_array_length(e->'nennungen_von') = 0) from jsonb_array_elements((select j from e_dash_ma)->'entwicklung') e),
+          'Mitarbeiterin: team_dashboard ohne Absender der Entwicklung');
+select is(jsonb_array_length((select j from e_anna)->'selbst_kommentare'), 2, 'meine_ergebnisse: eigene Selbstbild-Kommentare');
 select throws_ok($$ select * from public.abgabe_status() $$, '42501', null, 'Mitarbeiterin: kein abgabe_status');
 select throws_ok($$ select * from public.ueberfaellige_abgaben() $$, '42501', null, 'Mitarbeiterin: keine Reminder-Liste');
 
@@ -129,6 +137,7 @@ select throws_ok($$ select public.meine_ergebnisse() $$, '42501', 'Du nimmst nic
 
 create temp table e_pers as select public.person_ergebnisse('11111111-0000-0000-0000-00000000000a') as j;
 grant all on e_pers to public;
+select is(jsonb_array_length((select j from e_pers)->'selbst_kommentare'), 2, 'person_ergebnisse: Selbstbild-Kommentare der Person');
 select is(jsonb_array_length((select j from e_pers)->'einzelwerte'), 4, 'person_ergebnisse: 4 Einzelwerte mit Absender');
 select ok((select bool_and(e ? 'von') from jsonb_array_elements((select j from e_pers)->'einzelwerte') e), 'Einzelwerte nennen die Absender');
 select is((select j from e_pers)->'entwicklung'->0->>'von', 'Berta Test', 'person_ergebnisse: Entwicklung mit Absender');

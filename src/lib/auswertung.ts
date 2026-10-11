@@ -26,6 +26,8 @@ export interface PersonAuswertung {
   monate: string[]
   verhalten: VerhaltenZeile[]
   kommentare: { monat: string; nr: number; kommentar: string; note: number }[]
+  /** Eigene Antworten im Selbstbild (Kommentare der Person über sich selbst) */
+  selbst_kommentare?: { monat: string; nr: number; kommentar: string; note: number }[]
   rituale: { monat: string; ritual: string; frage_nr: number; frage: string; antwort: number }[]
   dauer: { monat: string; minuten: number | null }[]
   entwicklung: { monat: string; von?: string; begruendung?: string | null }[]

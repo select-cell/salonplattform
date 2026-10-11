@@ -916,3 +916,11 @@ h3 {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Logo rechts neben dem Salonnamen (dunkle Bildfläche, daher als Plakette) */
+.marke__logo {
+  display: block;
+  height: 38px;
+  width: auto;
+  border-radius: 6px;
+}

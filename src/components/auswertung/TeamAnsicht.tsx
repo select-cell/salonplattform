@@ -1,12 +1,22 @@
-import type { TeamAuswertung } from '../../lib/auswertung'
+import type { Dashboard, TeamAuswertung } from '../../lib/auswertung'
 import { einordnung, mittel, monatName, saeulenSchnitte, topFlop, vorzeichen, zahl } from '../../lib/auswertung'
 import { Abschnitt, EinordnungBadge, Kennzahl, Leer, Monatswahl } from './Bausteine'
 import { SbFbDiagramm, VerlaufDiagramm, type VerlaufDaten } from './Diagramme'
-import { TopFlop } from './Listen'
+import { Heatmap, Rangliste, TopFlop } from './Listen'
 import { SchnittTabelle } from './Tabellen'
 
-/** Team-Ergebnisse für Mitarbeiterinnen: nur Durchschnittswerte, keine Einzelpersonen (Plan §2) */
-export function TeamAnsicht({ daten, monat, onMonat }: { daten: TeamAuswertung; monat: string; onMonat: (m: string) => void }) {
+/** Team-Ergebnisse für Mitarbeiterinnen: Team-Schnitte, dazu Rangliste und Heatmap mit Namen (Wunsch des Auftraggebers) */
+export function TeamAnsicht({
+  daten,
+  monat,
+  onMonat,
+  uebersicht,
+}: {
+  daten: TeamAuswertung
+  monat: string
+  onMonat: (m: string) => void
+  uebersicht?: Dashboard | null
+}) {
   if (daten.monate.length === 0) {
     return <Leer titel="Noch keine Team-Ergebnisse" text="Sobald die ersten Umfragen abgegeben sind, siehst du hier, wie das Team insgesamt dasteht." />
   }
@@ -60,6 +70,17 @@ export function TeamAnsicht({ daten, monat, onMonat }: { daten: TeamAuswertung; 
               flop={flop.map((z) => ({ nr: z.nr, titel: z.titel, saeule: z.saeule, wert: z.fb }))}
             />
           </Abschnitt>
+
+          {uebersicht && uebersicht.monat === monat && uebersicht.personen.length > 0 && (
+            <>
+              <Abschnitt titel="Rangliste" kurz="Nach Fremdbild.">
+                <Rangliste personen={uebersicht.personen} aktivId={null} schwellen={schwellen} />
+              </Abschnitt>
+              <Abschnitt titel="Heatmap" kurz="Fremdbild je Säule und Person. Grün hoch, Gelb mittel, Rot niedrig.">
+                <Heatmap verhalten={uebersicht.verhalten} matrix={uebersicht.matrix} personen={uebersicht.personen} schwellen={schwellen} />
+              </Abschnitt>
+            </>
+          )}
 
           <Abschnitt titel="Alle Verhalten im Team-Schnitt">
             <SchnittTabelle zeilen={zeilen} schwellen={schwellen} />
