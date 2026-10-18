@@ -84,11 +84,11 @@ export function PersonenAnsicht({ daten, monat, onMonat, mitAbsender }: Props) {
           </Abschnitt>
 
           <Abschnitt
-            titel="Rückmeldungen im Monat"
+            titel={mitAbsender ? 'Rückmeldungen im Monat' : 'Deine Antworten im Monat'}
             kurz={
               mitAbsender
-                ? 'Mit Absender. Nur für Verantwortliche und Admins sichtbar.'
-                : 'Die Kolleginnen schreiben anonym. Absender werden nicht angezeigt.'
+                ? 'Selbstbild der Person und Fremdbild mit Absender. Nur für Verantwortliche und Admins sichtbar.'
+                : 'Deine eigenen Antworten aus dem Selbstbild.'
             }
           >
             <MonatsDetail daten={daten} monat={monat} zeilen={zeilen} mitAbsender={mitAbsender} />
@@ -127,12 +127,11 @@ function MonatsDetail({
   mitAbsender: boolean
 }) {
   const selbst = (daten.selbst_kommentare ?? []).filter((k) => k.monat === monat)
+  // Mitarbeiterinnen sehen nur ihr eigenes Selbstbild, die Fremdbild-Kommentare bleiben der Leitung vorbehalten
   const mitText = zeilen.filter(
     (z) =>
       selbst.some((k) => k.nr === z.nr) ||
-      (mitAbsender
-        ? (daten.einzelwerte ?? []).some((w) => w.monat === monat && w.nr === z.nr && w.kommentar)
-        : daten.kommentare.some((k) => k.monat === monat && k.nr === z.nr)),
+      (mitAbsender && (daten.einzelwerte ?? []).some((w) => w.monat === monat && w.nr === z.nr && w.kommentar)),
   )
   if (mitText.length === 0) return <p className="muted">In diesem Monat gibt es keine Kommentare.</p>
 
@@ -152,23 +151,15 @@ function MonatsDetail({
                   <span>{eigener.kommentar}</span>
                 </li>
               )}
-              {mitAbsender
-                ? (daten.einzelwerte ?? [])
-                    .filter((w) => w.monat === monat && w.nr === z.nr && w.kommentar)
-                    .map((w, i) => (
-                      <li key={i} className="kommentar">
-                        <span className="badge badge--blau">{w.von} · Note {w.note}</span>
-                        <span>{w.kommentar}</span>
-                      </li>
-                    ))
-                : daten.kommentare
-                    .filter((k) => k.monat === monat && k.nr === z.nr)
-                    .map((k, i) => (
-                      <li key={i} className="kommentar">
-                        <span className="badge badge--blau">Fremdbild · Note {k.note}</span>
-                        <span>{k.kommentar}</span>
-                      </li>
-                    ))}
+              {mitAbsender &&
+                (daten.einzelwerte ?? [])
+                  .filter((w) => w.monat === monat && w.nr === z.nr && w.kommentar)
+                  .map((w, i) => (
+                    <li key={i} className="kommentar">
+                      <span className="badge badge--blau">{w.von} · Note {w.note}</span>
+                      <span>{w.kommentar}</span>
+                    </li>
+                  ))}
             </ul>
           </li>
         )

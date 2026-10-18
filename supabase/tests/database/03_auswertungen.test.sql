@@ -89,7 +89,7 @@ grant all on e_anna to public;
 select is(jsonb_array_length((select j from e_anna)->'verhalten'), 2, 'meine_ergebnisse: ein Monat × 2 Verhalten');
 select is((select j from e_anna)->'person'->>'name', 'Anna Test', 'meine_ergebnisse: eigene Person');
 select is((select j from e_anna)->'monate', to_jsonb(array[to_char(pg_temp.monat(-1), 'YYYY-MM')]), 'meine_ergebnisse: Monate mit Daten');
-select is(jsonb_array_length((select j from e_anna)->'kommentare'), 4, 'Kommentare: 2 Kolleginnen × 2 Verhalten');
+select is(jsonb_array_length((select j from e_anna)->'kommentare'), 0, 'Mitarbeiterin sieht keine Fremdbild-Kommentare der Kolleginnen');
 select is(position('Berta' in ((select j from e_anna)->'kommentare')::text) + position('Cora' in ((select j from e_anna)->'kommentare')::text),
           0, 'Kommentare enthalten keine Absender');
 select ok(not exists (select 1 from jsonb_array_elements((select j from e_anna)->'kommentare') k where k ? 'von'),
