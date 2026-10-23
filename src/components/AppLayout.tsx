@@ -6,6 +6,7 @@ import { ROLLEN_LABEL } from '../lib/types'
 import { Fuss } from './Fuss'
 import { Icon } from './Icon'
 import { Marke } from './Marke'
+import { ThemaSchalter } from './ThemaSchalter'
 
 export function AppLayout() {
   const person = usePerson()
@@ -60,7 +61,14 @@ export function AppLayout() {
             <div className="nutzer">
               <div className="nutzer__name">{person.name}</div>
               <div className="nutzer__rolle">{ROLLEN_LABEL[person.rolle]}</div>
+              <NavLink to="/app/passwort" className="nutzer__link">
+                Passwort ändern
+              </NavLink>
             </div>
+            <NavLink to="/app/passwort" className="icon-btn passwort-btn" title="Passwort ändern" aria-label="Passwort ändern">
+              <Icon name="schloss" />
+            </NavLink>
+            <ThemaSchalter />
             <button
               type="button"
               className="icon-btn"
@@ -87,6 +95,9 @@ export function AppLayout() {
             {links}
             <div className="nav-mobil__fuss klein muted">
               Angemeldet als {person.name} ({ROLLEN_LABEL[person.rolle]})
+              <NavLink to="/app/passwort" className="textlink" style={{ display: 'block', marginTop: 8 }} onClick={() => setMenueOffen(false)}>
+                Passwort ändern
+              </NavLink>
             </div>
           </nav>
         )}

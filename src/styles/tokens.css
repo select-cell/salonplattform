@@ -25,6 +25,36 @@
   --surface: #ffffff;
   --line: #e8e0d0;
 
+  /* Textfarben, die im Nachtmodus heller werden */
+  --link: #a86840;
+  --accent-text: #8f5733;
+  --fb-text: #36678a;
+
+  /* Flächen und Verläufe */
+  --tint: #f6e7dc;
+  --tint-soft: #fdf3ea;
+  --glow: #f3dcc9;
+  --hero-von: #fffaf5;
+  --hero-bis: #fdf1e6;
+  --hero-line: #e9cfba;
+  --ok-von: #fbfdf8;
+  --ok-bis: #eef6e3;
+  --ok-line: #cfe3b8;
+  --kopf-bg: rgba(250, 248, 243, 0.92);
+  --fokus-ring: rgba(196, 132, 90, 0.28);
+  --overlay: rgba(26, 18, 8, 0.55);
+  --overlay-schatten: rgba(26, 18, 8, 0.3);
+
+  /* Heatmap und Wertetabellen */
+  --heat-hoch-bg: #cfe3b8;
+  --heat-hoch-fg: #264a0a;
+  --heat-mittel-bg: #f3dfb4;
+  --heat-mittel-fg: #6b4208;
+  --heat-niedrig-bg: #f1c4c4;
+  --heat-niedrig-fg: #7c1f1f;
+
+  color-scheme: light;
+
   --r-s: 8px;
   --r-m: 12px;
   --r-l: 16px;
@@ -46,4 +76,64 @@
   :root {
     --gutter: 24px;
   }
+}
+
+
+/* Nachtmodus: gesetzt über data-theme am <html> (index.html und lib/thema.ts) */
+:root[data-theme='dark'] {
+  --cream: #15110c;
+  --cream-mid: #211b14;
+  --cream-deep: #3a3025;
+
+  --accent: #d08a5e;
+  --accent-h: #a86840;
+  --accent-dark: #8f5733;
+
+  --text: #f3ede2;
+  --text2: #c2b6a3;
+  --muted: #8a7d6b;
+
+  --green: #9bcb6f;
+  --gbg: #1f2b16;
+  --red: #f09a94;
+  --rbg: #3a1f1d;
+  --yel: #e8b565;
+  --ybg: #3a2c12;
+  --fb: #6fa5cb;
+  --fbbg: #1a2a37;
+  --fb-dark: #36678a;
+
+  --surface: #1c1712;
+  --line: #30281f;
+
+  --link: #e2a47c;
+  --accent-text: #e8b08a;
+  --fb-text: #8fbfe3;
+
+  --tint: #34261b;
+  --tint-soft: #2a2018;
+  --glow: #3a2a1d;
+  --hero-von: #261d15;
+  --hero-bis: #2e2218;
+  --hero-line: #4a3727;
+  --ok-von: #1c2515;
+  --ok-bis: #222d19;
+  --ok-line: #3b4d29;
+  --kopf-bg: rgba(21, 17, 12, 0.92);
+  --fokus-ring: rgba(208, 138, 94, 0.4);
+  --overlay: rgba(0, 0, 0, 0.7);
+  --overlay-schatten: rgba(0, 0, 0, 0.6);
+
+  --heat-hoch-bg: #2c4a18;
+  --heat-hoch-fg: #d3efb6;
+  --heat-mittel-bg: #4d3a12;
+  --heat-mittel-fg: #f5dca3;
+  --heat-niedrig-bg: #5a2424;
+  --heat-niedrig-fg: #f8c5c0;
+
+  --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-h: 0 2px 4px rgba(0, 0, 0, 0.4), 0 14px 32px rgba(0, 0, 0, 0.5);
+
+  color-scheme: dark;
 }

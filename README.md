@@ -23,6 +23,7 @@ Die Umfrage läuft vollständig, sobald Personen angelegt sind. Diese Inhalte si
 
 - **Bewertungsstufen 1 bis 5** je Verhalten (Bezeichnung, Prozent, Leitsatz, Punkte). Ohne sie gibt es nur die Noten.
 - **Videos** je Verhalten. Ohne Link läuft ein Platzhalter von 8 Sekunden (`PLATZHALTER_VIDEO_SEKUNDEN` in `src/lib/umfrage.ts`), danach wird die Bewertung frei. Vorspulen ist gesperrt.
+- **Nachtmodus und Passwort:** Der Umschalter im Kopf wechselt zwischen hell und dunkel (Wahl im Browser, sonst folgt die Seite dem Gerät). Unter `/app/passwort` ändern alle angemeldeten Personen ihr Passwort selbst.
 - **„Locked In“:** Jede Note öffnet ein Popup mit der vollständigen Bewertungsstufe (`verhalten_kriterien`). Erst „Locked In“ bestätigt die Note, danach ist sie gesperrt; ab Note 4 ist der Kommentar im Popup Pflicht. Nach der letzten Person geht es automatisch zum nächsten Verhalten.
 - **Rituale** gehören nicht in die Plattform: Sie sind in der Datenbank deaktiviert (`rituale.aktiv = false`), die Tabellen und alten Antworten bleiben erhalten.
 
@@ -74,6 +75,9 @@ Alle Migrationen aus `supabase/migrations/` sind am 3. Oktober 2026 im Projekt `
 | `…_seed_dawiid_kriterien` | 100 Bewertungsstufen (5 je Verhalten) aus der bisherigen Umfrage |
 | `…_rituale_deaktivieren` | Rituale ausblenden (umkehrbar) |
 | `…_umfrage_entwicklung_pflicht` | Entwicklung des Monats mit Begründung ist Pflicht |
+| `…_ergebnisse_selbstbild_team` | Selbstbild-Kommentare in den Auswertungen, `team_dashboard` auch für Mitarbeiterinnen |
+| `…_mitarbeiterin_ohne_fremdkommentare` | Mitarbeiterinnen sehen keine Fremdbild-Kommentare |
+| `…_stufennamen_verhalten_1` | Einheitliche Stufennamen (Bewusstsein … High Performer) |
 | `…_auswertungen` | `meine_ergebnisse`, `team_ergebnisse`, `person_ergebnisse`, `team_dashboard` |
 | `…_abgabe_status_reminder` | `abgabe_status`, `ueberfaellige_abgaben` (Reminder ab dem 4. Tag nach Fristende) |
 

@@ -232,16 +232,16 @@
 }
 
 .tabelle .hervor {
-  background: #fdf3ea;
+  background: var(--tint-soft);
 }
 
 .tabelle thead th.hervor {
-  background: #f6e7dc;
+  background: var(--tint);
 }
 
 .tabelle .gruppe th {
   background: var(--cream);
-  color: var(--accent-dark);
+  color: var(--accent-text);
   font-size: 0.78rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -306,18 +306,18 @@
 }
 
 .heat--hoch {
-  background: #cfe3b8;
-  color: #264a0a;
+  background: var(--heat-hoch-bg);
+  color: var(--heat-hoch-fg);
 }
 
 .heat--mittel {
-  background: #f3dfb4;
-  color: #6b4208;
+  background: var(--heat-mittel-bg);
+  color: var(--heat-mittel-fg);
 }
 
 .heat--niedrig {
-  background: #f1c4c4;
-  color: #7c1f1f;
+  background: var(--heat-niedrig-bg);
+  color: var(--heat-niedrig-fg);
 }
 
 .heat--leer {
@@ -416,14 +416,17 @@
 
 .rang--1 .rang__platz {
   background: #f4d77a;
+  color: #1a1208;
 }
 
 .rang--2 .rang__platz {
   background: #dcdcdc;
+  color: #1a1208;
 }
 
 .rang--3 .rang__platz {
   background: #e3b48c;
+  color: #1a1208;
 }
 
 .rang__name {
@@ -546,11 +549,11 @@
   border-radius: var(--r-xl);
   background: var(--surface);
   color: var(--text);
-  box-shadow: 0 20px 60px rgba(26, 18, 8, 0.3);
+  box-shadow: 0 20px 60px var(--overlay-schatten);
 }
 
 .popup::backdrop {
-  background: rgba(26, 18, 8, 0.45);
+  background: var(--overlay);
 }
 
 .popup__kopf {
@@ -600,4 +603,14 @@
 
 .heat__pfeiler {
   display: block;
+}
+
+/* Diagramme: Legende und Auswahl-Hintergrund passen sich dem Nachtmodus an */
+.recharts-default-legend .recharts-legend-item-text {
+  color: var(--text2) !important;
+}
+
+.recharts-tooltip-cursor {
+  fill: var(--cream-mid);
+  fill-opacity: 0.5;
 }

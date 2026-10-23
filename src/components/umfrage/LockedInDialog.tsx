@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { Kriterium } from '../../lib/umfrage'
-import { KOMMENTAR_PFLICHT_AB } from '../../lib/umfrage'
+import { KOMMENTAR_PFLICHT_AB, stufenName } from '../../lib/umfrage'
 import { Icon } from '../Icon'
 
 interface Props {
@@ -60,7 +60,7 @@ export function LockedInDialog({
     }
   }, [pflicht])
 
-  const stufe = [kriterium?.bezeichnung, kriterium?.prozent].filter(Boolean).join(' · ')
+  const stufe = [kriterium?.bezeichnung ? stufenName(kriterium.bezeichnung) : null, kriterium?.prozent].filter(Boolean).join(' · ')
 
   return (
     <dialog
@@ -89,7 +89,7 @@ export function LockedInDialog({
           </div>
           <p className="klein muted lockin__verhalten">{verhaltenTitel}</p>
           <h2 id={titelId} className="lockin__titel">
-            Note {note}
+            Bewertung {note}
             {stufe && <span className="lockin__stufe"> · {stufe}</span>}
           </h2>
         </header>
@@ -109,7 +109,7 @@ export function LockedInDialog({
 
         <div className="feld">
           <label className="feld__label" htmlFor={`lockin-kommentar-${verhaltenNr}`}>
-            Kommentar <span className="muted">{pflicht ? `(Pflicht ab Note ${KOMMENTAR_PFLICHT_AB})` : '(freiwillig)'}</span>
+            Kommentar <span className="muted">{pflicht ? `(Pflicht ab Bewertung ${KOMMENTAR_PFLICHT_AB})` : '(freiwillig)'}</span>
           </label>
           <textarea
             ref={textarea}
@@ -124,7 +124,7 @@ export function LockedInDialog({
         </div>
 
         <p className="klein muted">
-          Mit „Locked In“ bestätigst du diese Stufe. Danach lässt sich die Note nicht mehr ändern.
+          Mit „Locked In“ bestätigst du diese Bewertung. Danach lässt sich die Bewertung nicht mehr ändern.
         </p>
 
         <div className="lockin__aktionen">

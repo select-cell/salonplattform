@@ -30,8 +30,8 @@ export function Zusammenfassung({ schritte, inhalt, entwurf, sendet, fehler, onS
         <p className="muted">Schau noch einmal drüber. Nach dem Absenden kannst du nichts mehr ändern.</p>
       </header>
 
-      <section className="karte karte--creme stack-s" aria-label="Durchschnitt deiner Noten">
-        <h3 className="abschnitt-titel">Durchschnitt deiner Noten</h3>
+      <section className="karte karte--creme stack-s" aria-label="Durchschnitt deiner Bewertungen">
+        <h3 className="abschnitt-titel">Durchschnitt deiner Bewertungen</h3>
         <ul className="zeilen">
           {schnitte.map(({ person, schnitt }) => (
             <li key={person.id} className="zeile">

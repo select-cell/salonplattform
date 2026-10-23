@@ -42,7 +42,7 @@ export function Skala({ name, id, legende, wert, onChange, variante = 'neutral',
               onChange={() => onChange(note)}
             />
             <span aria-hidden="true">{note}</span>
-            <span className="nur-sr">Note {note}</span>
+            <span className="nur-sr">Bewertung {note}</span>
             {feldLabels && <span className="skala__label">{feldLabels[note - 1]}</span>}
           </label>
         ))}

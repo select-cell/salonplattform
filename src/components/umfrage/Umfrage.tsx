@@ -214,7 +214,7 @@ function StartSchritt({
 
       <ul className="platzhalter__liste">
         <li>
-          {inhalt.verhalten.length} Verhalten, jeweils mit Video und Note 1 bis 5. Ab Note 4 brauchen wir einen Kommentar.
+          {inhalt.verhalten.length} Verhalten, jeweils mit Video und einer Bewertung von 1 bis 5. Ab Bewertung 4 brauchen wir einen Kommentar.
         </li>
         {kolleginnen > 0 && <li>Vorab eine Frage zur Entwicklung des Monats.</li>}
         <li>Dein Zwischenstand wird auf diesem Gerät gespeichert. Du kannst jederzeit später weitermachen.</li>

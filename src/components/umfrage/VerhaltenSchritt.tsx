@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Icon } from '../Icon'
 import type { Entwurf, UmfrageInhalt, Verhalten } from '../../lib/umfrage'
-import { SELBSTBILD_LABELS, bewertete, brauchtVideo, notenSchluessel } from '../../lib/umfrage'
+import { STUFEN_NAMEN, bewertete, brauchtVideo, notenSchluessel } from '../../lib/umfrage'
 import { LockedInDialog } from './LockedInDialog'
 import { Skala } from './Skala'
 import { VideoSperre } from './VideoSperre'
@@ -107,7 +107,7 @@ export function VerhaltenSchritt({
                 gesperrt={!!note}
                 onChange={(n) => setAuswahl({ personId: person.id, note: n })}
                 beschreibung={beschreibung}
-                feldLabels={person.selbst ? SELBSTBILD_LABELS : undefined}
+                feldLabels={STUFEN_NAMEN}
               >
                 {note && (
                   <p className="bewertung__gesperrt">

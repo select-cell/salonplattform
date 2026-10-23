@@ -14,7 +14,13 @@ import {
 } from 'recharts'
 import { FARBE_FB, FARBE_SB, monatKurz, zahl } from '../../lib/auswertung'
 
-const ACHSE = { fontSize: 12, fill: '#6b5b45' }
+const ACHSE = { fontSize: 12, fill: 'var(--text2)' }
+const RASTER = 'var(--line)'
+const TOOLTIP = {
+  contentStyle: { background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)' },
+  labelStyle: { color: 'var(--text)' },
+  itemStyle: { color: 'var(--text2)' },
+}
 const tooltipWert = (v: unknown) => (typeof v === 'number' ? zahl(v, 2) : '–')
 
 export interface BalkenDaten {
@@ -30,10 +36,11 @@ export function SbFbDiagramm({ daten, beschreibung }: { daten: BalkenDaten[]; be
     <div className="diagramm" role="img" aria-label={beschreibung}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={daten} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8e0d0" />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={RASTER} />
           <XAxis dataKey="name" tick={ACHSE} interval={0} />
           <YAxis domain={[0, 5]} ticks={[1, 2, 3, 4, 5]} tick={ACHSE} />
           <Tooltip
+            {...TOOLTIP}
             formatter={tooltipWert}
             labelFormatter={(l, p) => (p?.[0]?.payload as BalkenDaten | undefined)?.voll ?? String(l)}
           />
@@ -58,11 +65,11 @@ export function DifferenzDiagramm({
     <div className="diagramm" role="img" aria-label="Differenz zwischen Selbstbild und Fremdbild je Person">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={daten} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8e0d0" />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={RASTER} />
           <XAxis dataKey="name" tick={ACHSE} interval={0} />
           <YAxis tick={ACHSE} />
-          <Tooltip formatter={tooltipWert} />
-          <ReferenceLine y={0} stroke="#6b5b45" />
+          <Tooltip {...TOOLTIP} formatter={tooltipWert} />
+          <ReferenceLine y={0} stroke="var(--text2)" />
           <Bar dataKey="differenz" name="Selbstbild − Fremdbild" radius={[4, 4, 0, 0]} isAnimationActive={false}>
             {daten.map((d) => (
               <Cell key={d.name} fill={d.differenz !== null && Math.abs(d.differenz) <= schwelle ? '#3B6D11' : '#A32D2D'} />
@@ -86,10 +93,10 @@ export function VerlaufDiagramm({ daten }: { daten: VerlaufDaten[] }) {
     <div className="diagramm" role="img" aria-label="Verlauf von Selbstbild und Fremdbild über alle Monate">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={beschriftet} margin={{ top: 8, right: 12, bottom: 0, left: -18 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8e0d0" />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={RASTER} />
           <XAxis dataKey="name" tick={ACHSE} />
           <YAxis domain={[0, 5]} ticks={[1, 2, 3, 4, 5]} tick={ACHSE} />
-          <Tooltip formatter={tooltipWert} />
+          <Tooltip {...TOOLTIP} formatter={tooltipWert} />
           <Legend wrapperStyle={{ fontSize: 13 }} />
           <Line type="monotone" dataKey="sb" name="Ø Selbstbild" stroke={FARBE_SB} strokeWidth={2.5} dot={{ r: 4 }} connectNulls isAnimationActive={false} />
           <Line type="monotone" dataKey="fb" name="Ø Fremdbild" stroke={FARBE_FB} strokeWidth={2.5} dot={{ r: 4 }} connectNulls isAnimationActive={false} />

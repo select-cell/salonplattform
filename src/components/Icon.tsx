@@ -96,6 +96,12 @@ const PFADE = {
       <path d="m12 5 7 7-7 7" />
     </>
   ),
+  thema: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" />
+    </>
+  ),
   schloss: (
     <>
       <rect x="3" y="11" width="18" height="11" rx="2" />

@@ -141,8 +141,11 @@ export const notenSchluessel = (verhaltenNr: number, personId: string) => `${ver
 /** Ab dieser Note ist ein Kommentar Pflicht (Plan §1, Datenbank: bewertungen_kommentar_ab_4). */
 export const KOMMENTAR_PFLICHT_AB = 4
 
-/** Beschriftung der Noten 1–5 beim Selbstbild (wie in der bisherigen Umfrage). */
-export const SELBSTBILD_LABELS = ['Nicht sichtbar', 'Selten sichtbar', 'Oft sichtbar', 'Immer sichtbar', 'Vorbildlich'] as const
+/** Namen der fünf Bewertungsstufen, die unter den Zahlen 1–5 stehen (für Selbstbild und Fremdbild). */
+export const STUFEN_NAMEN = ['Bewusstsein', 'Aufbau', 'Stabilität', 'Profi', 'High Performer'] as const
+
+/** „4 – Profi“ → „Profi“ (die Zahl steht schon davor) */
+export const stufenName = (bezeichnung: string) => bezeichnung.replace(/^\d+\s*[–-]\s*/, '')
 
 /** Mindestdauer des Platzhalter-Videos, solange noch kein echtes Video hinterlegt ist. */
 export const PLATZHALTER_VIDEO_SEKUNDEN = 8
@@ -176,7 +179,7 @@ export function schrittFehler(schritt: Schritt, entwurf: Entwurf, inhalt: Umfrag
           : `Bitte bewerte ${person.name}.`
       }
       if (note >= KOMMENTAR_PFLICHT_AB && !(entwurf.kommentare[schluessel] ?? '').trim()) {
-        return `Ab Note ${KOMMENTAR_PFLICHT_AB} brauchen wir einen Kommentar${person.selbst ? ' zu dir' : ` zu ${person.name}`}.`
+        return `Ab Bewertung ${KOMMENTAR_PFLICHT_AB} brauchen wir einen Kommentar${person.selbst ? ' zu dir' : ` zu ${person.name}`}.`
       }
     }
     return null

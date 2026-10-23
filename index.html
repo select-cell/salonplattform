@@ -7,6 +7,15 @@
     <meta name="robots" content="noindex" />
     <meta name="description" content="Team-Plattform für Feedback, Selbstbild und Fremdbild im Salon." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // Hell oder Nacht festlegen, bevor die Seite gezeichnet wird (Wahl aus dem Browser, sonst Einstellung des Geräts)
+      try {
+        var t = localStorage.getItem('dawiid-theme')
+        if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        document.documentElement.dataset.theme = t
+        if (t === 'dark') document.querySelector('meta[name="theme-color"]').setAttribute('content', '#15110C')
+      } catch (e) {}
+    </script>
     <title>Dawiid · Team-Plattform</title>
   </head>
   <body>

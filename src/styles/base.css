@@ -55,12 +55,12 @@ input {
 }
 
 a {
-  color: var(--accent-h);
+  color: var(--link);
   text-underline-offset: 3px;
 }
 
 a:hover {
-  color: var(--accent-dark);
+  color: var(--accent-text);
 }
 
 :focus-visible {
@@ -132,7 +132,7 @@ h3 {
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--accent-h);
+  color: var(--link);
 }
 
 /* ---- Schaltflächen ------------------------------------------------------ */
@@ -230,8 +230,8 @@ h3 {
 
 .feld__eingabe:focus {
   outline: none;
-  border-color: var(--accent-h);
-  box-shadow: 0 0 0 3px rgba(196, 132, 90, 0.28);
+  border-color: var(--link);
+  box-shadow: 0 0 0 3px var(--fokus-ring);
 }
 
 /* ---- Karten ------------------------------------------------------------- */
@@ -295,8 +295,8 @@ h3 {
 }
 
 .badge--akzent {
-  background: #f6e7dc;
-  color: var(--accent-dark);
+  background: var(--tint);
+  color: var(--accent-text);
 }
 
 .hinweis {
@@ -400,7 +400,7 @@ h3 {
   top: 0;
   z-index: 20;
   border-bottom: 1px solid var(--line);
-  background: rgba(250, 248, 243, 0.92);
+  background: var(--kopf-bg);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
@@ -501,7 +501,7 @@ h3 {
   border-top: 1px solid var(--line);
 }
 
-@media (min-width: 960px) {
+@media (min-width: 1100px) {
   .nav {
     display: flex;
     flex: 1;
@@ -524,7 +524,7 @@ h3 {
   }
 }
 
-@media (min-width: 1180px) {
+@media (min-width: 1280px) {
   .nutzer {
     display: block;
   }
@@ -588,7 +588,7 @@ h3 {
   width: 520px;
   height: 520px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #f3dcc9 0%, rgba(243, 220, 201, 0) 68%);
+  background: radial-gradient(circle at 35% 35%, var(--glow) 0%, transparent 68%);
 }
 
 .hero__text {
@@ -601,7 +601,7 @@ h3 {
 
 .hero h1 em {
   font-style: italic;
-  color: var(--accent-h);
+  color: var(--link);
 }
 
 .hero__lead {
@@ -644,8 +644,8 @@ h3 {
   place-items: center;
   margin-bottom: 14px;
   border-radius: var(--r-m);
-  background: #f6e7dc;
-  color: var(--accent-dark);
+  background: var(--tint);
+  color: var(--accent-text);
 }
 
 .merkmal h3 {
@@ -700,7 +700,7 @@ h3 {
 /* ---- Dashboard ---------------------------------------------------------- */
 .begruessung h1 em {
   font-style: italic;
-  color: var(--accent-h);
+  color: var(--link);
 }
 
 .abschnitt-titel {
@@ -716,8 +716,8 @@ h3 {
 .umfrage-karte {
   display: grid;
   gap: 18px;
-  border-color: #e9cfba;
-  background: linear-gradient(135deg, #fffaf5 0%, #fdf1e6 100%);
+  border-color: var(--hero-line);
+  background: linear-gradient(135deg, var(--hero-von) 0%, var(--hero-bis) 100%);
 }
 
 .umfrage-karte__titel {
@@ -790,7 +790,7 @@ h3 {
   place-items: center;
   border-radius: var(--r-m);
   background: var(--cream-mid);
-  color: var(--accent-dark);
+  color: var(--accent-text);
 }
 
 .kachel__badge {
@@ -923,4 +923,48 @@ h3 {
   height: 38px;
   width: auto;
   border-radius: 6px;
+}
+
+.nutzer__link {
+  display: inline-block;
+  margin-top: 2px;
+  color: var(--link);
+  font-size: 0.75rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.nutzer__link:hover {
+  color: var(--accent-text);
+}
+
+/* Zwischen Handy-Menü und breitem Kopf: Schloss-Symbol für „Passwort ändern“ */
+.passwort-btn {
+  display: none;
+}
+
+@media (min-width: 1100px) and (max-width: 1279px) {
+  .passwort-btn {
+    display: inline-grid;
+  }
+}
+
+.nutzer__link,
+.marke__zusatz {
+  white-space: nowrap;
+}
+
+/* Schmale Handys: Logo etwas kleiner, damit Umschalter, Abmelden und Menü Platz haben */
+@media (max-width: 480px) {
+  .marke {
+    gap: 8px;
+  }
+
+  .marke__logo {
+    height: 30px;
+  }
+
+  .kopf__rechts {
+    gap: 0;
+  }
 }

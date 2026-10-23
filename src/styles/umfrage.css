@@ -19,7 +19,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--accent-h);
+  color: var(--link);
   font: inherit;
   font-size: 0.925rem;
   text-decoration: underline;
@@ -28,7 +28,7 @@
 }
 
 .textlink:hover {
-  color: var(--accent-dark);
+  color: var(--accent-text);
 }
 
 /* ---- Fortschritt ---------------------------------------------------------- */
@@ -81,7 +81,7 @@
   gap: 12px;
   margin-top: 24px;
   padding: 14px 0 calc(14px + env(safe-area-inset-bottom));
-  background: linear-gradient(to top, var(--cream) 72%, rgba(250, 248, 243, 0));
+  background: linear-gradient(to top, var(--cream) 72%, transparent);
 }
 
 .umfrage__aktionen .btn {
@@ -155,7 +155,7 @@
 .stufe > summary::after {
   content: '+';
   margin-left: auto;
-  color: var(--accent-h);
+  color: var(--link);
   font-size: 1.25rem;
   line-height: 1;
 }
@@ -237,13 +237,13 @@
 }
 
 .bewertung--selbst .bewertung__art {
-  background: #f6e7dc;
-  color: var(--accent-dark);
+  background: var(--tint);
+  color: var(--accent-text);
 }
 
 .bewertung--fremd .bewertung__art {
   background: var(--fbbg);
-  color: var(--fb-dark);
+  color: var(--fb-text);
 }
 
 .bewertung__frage {
@@ -297,20 +297,21 @@
 }
 
 .skala__feld input:checked + span {
-  border-color: var(--accent-h);
+  border-color: var(--link);
   background: var(--accent-h);
   color: #fff;
   transform: scale(1.03);
 }
 
 .bewertung--fremd .skala__feld input:checked + span {
-  border-color: var(--fb-dark);
+  border-color: var(--fb-text);
   background: var(--fb-dark);
 }
 
 .bewertung--neutral .skala__feld input:checked + span {
   border-color: var(--text);
   background: var(--text);
+  color: var(--cream);
 }
 
 /* ---- Auswahl ---------------------------------------------------------------- */
@@ -339,12 +340,12 @@
   width: 20px;
   height: 20px;
   flex: none;
-  accent-color: var(--accent-h);
+  accent-color: var(--link);
 }
 
 .auswahl__option:has(input:checked) {
-  border-color: var(--accent-h);
-  background: #fdf3ea;
+  border-color: var(--link);
+  background: var(--tint-soft);
 }
 
 /* ---- Zusammenfassung und Listen --------------------------------------------- */
@@ -366,12 +367,12 @@
 
 .badge--blau {
   background: var(--fbbg);
-  color: var(--fb-dark);
+  color: var(--fb-text);
 }
 
 .umfrage-karte--erledigt {
-  border-color: #cfe3b8;
-  background: linear-gradient(135deg, #fbfdf8 0%, #eef6e3 100%);
+  border-color: var(--ok-line);
+  background: linear-gradient(135deg, var(--ok-von) 0%, var(--ok-bis) 100%);
 }
 
 .lade--kompakt {
@@ -416,7 +417,7 @@
 }
 
 .lockin::backdrop {
-  background: rgba(26, 18, 8, 0.55);
+  background: var(--overlay);
 }
 
 .lockin[open] {
@@ -440,7 +441,7 @@
 }
 
 .lockin__stufe {
-  color: var(--accent-dark);
+  color: var(--accent-text);
 }
 
 .lockin__kriterium {
