@@ -401,3 +401,121 @@
   width: 100%;
   max-width: 260px;
 }
+
+/* ---- Locked-In-Popup ----------------------------------------------------------- */
+.lockin {
+  width: min(560px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-h);
+  overflow: auto;
+}
+
+.lockin::backdrop {
+  background: rgba(26, 18, 8, 0.55);
+}
+
+.lockin[open] {
+  animation: lockin-ein 0.18s ease-out;
+}
+
+.lockin__innen {
+  padding: 22px 22px 20px;
+}
+
+.lockin__verhalten {
+  margin: 0;
+}
+
+.lockin__titel {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.6rem;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.lockin__stufe {
+  color: var(--accent-dark);
+}
+
+.lockin__kriterium {
+  padding: 14px 16px;
+  border-radius: var(--r-m);
+  background: var(--cream-mid);
+}
+
+.lockin__kriterium p {
+  margin: 0;
+}
+
+.lockin__aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.bewertung--gesperrt .skala__feld {
+  cursor: default;
+}
+
+.bewertung--gesperrt .skala__feld input:not(:checked) + span {
+  opacity: 0.45;
+}
+
+.bewertung__gesperrt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+  margin: 12px 0 0;
+}
+
+.bewertung__kommentar {
+  color: var(--text2);
+  font-size: 0.925rem;
+}
+
+/* Am Handy als Fläche von unten */
+@media (max-width: 600px) {
+  .lockin {
+    width: 100%;
+    max-width: none;
+    margin: auto 0 0;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    max-height: 92dvh;
+  }
+
+  .lockin[open] {
+    animation: lockin-hoch 0.22s ease-out;
+  }
+
+  .lockin__aktionen .btn {
+    flex: 1 1 140px;
+  }
+}
+
+@keyframes lockin-ein {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@keyframes lockin-hoch {
+  from {
+    transform: translateY(40px);
+    opacity: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lockin[open] {
+    animation: none;
+  }
+}

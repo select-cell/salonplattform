@@ -23,6 +23,7 @@ Die Umfrage läuft vollständig, sobald Personen angelegt sind. Diese Inhalte si
 
 - **Bewertungsstufen 1 bis 5** je Verhalten (Bezeichnung, Prozent, Leitsatz, Punkte). Ohne sie gibt es nur die Noten.
 - **Videos** je Verhalten. Ohne Link läuft ein Platzhalter von 8 Sekunden (`PLATZHALTER_VIDEO_SEKUNDEN` in `src/lib/umfrage.ts`), danach wird die Bewertung frei. Vorspulen ist gesperrt.
+- **„Locked In“:** Jede Note öffnet ein Popup mit der vollständigen Bewertungsstufe (`verhalten_kriterien`). Erst „Locked In“ bestätigt die Note, danach ist sie gesperrt; ab Note 4 ist der Kommentar im Popup Pflicht. Nach der letzten Person geht es automatisch zum nächsten Verhalten.
 - **Rituale** gehören nicht in die Plattform: Sie sind in der Datenbank deaktiviert (`rituale.aktiv = false`), die Tabellen und alten Antworten bleiben erhalten.
 
 Das Nachtragen geht ohne Code, siehe „Inhalte der Umfrage pflegen“. Außerdem zu klären (Plan §9): Die Fragen sagen noch „im letzten Monat“, obwohl die Umfrage für Monat M bis Ende M läuft. Aktuell steht `start_monat` auf **Oktober 2026**.

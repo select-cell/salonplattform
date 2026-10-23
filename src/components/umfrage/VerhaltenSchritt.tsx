@@ -1,5 +1,8 @@
+import { useState } from 'react'
+import { Icon } from '../Icon'
 import type { Entwurf, UmfrageInhalt, Verhalten } from '../../lib/umfrage'
-import { KOMMENTAR_PFLICHT_AB, SELBSTBILD_LABELS, bewertete, brauchtVideo, notenSchluessel } from '../../lib/umfrage'
+import { SELBSTBILD_LABELS, bewertete, brauchtVideo, notenSchluessel } from '../../lib/umfrage'
+import { LockedInDialog } from './LockedInDialog'
 import { Skala } from './Skala'
 import { VideoSperre } from './VideoSperre'
 
@@ -9,8 +12,10 @@ interface Props {
   gesamt: number
   inhalt: UmfrageInhalt
   entwurf: Entwurf
-  onNote: (schluessel: string, note: number) => void
-  onKommentar: (schluessel: string, text: string) => void
+  /** „Locked In“: Note und Kommentar sind bestätigt */
+  onLockedIn: (schluessel: string, note: number, kommentar: string) => void
+  /** Alle Personen dieses Verhaltens sind bestätigt: weiter zum nächsten Verhalten */
+  onFertig: () => void
   onVideoGesehen: () => void
 }
 
@@ -20,12 +25,33 @@ export function VerhaltenSchritt({
   gesamt,
   inhalt,
   entwurf,
-  onNote,
-  onKommentar,
+  onLockedIn,
+  onFertig,
   onVideoGesehen,
 }: Props) {
   const gesperrt = brauchtVideo(verhalten.video_url) && !entwurf.videos[`v${verhalten.nr}`]
   const stufen = new Map(verhalten.kriterien.map((k) => [k.stufe, k]))
+
+  // Gewählte, aber noch nicht bestätigte Note: öffnet das Popup
+  const [auswahl, setAuswahl] = useState<{ personId: string; note: number } | null>(null)
+  const personen = bewertete(inhalt)
+
+  const lockedIn = (kommentar: string) => {
+    if (!auswahl) return
+    const schluessel = notenSchluessel(verhalten.nr, auswahl.personId)
+    onLockedIn(schluessel, auswahl.note, kommentar)
+    setAuswahl(null)
+    // Weiter zur nächsten noch offenen Person, nach der letzten zum nächsten Verhalten
+    const naechste = personen.find(
+      (p) => p.id !== auswahl.personId && !entwurf.noten[notenSchluessel(verhalten.nr, p.id)],
+    )
+    window.setTimeout(() => {
+      if (!naechste) return onFertig()
+      const feld = document.getElementById(`bewertung-${verhalten.nr}-${naechste.id}`)
+      feld?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      feld?.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true })
+    }, 0)
+  }
 
   const beschreibung = (note: number): string | null => {
     const k = stufen.get(note)
@@ -55,45 +81,20 @@ export function VerhaltenSchritt({
         onGesehen={onVideoGesehen}
       />
 
-      {verhalten.kriterien.length > 0 && (
-        <details className="stufen">
-          <summary>Bewertungsstufen ansehen</summary>
-          <div className="stufen__liste">
-            {verhalten.kriterien.map((k) => (
-              <details key={k.stufe} className="stufe">
-                <summary>
-                  <span>{k.bezeichnung ?? `Stufe ${k.stufe}`}</span>
-                  {k.prozent && <span className="badge">{k.prozent}</span>}
-                </summary>
-                <div className="stufe__inhalt">
-                  {k.leitsatz && <p>{k.leitsatz}</p>}
-                  {k.punkte.length > 0 && (
-                    <ul className="platzhalter__liste">
-                      {k.punkte.map((p) => (
-                        <li key={p}>{p}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </details>
-            ))}
-          </div>
-        </details>
-      )}
-
       {gesperrt ? (
         <p className="hinweis">
           <span>Sobald das Video zu Ende ist, kannst du bewerten.</span>
         </p>
       ) : (
         <div className="stack">
-          {bewertete(inhalt).map((person) => {
+          {personen.map((person) => {
             const schluessel = notenSchluessel(verhalten.nr, person.id)
             const note = entwurf.noten[schluessel]
-            const pflicht = !!note && note >= KOMMENTAR_PFLICHT_AB
+            const kommentar = (entwurf.kommentare[schluessel] ?? '').trim()
             return (
               <Skala
                 key={schluessel}
+                id={`bewertung-${verhalten.nr}-${person.id}`}
                 name={`note-${schluessel}`}
                 variante={person.selbst ? 'selbst' : 'fremd'}
                 legende={
@@ -103,31 +104,38 @@ export function VerhaltenSchritt({
                   </>
                 }
                 wert={note}
-                onChange={(n) => onNote(schluessel, n)}
+                gesperrt={!!note}
+                onChange={(n) => setAuswahl({ personId: person.id, note: n })}
                 beschreibung={beschreibung}
                 feldLabels={person.selbst ? SELBSTBILD_LABELS : undefined}
               >
                 {note && (
-                  <div className="feld">
-                    <label className="feld__label" htmlFor={`kommentar-${schluessel}`}>
-                      Kommentar{' '}
-                      <span className="muted">{pflicht ? '(Pflicht ab Note 4)' : '(freiwillig)'}</span>
-                    </label>
-                    <textarea
-                      id={`kommentar-${schluessel}`}
-                      className="feld__eingabe"
-                      rows={3}
-                      value={entwurf.kommentare[schluessel] ?? ''}
-                      onChange={(e) => onKommentar(schluessel, e.target.value)}
-                      required={pflicht}
-                      aria-required={pflicht}
-                    />
-                  </div>
+                  <p className="bewertung__gesperrt">
+                    <span className="badge badge--gruen">
+                      <Icon name="haken" groesse={14} /> Locked In
+                    </span>
+                    {kommentar && <span className="bewertung__kommentar">{kommentar}</span>}
+                  </p>
                 )}
               </Skala>
             )
           })}
         </div>
+      )}
+
+      {auswahl && (
+        <LockedInDialog
+          key={`${verhalten.nr}-${auswahl.personId}`}
+          verhaltenNr={verhalten.nr}
+          verhaltenTitel={verhalten.titel}
+          personName={personen.find((p) => p.id === auswahl.personId)?.name ?? ''}
+          selbst={personen.find((p) => p.id === auswahl.personId)?.selbst ?? false}
+          note={auswahl.note}
+          kriterium={stufen.get(auswahl.note) ?? null}
+          kommentar={entwurf.kommentare[notenSchluessel(verhalten.nr, auswahl.personId)] ?? ''}
+          onLockedIn={lockedIn}
+          onAbbrechen={() => setAuswahl(null)}
+        />
       )}
     </article>
   )

@@ -123,11 +123,15 @@ export function Umfrage({ inhalt, monat, userId }: Props) {
             gesamt={inhalt.verhalten.length}
             inhalt={inhalt}
             entwurf={entwurf}
-            onNote={(k, note) => {
+            onLockedIn={(k, note, kommentar) => {
               setFehler(null)
-              setEntwurf((e) => ({ ...e, noten: { ...e.noten, [k]: note } }))
+              setEntwurf((e) => ({
+                ...e,
+                noten: { ...e.noten, [k]: note },
+                kommentare: { ...e.kommentare, [k]: kommentar },
+              }))
             }}
-            onKommentar={(k, text) => setEntwurf((e) => ({ ...e, kommentare: { ...e.kommentare, [k]: text } }))}
+            onFertig={() => geheZu(index + 1)}
             onVideoGesehen={() => {
               setFehler(null)
               setEntwurf((e) => ({ ...e, videos: { ...e.videos, [`v${schritt.verhalten.nr}`]: true } }))
