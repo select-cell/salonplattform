@@ -131,10 +131,12 @@ function baueText(platz, positionen, einst) {
 if (typeof $input !== 'undefined') {
   // Ergebnis einer Supabase-Abfrage: null bei Fehler, sonst die Zeilen. Mit „Always Output Data“
   // liefert eine leere Abfrage ein leeres Objekt, das hier herausfällt.
+  // Ein Fehler kommt als Item mit dem Schlüssel „error“, dessen Wert auch leer sein kann (Verbindungsabbruch):
+  // deshalb zählt schon das Vorhandensein des Schlüssels.
   const lies = (node) => {
     try {
       const items = $(node).all()
-      if (items.some((i) => i.json && i.json.error)) return null
+      if (items.some((i) => i.json && 'error' in i.json)) return null
       return items.map((i) => i.json).filter((zeile) => zeile && Object.keys(zeile).length > 0)
     } catch (e) {
       return null // Node nicht gelaufen

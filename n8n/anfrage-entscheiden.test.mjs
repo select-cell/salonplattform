@@ -247,6 +247,14 @@ describe('Code-Node in der n8n-Umgebung', () => {
     assert.equal(ergebnis[0].json.senden, true) // Notkarte greift
   })
 
+  it('Fehler ohne Text (Verbindungsabbruch: { error: undefined }) gilt ebenfalls als Ausfall', () => {
+    // So liefert der Supabase-Node einen Fehler ohne Beschreibung. Die Zeile darf nicht als Datensatz gelesen werden.
+    const leer = items({ error: undefined })
+    const ergebnis = inN8n(anfrage(), { ...alleDa, 'Plaetze laden': leer, 'Artikel laden': leer, 'Letzte Anfrage am Platz': leer })
+    assert.equal(ergebnis[0].json.senden, true)
+    assert.equal(ergebnis[0].json.text, 'Platz 4: 2× Wasser, 1× Apfelschorle')
+  })
+
   it('Node nicht gelaufen (wirft): ebenfalls Ausfall, Anfrage kommt trotzdem an', () => {
     const weg = new Error('Node did not execute')
     const ergebnis = inN8n(anfrage(), { ...alleDa, 'Letzte Anfrage am Platz': weg, 'Doppelte Anfrage pruefen': weg })

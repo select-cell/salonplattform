@@ -1,0 +1,450 @@
+{
+  "name": "Salon Dawiid · Anfragen",
+  "nodes": [
+    {
+      "id": "5a10d0a0-0000-4000-8000-000000000001",
+      "name": "Anleitung",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        80
+      ],
+      "parameters": {
+        "width": 460,
+        "height": 520,
+        "color": 4,
+        "content": "## Vor dem Veröffentlichen\n\n1. **Credential „Supabase API“** anlegen: Host `https://hgtvlcucxzksvmvgvbgo.supabase.co`, Secret Key = der Service-Key (am besten ein eigener Secret-Key nur für n8n). In **allen 6 Supabase-Nodes** dieses Credential auswählen.\n2. **Credential „Telegram API“** anlegen (Token vom @BotFather) und im Node *Telegram senden* auswählen.\n3. Im Node *Telegram senden* die **Chat-ID** der Anfragen-Gruppe eintragen (statt `HIER_CHAT_ID_DER_ANFRAGEN_GRUPPE`). Negative Zahl, bei Supergruppen `-100…`.\n4. Workflow **speichern und veröffentlichen (Publish)**. Erst dann gilt die Produktions-URL `/webhook/…`.\n5. Unter *Settings* den **Error Workflow** wählen (siehe n8n/README.md).\n\nSpäter im Node *Webhook* unter *Allowed Origins* statt `*` die Domain der Seite eintragen."
+      }
+    },
+    {
+      "id": "5a10d0a0-0000-4000-8000-000000000002",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "webhookId": "5a10d0a0-0000-4000-8000-000000000002",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "salondawiidbestellungen",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      }
+    },
+    {
+      "id": "5a10d0a0-0000-4000-8000-000000000680",
+      "name": "Plaetze laden",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "plaetze",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "aktiv=eq.true"
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "5a10d0a0-0000-4000-8000-000000000900",
+      "name": "Artikel laden",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "artikel",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "aktiv=eq.true&order=sortierung.asc"
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "5a10d0a0-0000-4000-8000-000000001120",
+      "name": "Letzte Anfrage am Platz",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "anfragen",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "=platz=eq.{{ Number($('Webhook').first().json.body.platz) || 0 }}&order=erstellt_am.desc&limit=1"
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "5a10d0a0-0000-4000-8000-000000001340",
+      "name": "Doppelte Anfrage pruefen",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        300
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "anfragen",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "=id=eq.{{ /^[0-9a-f-]{36}$/i.test(String($('Webhook').first().json.body.anfrage_id)) ? $('Webhook').first().json.body.anfrage_id : '00000000-0000-0000-0000-000000000000' }}"
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "5a10d0a0-0000-4000-8000-000000000008",
+      "name": "Entscheiden",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// n8n · Code-Node „Entscheiden“ (Modus: Run Once for All Items, Sprache: JavaScript)\n// Diese Datei komplett in den Code-Node kopieren. Anleitung: n8n/README.md\n//\n// Der Node bekommt die Anfrage vom Webhook und die Ergebnisse der vier Supabase-Abfragen und\n// entscheidet: absenden, als Doppelung bestätigen, wegen Sperre ablehnen oder als ungültig abweisen.\n// Er baut außerdem die Telegram-Nachricht und die Daten für den Speicher-Zweig.\n// Eine Abfrage, die fehlschlug (Supabase nicht erreichbar), wird übersprungen: Die Anfrage läuft\n// dann mit der Notkarte weiter, die Telegram-Nachricht geht immer raus.\n//\n// Getestet mit: node --test n8n/*.test.mjs\n\n// ---- Einstellungen: hier ändern ---------------------------------------------------------------------\nconst EINSTELLUNGEN = {\n  SPERRE_SEKUNDEN: 60, // Sperre pro Platz nach einer Anfrage\n  MENGE_MAX: 10, // je Artikel\n  POSITIONEN_MAX: 20, // Schutz gegen übergroße Anfragen\n  // Notkarte: gilt, wenn Supabase nicht antwortet. Muss zur Notkarte im Frontend passen\n  // (src/lib/bestellung.ts: NOTKARTE und NOTFALL_PLAETZE).\n  NOTKARTE: [\n    { id: 'wasser', name: 'Wasser', kategorie: 'getraenk' },\n    { id: 'apfelschorle', name: 'Apfelschorle', kategorie: 'getraenk' },\n  ],\n  NOTFALL_PLAETZE: [1, 2, 3, 4, 5, 6, 7],\n  // Reihenfolge und Anzeigenamen der Kategorien in der Nachricht. Unbekannte kommen danach.\n  KATEGORIEN: { getraenk: 'Getränke', decke: 'Decke', essen: 'Essen' },\n}\n\nconst UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i\n\nconst fehler = (grund) => ({ senden: false, status: 400, antwort: { ok: false, grund } })\n\n/**\n * @param {object} eingabe\n * @param {unknown} eingabe.body      Body der Webhook-Anfrage\n * @param {object[]|null} eingabe.plaetze   aktive Plätze aus Supabase, null = Abfrage fehlgeschlagen\n * @param {object[]|null} eingabe.artikel   aktive Artikel (nach sortierung), null = fehlgeschlagen\n * @param {object[]|null} eingabe.letzte    neueste Anfrage dieses Platzes (höchstens eine Zeile), null = fehlgeschlagen\n * @param {object[]|null} eingabe.doppelt   Zeile mit dieser anfrage_id, falls vorhanden, null = fehlgeschlagen\n * @param {number} [eingabe.jetzt]    Zeitpunkt in ms (für Tests)\n */\nfunction entscheide({ body, plaetze, artikel, letzte, doppelt, jetzt = Date.now() }, einst = EINSTELLUNGEN) {\n  // ---- 1. Form der Anfrage ------------------------------------------------------------------------\n  if (typeof body !== 'object' || body === null || Array.isArray(body)) return fehler('ungueltig')\n  if (typeof body.anfrage_id !== 'string' || !UUID.test(body.anfrage_id)) return fehler('ungueltige_anfrage_id')\n  if (body.typ !== 'anfrage') return fehler('ungueltiger_typ')\n  if (!Number.isInteger(body.platz) || body.platz < 1 || body.platz > 999) return fehler('ungueltiger_platz')\n  if (!Array.isArray(body.positionen) || body.positionen.length === 0) return fehler('keine_positionen')\n  if (body.positionen.length > einst.POSITIONEN_MAX) return fehler('zu_viele_positionen')\n\n  // Gleiche Artikel zu einer Position zusammenführen (Mengen addieren)\n  const mengen = new Map()\n  for (const position of body.positionen) {\n    if (typeof position !== 'object' || position === null) return fehler('ungueltige_position')\n    if (typeof position.artikel !== 'string' || !/^[a-z0-9_]+$/.test(position.artikel)) return fehler('ungueltiger_artikel')\n    if (!Number.isInteger(position.menge) || position.menge < 1 || position.menge > einst.MENGE_MAX) {\n      return fehler('ungueltige_menge')\n    }\n    mengen.set(position.artikel, (mengen.get(position.artikel) ?? 0) + position.menge)\n  }\n  if ([...mengen.values()].some((menge) => menge > einst.MENGE_MAX)) return fehler('ungueltige_menge')\n\n  const anfrageId = body.anfrage_id.toLowerCase()\n  const platz = body.platz\n\n  // ---- 2. Platz und Artikel gegen die Karte prüfen -------------------------------------------------\n  // Leere Antwort zählt wie ein Ausfall: „keine aktiven Plätze/Artikel“ ist eine Fehleinstellung,\n  // und die Anfrage soll trotzdem ankommen.\n  const platzKarte = plaetze?.length ? plaetze.map((p) => Number(p.platz)) : einst.NOTFALL_PLAETZE\n  const artikelKarte = artikel?.length ? artikel : einst.NOTKARTE\n  if (!platzKarte.includes(platz)) return fehler('platz_unbekannt')\n\n  const positionen = []\n  for (const [artikelId, menge] of mengen) {\n    const index = artikelKarte.findIndex((a) => a.id === artikelId)\n    if (index === -1) return fehler('artikel_unbekannt')\n    positionen.push({ ...artikelKarte[index], menge, index })\n  }\n  positionen.sort((a, b) => a.index - b.index) // Reihenfolge der Karte\n\n  // ---- 3. Doppelung vor Sperre ----------------------------------------------------------------------\n  // Kam die Antwort auf eine erste Anfrage nie an, wiederholt der Gast mit derselben ID. Dann soll er\n  // die Bestätigung sehen statt „gesperrt“, und es geht keine zweite Nachricht raus.\n  const ok = { ok: true, sperre_sekunden: einst.SPERRE_SEKUNDEN }\n  if (doppelt?.length) return { senden: false, status: 200, antwort: ok }\n\n  // ---- 4. Sperre pro Platz ---------------------------------------------------------------------------\n  const zuletzt = letzte?.length ? Date.parse(letzte[0].erstellt_am) : NaN\n  if (Number.isFinite(zuletzt)) {\n    const vergangen = (jetzt - zuletzt) / 1000\n    if (vergangen < einst.SPERRE_SEKUNDEN) {\n      // Status 200, damit der Browser die Antwort auch bei fehlenden CORS-Kopfzeilen sicher liest\n      const warte = Math.max(1, Math.ceil(einst.SPERRE_SEKUNDEN - vergangen))\n      return { senden: false, status: 200, antwort: { ok: false, grund: 'gesperrt', warte_sekunden: warte } }\n    }\n  }\n\n  // ---- 5. Absenden ---------------------------------------------------------------------------------------\n  return {\n    senden: true,\n    status: 200,\n    antwort: ok,\n    text: baueText(platz, positionen, einst),\n    speichern: {\n      anfrage: { id: anfrageId, platz, typ: 'anfrage' },\n      positionen: positionen.map((p) => ({ anfrage_id: anfrageId, artikel_id: p.id, menge: p.menge })),\n    },\n  }\n}\n\n/** „Platz 4: 2× Wasser, 1× Apfelschorle“, bei mehreren Kategorien zeilenweise je Kategorie */\nfunction baueText(platz, positionen, einst) {\n  const gruppen = new Map()\n  for (const p of positionen) {\n    const liste = gruppen.get(p.kategorie) ?? []\n    liste.push(`${p.menge}× ${p.name}`)\n    gruppen.set(p.kategorie, liste)\n  }\n  if (gruppen.size === 1) return `Platz ${platz}: ${[...gruppen.values()][0].join(', ')}`\n\n  const bekannt = Object.keys(einst.KATEGORIEN)\n  const reihenfolge = [\n    ...bekannt.filter((k) => gruppen.has(k)),\n    ...[...gruppen.keys()].filter((k) => !bekannt.includes(k)),\n  ]\n  const zeilen = reihenfolge.map((k) => `${einst.KATEGORIEN[k] ?? k.charAt(0).toUpperCase() + k.slice(1)}: ${gruppen.get(k).join(', ')}`)\n  return [`Platz ${platz} wünscht:`, ...zeilen].join('\\n')\n}\n\n// ---- n8n-Teil: nur aktiv, wenn der Code in n8n läuft ------------------------------------------------------\n// Die Namen der Nodes müssen genau so heißen (siehe n8n/README.md).\nif (typeof $input !== 'undefined') {\n  // Ergebnis einer Supabase-Abfrage: null bei Fehler, sonst die Zeilen. Mit „Always Output Data“\n  // liefert eine leere Abfrage ein leeres Objekt, das hier herausfällt.\n  // Ein Fehler kommt als Item mit dem Schlüssel „error“, dessen Wert auch leer sein kann (Verbindungsabbruch):\n  // deshalb zählt schon das Vorhandensein des Schlüssels.\n  const lies = (node) => {\n    try {\n      const items = $(node).all()\n      if (items.some((i) => i.json && 'error' in i.json)) return null\n      return items.map((i) => i.json).filter((zeile) => zeile && Object.keys(zeile).length > 0)\n    } catch (e) {\n      return null // Node nicht gelaufen\n    }\n  }\n  return [\n    {\n      json: entscheide({\n        body: $('Webhook').first().json.body,\n        plaetze: lies('Plaetze laden'),\n        artikel: lies('Artikel laden'),\n        letzte: lies('Letzte Anfrage am Platz'),\n        doppelt: lies('Doppelte Anfrage pruefen'),\n      }),\n    },\n  ]\n}\n\nif (typeof module !== 'undefined') module.exports = { entscheide, baueText, EINSTELLUNGEN }\n"
+      }
+    },
+    {
+      "id": "5a10d0a0-0000-4000-8000-000000000009",
+      "name": "Senden?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1780,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5a10d0a0-0000-4000-8000-000000000090",
+              "leftValue": "={{ $json.senden }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "5a10d0a0-0000-4000-8000-000000000010",
+      "name": "Telegram senden",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2020,
+        140
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "HIER_CHAT_ID_DER_ANFRAGEN_GRUPPE",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      }
+    },
+    {
+      "id": "5a10d0a0-0000-4000-8000-000000000011",
+      "name": "Antwort ok",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2240,
+        140
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($('Entscheiden').first().json.antwort) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "5a10d0a0-0000-4000-8000-000000000012",
+      "name": "Anfrage speichern",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2020,
+        460
+      ],
+      "parameters": {
+        "operation": "create",
+        "tableId": "anfragen",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "id",
+              "fieldValue": "={{ $('Entscheiden').first().json.speichern.anfrage.id }}"
+            },
+            {
+              "fieldId": "platz",
+              "fieldValue": "={{ $('Entscheiden').first().json.speichern.anfrage.platz }}"
+            },
+            {
+              "fieldId": "typ",
+              "fieldValue": "={{ $('Entscheiden').first().json.speichern.anfrage.typ }}"
+            }
+          ]
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "5a10d0a0-0000-4000-8000-000000000013",
+      "name": "Positionen vorbereiten",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        460
+      ],
+      "parameters": {
+        "jsCode": "return $('Entscheiden').first().json.speichern.positionen.map((json) => ({ json }))"
+      }
+    },
+    {
+      "id": "5a10d0a0-0000-4000-8000-000000000014",
+      "name": "Positionen speichern",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2460,
+        460
+      ],
+      "parameters": {
+        "operation": "create",
+        "tableId": "anfrage_positionen",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "anfrage_id",
+              "fieldValue": "={{ $json.anfrage_id }}"
+            },
+            {
+              "fieldId": "artikel_id",
+              "fieldValue": "={{ $json.artikel_id }}"
+            },
+            {
+              "fieldId": "menge",
+              "fieldValue": "={{ $json.menge }}"
+            }
+          ]
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "5a10d0a0-0000-4000-8000-000000000015",
+      "name": "Speicherfehler melden",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2680,
+        460
+      ],
+      "parameters": {
+        "jsCode": "const fehler = [...$('Anfrage speichern').all(), ...$('Positionen speichern').all()].filter((i) => i.json.error)\nif (fehler.length) {\n  const e = fehler[0].json.error\n  throw new Error('Speichern in Supabase fehlgeschlagen: ' + (typeof e === 'string' ? e : (e.message ?? JSON.stringify(e))))\n}\nreturn [{ json: { gespeichert: true } }]"
+      }
+    },
+    {
+      "id": "5a10d0a0-0000-4000-8000-000000000016",
+      "name": "Antwort",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2020,
+        700
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.antwort) }}",
+        "options": {
+          "responseCode": "={{ $json.status }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Plaetze laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plaetze laden": {
+      "main": [
+        [
+          {
+            "node": "Artikel laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Artikel laden": {
+      "main": [
+        [
+          {
+            "node": "Letzte Anfrage am Platz",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Letzte Anfrage am Platz": {
+      "main": [
+        [
+          {
+            "node": "Doppelte Anfrage pruefen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Doppelte Anfrage pruefen": {
+      "main": [
+        [
+          {
+            "node": "Entscheiden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entscheiden": {
+      "main": [
+        [
+          {
+            "node": "Senden?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Senden?": {
+      "main": [
+        [
+          {
+            "node": "Telegram senden",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Anfrage speichern",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Antwort",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram senden": {
+      "main": [
+        [
+          {
+            "node": "Antwort ok",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anfrage speichern": {
+      "main": [
+        [
+          {
+            "node": "Positionen vorbereiten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Positionen vorbereiten": {
+      "main": [
+        [
+          {
+            "node": "Positionen speichern",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Positionen speichern": {
+      "main": [
+        [
+          {
+            "node": "Speicherfehler melden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

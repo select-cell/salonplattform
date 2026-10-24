@@ -11,7 +11,7 @@ Das System läuft **im selben Repo und im selben Supabase-Projekt** wie die Team
 | Datenbank | `supabase/migrations/20261024201935_bestellsystem.sql`, Tests in `supabase/tests/database/04_bestellsystem.test.sql` | **in Supabase angelegt** (24. Oktober 2026, Version `20261024201935`), Struktur identisch zur getesteten Datei, Zugriff als `anon` und eingeloggt geprüft |
 | Gäste-Seite | `src/pages/Bestellen.tsx`, `src/components/bestellung/`, `src/lib/bestellung.ts`, `src/lib/bestellApi.ts`, `src/styles/bestellung.css` | fertig, im Browser gegen ein simuliertes Backend getestet |
 | QR-Codes | `tools/qr-codes/` (eigene `package.json`) | fertig, Lesbarkeit mit einem unabhängigen Dekoder geprüft; **erst mit der endgültigen Domain erzeugen** |
-| n8n | `n8n/README.md`, Code-Node `n8n/anfrage-entscheiden.cjs` mit 47 Tests | Anleitung und getestete Logik; **der Workflow selbst ist in n8n noch zu bauen** |
+| n8n | `n8n/anfragen-workflow.json` (zum Importieren), `n8n/README.md`, Code-Node `n8n/anfrage-entscheiden.cjs`, zusammen 60 Tests | Workflow in n8n 2.44.6 lokal importiert und mit echtem Browser getestet, Telegram und Supabase dabei simuliert; **in der echten n8n-Instanz noch zu importieren und mit Telegram zu verbinden** |
 
 **Entscheidungen und Abweichungen vom Master**
 
@@ -20,6 +20,7 @@ Das System läuft **im selben Repo und im selben Supabase-Projekt** wie die Team
 - **Frontend in React** (wie die Plattform) statt reinem HTML. Die Gäste-Seite ist ein eigener, nachgeladener Chunk (rund 3 KB gzip), die Plattform lädt davon nichts mit. Insgesamt lädt ein Gast rund 160 KB JavaScript (gzip), das meiste davon React und der Supabase-Client.
 - **Design:** keine zweite Farbpalette. Die Hex-Werte aus dem Master (§5a) sind durch die Tokens der Plattform ersetzt, Hell und Nachtmodus kommen von dort.
 - **Routing:** `/p/:platz` ist eine Route der App, der vorhandene Netlify-Fallback genügt.
+- **Webhook-URL:** `https://tobitest2008.app.n8n.cloud/webhook/salondawiidbestellungen` (n8n-Cloud-Testinstanz). Sie steht in `.env.example` und wird beim Bauen als `VITE_BESTELL_WEBHOOK_URL` eingebacken. Wechselt die n8n-Instanz, genügt eine neue URL und ein neuer Build.
 - **Webhook:** Die Erfolgsantwort enthält zusätzlich `sperre_sekunden`, damit der Zähler im Frontend zur n8n-Einstellung passt. Sperre antwortet mit Status 200 und `ok: false`.
 - **Doppelung wird vor der Sperre geprüft:** Kam die Antwort auf eine erste Anfrage nie an, sieht der Gast beim Wiederholen die Bestätigung statt „gesperrt“.
 - **Notkarte in n8n:** Fällt Supabase aus, gelten Artikel und Plätze aus dem Code-Node, damit die Nachricht trotzdem rausgeht. Sie muss zur Notkarte im Frontend passen.
@@ -234,15 +235,15 @@ Beziehungen: `anfrage_positionen.anfrage_id` → `anfragen.id`, `anfrage_positio
 
 ## 11. Akzeptanzkriterien Phase 1
 
-Stand: Alles, was ohne Salon, Telegram und die echte Datenbank prüfbar ist, ist geprüft (Browser-Test im Produktions-Build mit simuliertem Supabase und n8n: 18 Tests; pgTAP lokal: 28 Tests für die neuen Tabellen; n8n-Code-Node: 47 Tests). Offen ist, was die echten Systeme braucht.
+Stand: Alles, was ohne Salon, echtes Telegram und die echte n8n-Instanz prüfbar ist, ist geprüft: Browser-Test im Produktions-Build mit simuliertem Backend (18 Tests), pgTAP lokal und gegen die Produktion (28 Tests für die neuen Tabellen), n8n-Code-Node und Workflow-JSON (60 Tests), der importierte Workflow in einem lokalen n8n 2.44.6 mit 18 Szenarien per HTTP und 5 Tests mit echtem Browser (Telegram und Supabase simuliert). Offen ist, was die echten Systeme braucht.
 
 - [x] Alle 7 Links (`/p/1` bis `/p/7`) öffnen die Seite mit der richtigen Platznummer, groß sichtbar
 - [x] Mehrere Artikel mit Mengen lassen sich auswählen und in „Deine Auswahl“ zusammenfassen
-- [ ] Ein Klick auf den Hauptbutton erzeugt genau eine Nachricht in der Telegram-Gruppe, auch bei Doppelklick oder Wiederholung *(Frontend sendet bei Doppelklick genau eine Anfrage, Wiederholung mit gleicher `anfrage_id`; Telegram und n8n noch nicht angeschlossen)*
+- [ ] Ein Klick auf den Hauptbutton erzeugt genau eine Nachricht in der Telegram-Gruppe, auch bei Doppelklick oder Wiederholung *(Browser gegen lokales n8n mit simuliertem Telegram geprüft: eine Anfrage bei Doppelklick, Wiederholung mit gleicher `anfrage_id` ergibt keine zweite Nachricht; echte Telegram-Gruppe offen)*
 - [ ] Nachricht entspricht dem Format `Platz N: 2× Wasser, 1× Apfelschorle` *(Format im Code-Node getestet, noch nicht in Telegram gesehen)*
 - [ ] Nachricht erscheint auf den Apple Watches des Teams
 - [ ] Anfrage steht in Supabase (eine Zeile in `anfragen`, je Artikel eine Zeile in `anfrage_positionen`) *(Tabellen angelegt, Constraints getestet, Schreibschutz für Gäste in der Produktion geprüft; Schreiben durch n8n erst mit dem Workflow)*
-- [ ] Fällt Supabase aus, geht die Telegram-Nachricht trotzdem raus, und der Fehler-Workflow meldet sich *(Frontend-Notkarte und Code-Node-Ausfall getestet, Workflow und Ausfalltest in n8n offen)*
+- [ ] Fällt Supabase aus, geht die Telegram-Nachricht trotzdem raus, und der Fehler-Workflow meldet sich *(im lokalen n8n geprüft: Nachricht geht raus, die Ausführung endet als Fehler; der Fehler-Workflow selbst ist noch einzurichten)*
 - [x] Die Artikelliste kommt aus der Tabelle `artikel`, ein neuer Eintrag erscheint ohne Code-Änderung. Ohne Supabase greift die Notkarte.
 - [x] Zweite Anfrage am selben Platz innerhalb der Sperrzeit wird freundlich abgelehnt *(Frontend und Entscheidungslogik getestet, Ende-zu-Ende erst mit n8n)*
 - [x] Nach einem Timeout von ca. 10 Sekunden sieht der Gast die Meldung „Bitte sprich kurz das Team an“
@@ -266,10 +267,10 @@ Jeweils als neue Artikel oder Kategorien im selben Webhook:
 ## 13. Offene Platzhalter
 
 - `<DOMAIN>` der Bestellseite (vor dem Erzeugen der QR-Codes)
-- n8n-Webhook-URL (Test und Produktion) → Netlify-Variable `VITE_BESTELL_WEBHOOK_URL`
+- n8n-Webhook-URL → Netlify-Variable `VITE_BESTELL_WEBHOOK_URL` (aktuell die Testinstanz, siehe Abschnitt 0)
 - Telegram-Chat-ID der Anfragen-Gruppe und des Admin-Chats
 - Supabase-Anon-Key für Netlify (`VITE_SUPABASE_ANON_KEY`, ist für die Plattform schon nötig); der Service-Key gehört nur in n8n
 - Links zu Impressum und Datenschutz für den Fuß → Netlify-Variablen `VITE_IMPRESSUM_URL` und `VITE_DATENSCHUTZ_URL` (die Datenschutzerklärung muss Supabase, n8n und Telegram nennen)
 - Endgültiger Text des Hauptbuttons (Standard: „Jetzt anfordern“, Konstante `HAUPTBUTTON_TEXT` in `src/lib/bestellung.ts`)
-- Den Workflow in n8n bauen (die Migration ist angewendet)
+- Den Workflow in n8n importieren (`n8n/anfragen-workflow.json`) und mit Telegram verbinden (die Migration ist angewendet)
 

@@ -16,7 +16,7 @@ Die vollständige Bauanleitung steht in [`docs/plattform-architektur.md`](docs/p
 | 4 | Abgabe-Status und Reminder-Popup | **fertig, in Supabase installiert** |
 | 5 | Chef-, Gäste- und Verantwortlichen-Umfrage | offen: die Fragen fehlen noch (Seiten sind als „Kommt bald“ vorbereitet) |
 | 6 | Jarvis | offen: braucht die n8n-Webhook-URL (Seite ist als „Kommt bald“ vorbereitet) |
-| – | Bestellsystem „Jetzt anfordern“ | Datenbank (in Supabase angelegt), Gäste-Seite (`/p/<platz>`) und QR-Skript fertig und getestet. **Offen:** Workflow in n8n bauen, QR-Codes mit der endgültigen Domain erzeugen, Merge und Netlify-Variablen. Details und Abnahme: [`docs/bestellsystem.md`](docs/bestellsystem.md) |
+| – | Bestellsystem „Jetzt anfordern“ | Datenbank (in Supabase angelegt), Gäste-Seite (`/p/<platz>`) und QR-Skript fertig und getestet. **Offen:** Workflow in n8n importieren und mit Telegram verbinden (`n8n/anfragen-workflow.json`), QR-Codes mit der endgültigen Domain erzeugen, Merge und Netlify-Variablen. Details und Abnahme: [`docs/bestellsystem.md`](docs/bestellsystem.md) |
 
 ### Was in der Umfrage noch fehlt
 

@@ -1,9 +1,13 @@
 # n8n-Workflow „Anfragen“
 
-Ein Webhook für alle Anfragen: prüfen, an Telegram senden, in Supabase speichern. Der Workflow entsteht in n8n; die schwierige Logik (Prüfen, Sperre, Doppelung, Notkarte, Nachrichtentext) liegt getestet in [`anfrage-entscheiden.cjs`](anfrage-entscheiden.cjs) und wird in einen Code-Node kopiert.
+Ein Webhook für alle Anfragen: prüfen, an Telegram senden, in Supabase speichern.
+
+**Schnellstart:** [`anfragen-workflow.json`](anfragen-workflow.json) in n8n importieren (*Workflows → ⋯ → Import from File*). Der Workflow enthält eine Notiz mit den fünf Schritten, die danach noch fehlen: Credentials anlegen und in den Nodes auswählen, Telegram-Chat-ID eintragen, veröffentlichen. Der Webhook-Pfad ist `salondawiidbestellungen`, die Produktions-URL also `https://<deine-n8n-adresse>/webhook/salondawiidbestellungen`.
+
+Die Beschreibung unten erklärt jeden Node und ist der Weg ohne Import. Die schwierige Logik (Prüfen, Sperre, Doppelung, Notkarte, Nachrichtentext) liegt getestet in [`anfrage-entscheiden.cjs`](anfrage-entscheiden.cjs); die JSON wird daraus gebaut (`node n8n/workflow-bauen.mjs`).
 
 ```bash
-node --test n8n/*.test.mjs   # 47 Tests für den Code-Node
+node --test n8n/*.test.mjs   # 60 Tests: Code-Node und Workflow-JSON
 ```
 
 ## Aufbau
@@ -26,7 +30,7 @@ Die Namen der Nodes müssen **genau** so heißen, der Code-Node liest sie darüb
 
 - **Credential „Supabase API“:** Host `https://hgtvlcucxzksvmvgvbgo.supabase.co`, als Key den Service-Key. Am besten ein eigener Secret-Key nur für n8n (Supabase → Project Settings → API Keys), den Du einzeln widerrufen kannst. Der Key steht nur hier, nie in einem Node, nie im Frontend.
 - **Credential „Telegram API“:** Token vom @BotFather.
-- **Telegram-Gruppe nur für Anfragen** mit dem Bot und dem Team. Die Chat-ID ist eine negative Zahl (wird die Gruppe zur Supergruppe, ändert sie sich auf `-100…`).
+- **Telegram-Gruppe nur für Anfragen** mit dem Bot und dem Team. Die Chat-ID ist eine negative Zahl (wird die Gruppe zur Supergruppe, ändert sie sich auf `-100…`). Herausfinden: den Bot in die Gruppe holen, dort eine Nachricht schreiben und `https://api.telegram.org/bot<TOKEN>/getUpdates` im Browser öffnen. Die Zahl bei `"chat":{"id":…}` ist die Chat-ID. Der Token ist ein Geheimnis, die Adresse also nur im eigenen Browser öffnen.
 - Workflow-Einstellung **Execution Order: v1** (Standard in neuen Workflows). Der obere Zweig läuft dadurch zuerst.
 
 ## Die Nodes
@@ -100,9 +104,16 @@ curl -s -X POST "<Webhook-URL>" -H 'Content-Type: application/json' \
 
 **Ausfalltest:** Im Credential einen falschen Service-Key eintragen und eine Anfrage senden. Die Telegram-Nachricht muss trotzdem ankommen (Notkarte), und im Admin-Chat meldet sich der Fehler-Workflow. Danach den Key zurücksetzen.
 
+## Geprüft
+
+Die JSON wurde in **n8n 2.44.6** (lokal) importiert, veröffentlicht und mit echten HTTP-Anfragen sowie einem echten Browser getestet. Supabase und Telegram waren dabei simulierte Server, die n8n über die Credentials erreichte. Geprüft sind: Normalfall (Text, Antwort, Zeilen in Supabase), Doppelung, Sperre, Platz-Wechsel, alle Ablehnungen mit Status 400, Einschleusungsversuche in die Filter, Supabase-Ausfall (Fehlerstatus und Verbindungsabbruch), Telegram-Ausfall mit anschließender Wiederholung und CORS inklusive Preflight.
+
+**Nicht geprüft:** die Zustellung in eine echte Telegram-Gruppe und auf die Apple Watches, ein echter Supabase-Aufruf und Deine n8n-Instanz selbst. Beim ersten Lauf dort zuerst die Tabelle unter *Testen* durchgehen.
+
 ## Gut zu wissen
 
 - **Notkarte:** Fällt Supabase aus, gelten die Artikel und Plätze aus `EINSTELLUNGEN` im Code-Node. Sie muss zu `NOTKARTE` und `NOTFALL_PLAETZE` im Frontend (`src/lib/bestellung.ts`) passen. Neue Artikel in der Tabelle `artikel` brauchen keine Änderung, die Notkarte nur, wenn sie auch im Ausfall bestellbar sein sollen.
 - **Doppelung vor Sperre:** Kam die Antwort auf eine erste Anfrage nie beim Gast an, wiederholt sein Handy mit derselben `anfrage_id`. Er sieht dann die Bestätigung statt „gesperrt“, und es geht keine zweite Nachricht raus.
 - **Sperre mit Status 200:** Der Browser liest die Antwort sicher auch dann, wenn n8n bei Fehlerstatus keine CORS-Kopfzeilen mitschickt. Das Frontend wertet den Inhalt aus, nicht den Status.
+- **Gleichzeitige Anfragen:** Prüfen und Speichern sind getrennte Schritte. Schicken zwei Handys am selben Platz im selben Sekundenbruchteil ab, kann theoretisch beides durchkommen (zwei Nachrichten). Für den Salon unkritisch, die Sperre fängt alles Spätere ab.
 - **Frontend:** In Netlify die Variable `VITE_BESTELL_WEBHOOK_URL` auf die **Produktions-URL** setzen und neu bauen, die Variable wird beim Bauen eingebacken.
