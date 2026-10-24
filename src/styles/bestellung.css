@@ -227,3 +227,59 @@
   display: flex;
   gap: 16px;
 }
+
+/* ---- Testversion (nur dort sichtbar) -------------------------------------------- */
+.testband {
+  padding: 8px var(--gutter);
+  border-bottom: 1px solid var(--line);
+  background: var(--ybg);
+  color: var(--yel);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.testband a {
+  color: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.platzwahl {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 480px) {
+  .platzwahl {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.platzwahl__link {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 12px 18px;
+  border: 1px solid var(--hero-line);
+  border-radius: var(--r-l);
+  background: var(--tint);
+  color: var(--accent-text);
+  text-decoration: none;
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s;
+}
+
+.platzwahl__link:hover {
+  color: var(--accent-text);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-h);
+}
+
+.platzwahl__zahl {
+  font-family: var(--font-serif);
+  font-size: 2.75rem;
+  line-height: 1;
+}

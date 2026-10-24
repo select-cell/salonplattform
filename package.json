@@ -10,7 +10,9 @@
     "typecheck": "tsc -b",
     "dev:bestellung": "vite --config vite.bestellung.config.ts",
     "build:bestellung": "tsc -b && vite build --config vite.bestellung.config.ts",
-    "preview:bestellung": "vite preview --config vite.bestellung.config.ts"
+    "preview:bestellung": "vite preview --config vite.bestellung.config.ts",
+    "dev:bestellung:test": "vite --config vite.bestellung.config.ts --mode testversion",
+    "build:bestellung:test": "tsc -b && vite build --config vite.bestellung.config.ts --mode testversion"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.3.0",

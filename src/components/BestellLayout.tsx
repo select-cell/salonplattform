@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import logo from '../assets/logo-dawiid.png'
 import { DATENSCHUTZ_URL, IMPRESSUM_URL } from '../lib/bestellKonfiguration'
 import { ThemaSchalter } from './ThemaSchalter'
@@ -16,6 +17,11 @@ export function BestellLayout({ children }: { children: ReactNode }) {
           <ThemaSchalter />
         </div>
       </header>
+      {__TESTVERSION__ && (
+        <div className="testband" role="note">
+          <strong>Testversion</strong> · Anfragen werden wirklich gesendet · <Link to="/">Platz wechseln</Link>
+        </div>
+      )}
       <main className="seite__inhalt bestell">{children}</main>
       <footer className="fuss">
         <div className="container fuss__innen">

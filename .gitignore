@@ -1,6 +1,7 @@
 node_modules
 dist
 dist-bestellung
+dist-bestellung-test
 .env
 .env.*
 !.env.example

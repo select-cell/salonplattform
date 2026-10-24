@@ -11,6 +11,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { pruefeKonfiguration } from '../lib/konfiguration'
 import Bestellen from '../pages/Bestellen'
+import TestAuswahl from '../pages/TestAuswahl'
 
 const wurzel = createRoot(document.getElementById('root')!)
 const konfigFehler = pruefeKonfiguration()
@@ -31,10 +32,11 @@ if (konfigFehler) {
     <StrictMode>
       <BrowserRouter>
         <Routes>
-          <Route path="p" element={<Bestellen />} />
           <Route path="p/:platz" element={<Bestellen />} />
-          {/* Alles andere (auch die Startseite): Hinweis, den QR-Code am Platz zu scannen */}
-          <Route path="*" element={<Bestellen />} />
+          {/* Ohne Platznummer: produktiv der Hinweis, den QR-Code am Platz zu scannen.
+              In der Testversion stattdessen die Platzauswahl, damit kein QR-Code nötig ist. */}
+          <Route path="p" element={__TESTVERSION__ ? <TestAuswahl /> : <Bestellen />} />
+          <Route path="*" element={__TESTVERSION__ ? <TestAuswahl /> : <Bestellen />} />
         </Routes>
       </BrowserRouter>
     </StrictMode>,

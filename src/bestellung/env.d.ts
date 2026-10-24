@@ -5,3 +5,6 @@ interface ImportMetaEnv {
   readonly VITE_IMPRESSUM_URL?: string
   readonly VITE_DATENSCHUTZ_URL?: string
 }
+
+// Vom Build gesetzt (vite.bestellung.config.ts): true nur in der Testversion
+declare const __TESTVERSION__: boolean

@@ -60,7 +60,8 @@ cp .env.example .env     # VITE_SUPABASE_ANON_KEY eintragen (Supabase → Projec
 npm run dev              # http://localhost:5173
 npm run build            # Produktions-Build der Bewertungsplattform nach dist/
 npm run dev:bestellung   # Bestell-Seite: http://localhost:5174/p/4
-npm run build:bestellung # Bestell-Seite als eigenes Paket nach dist-bestellung/
+npm run build:bestellung # Bestell-Seite als eigenes Paket nach dist-bestellung/ (für die QR-Codes im Salon)
+npm run build:bestellung:test # Testversion ohne QR-Code nach dist-bestellung-test/
 ```
 
 In die `.env` gehört **nur** der öffentliche anon-/publishable-Key. Den `service_role`-/secret-Key niemals ins Frontend oder ins Repo. Die App weigert sich zu starten, wenn sie einen geheimen Schlüssel erkennt.
@@ -211,4 +212,4 @@ supabase start && supabase test db
 
 Die Netlify-Domain danach in den Supabase-Redirect-URLs eintragen (siehe oben).
 
-**Bestellsystem (eigene Seite):** Die Bestell-Seite ist ein eigenes Paket und läuft auf einer **eigenen Netlify-Seite**, nicht auf der der Bewertungsplattform. Sie liest dieselbe `.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) und braucht zusätzlich `VITE_BESTELL_WEBHOOK_URL` (n8n-Webhook), optional `VITE_IMPRESSUM_URL` und `VITE_DATENSCHUTZ_URL`. `npm run build:bestellung` erzeugt `dist-bestellung/`; dessen Inhalt (oder als ZIP) auf die neue Netlify-Seite hochladen. Die Bewertungsplattform wird dadurch nicht angefasst: Ihr Build ist Byte für Byte derselbe wie vor dem Bestellsystem. Eine eigene Seite hat außerdem eine eigene Adresse, Anmeldungen der Plattform und der Bestell-Seite mischen sich also nie.
+**Bestellsystem (eigene Seite):** Die Bestell-Seite ist ein eigenes Paket und läuft auf einer **eigenen Netlify-Seite**, nicht auf der der Bewertungsplattform. Sie liest dieselbe `.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) und braucht zusätzlich `VITE_BESTELL_WEBHOOK_URL` (n8n-Webhook), optional `VITE_IMPRESSUM_URL` und `VITE_DATENSCHUTZ_URL`. `npm run build:bestellung` erzeugt `dist-bestellung/`; dessen Inhalt (oder als ZIP) auf die neue Netlify-Seite hochladen. **Testversion ohne QR-Code:** `npm run build:bestellung:test` erzeugt `dist-bestellung-test/`. Dort zeigt die Startseite eine Platzauswahl (Platz 1 bis 7), ein gelbes Band weist auf die Testversion hin, und jeder Platz ist auch direkt unter `/p/<platz>` erreichbar. Anfragen werden auch in der Testversion wirklich gesendet. Der produktive Build enthält davon nichts (die Startseite zeigt dort nur den Hinweis, den QR-Code am Platz zu scannen). Die Bewertungsplattform wird dadurch nicht angefasst: Ihr Build ist Byte für Byte derselbe wie vor dem Bestellsystem. Eine eigene Seite hat außerdem eine eigene Adresse, Anmeldungen der Plattform und der Bestell-Seite mischen sich also nie.

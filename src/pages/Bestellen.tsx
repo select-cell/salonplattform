@@ -15,7 +15,7 @@ export default function Bestellen() {
 
   useEffect(() => {
     const vorher = document.title
-    document.title = platz ? `Platz ${platz} · Dawiid` : 'Dawiid'
+    document.title = (platz ? `Platz ${platz} · Dawiid` : 'Dawiid') + (__TESTVERSION__ ? ' (Test)' : '')
     return () => {
       document.title = vorher
     }
