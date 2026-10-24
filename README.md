@@ -1,6 +1,6 @@
 # Dawiid · Team-Plattform
 
-Web-Plattform für den Salon: Mitarbeiterinnen füllen monatlich die Verhaltens-Umfrage aus und sehen ihre Ergebnisse. Der Verantwortliche sieht alles im Detail. Der Admin pflegt Zugänge in Supabase.
+Web-Plattform für den Salon: Mitarbeiterinnen füllen monatlich die Verhaltens-Umfrage aus und sehen ihre Ergebnisse. Der Verantwortliche sieht alles im Detail. Der Admin pflegt Zugänge in Supabase. Zusätzlich fordern Gäste am Platz per QR-Code etwas an („Jetzt anfordern“, siehe [`docs/bestellsystem.md`](docs/bestellsystem.md)).
 
 Die vollständige Bauanleitung steht in [`docs/plattform-architektur.md`](docs/plattform-architektur.md).
 
@@ -16,6 +16,7 @@ Die vollständige Bauanleitung steht in [`docs/plattform-architektur.md`](docs/p
 | 4 | Abgabe-Status und Reminder-Popup | **fertig, in Supabase installiert** |
 | 5 | Chef-, Gäste- und Verantwortlichen-Umfrage | offen: die Fragen fehlen noch (Seiten sind als „Kommt bald“ vorbereitet) |
 | 6 | Jarvis | offen: braucht die n8n-Webhook-URL (Seite ist als „Kommt bald“ vorbereitet) |
+| – | Bestellsystem „Jetzt anfordern“ | Datenbank, Gäste-Seite (`/p/<platz>`) und QR-Skript fertig und getestet. **Offen:** Migration anwenden, Workflow in n8n bauen, QR-Codes mit der endgültigen Domain erzeugen. Details und Abnahme: [`docs/bestellsystem.md`](docs/bestellsystem.md) |
 
 ### Was in der Umfrage noch fehlt
 
@@ -40,7 +41,9 @@ supabase/
   tests/database/     pgTAP-Tests für Rechte und Verknüpfung (supabase test db)
   email-vorlagen/     Magic-Link- und Einladungs-Mail auf Deutsch
   config.toml         Supabase-CLI
-docs/                 Architektur-Dokument
+docs/                 Architektur-Dokument, Bestellsystem
+n8n/                  Bestellsystem: Anleitung für den n8n-Workflow, getesteter Code-Node
+tools/qr-codes/       Bestellsystem: druckbare QR-Codes je Platz (eigene package.json)
 public/_redirects     SPA-Routing für Netlify
 netlify.toml          Build-Einstellungen und Sicherheits-Header
 ```
@@ -82,6 +85,8 @@ Alle Migrationen aus `supabase/migrations/` sind am 3. Oktober 2026 im Projekt `
 | `…_abgabe_status_reminder` | `abgabe_status`, `ueberfaellige_abgaben` (Reminder ab dem 4. Tag nach Fristende) |
 
 Die Dateinamen entsprechen den verbuchten Versionen. Das ist wichtig: Die GitHub-Integration (Supabase → **Project Settings → Integrations → GitHub**, Supabase directory `supabase`, **Deploy to production**) vergleicht Versionen und führt nur neue Dateien aus. Würden Datei und Datenbank abweichen, liefe dieselbe Migration ein zweites Mal und scheiterte an „already exists“.
+
+**Neu und noch nicht angewendet:** `20261024193000_bestellsystem` (Plätze, Artikel, Anfragen, Positionen). Sie läuft nach dem Merge in den Produktions-Branch über die GitHub-Integration, siehe [`docs/bestellsystem.md`](docs/bestellsystem.md).
 
 Für künftige Änderungen: neue Datei mit neuerem Zeitstempel in `supabase/migrations/` anlegen und pushen. Die Integration wendet sie nach dem Merge in den Produktions-Branch an. Wird eine Migration stattdessen direkt angewendet, muss der Dateiname danach zur verbuchten Version passen (`list_migrations` bzw. Tabelle `supabase_migrations.schema_migrations`).
 
@@ -189,7 +194,7 @@ Die Rechte stecken in Row Level Security und Datenbank-Funktionen. Die Routen-Sp
 
 ## Tests
 
-Die Datenbank ist mit pgTAP getestet (151 Tests): Verknüpfung von Login und Person, Constraints, wer was lesen darf, und die komplette Monatsumfrage (Monate, Fristen, Abgabe, alle Ablehnungsfälle, Nachtragen der Altdaten), die Auswertungen (inklusive Abgleich mit den Views und Anonymität der Kommentare) und der Reminder:
+Die Datenbank ist mit pgTAP getestet (187 Tests): Verknüpfung von Login und Person, Constraints, wer was lesen darf, und die komplette Monatsumfrage (Monate, Fristen, Abgabe, alle Ablehnungsfälle, Nachtragen der Altdaten), die Auswertungen (inklusive Abgleich mit den Views und Anonymität der Kommentare) den Reminder und das Bestellsystem (wer was lesen darf, Constraints):
 
 ```bash
 supabase start && supabase test db
@@ -201,3 +206,5 @@ supabase start && supabase test db
 - **Weg B (empfohlen):** Repo mit Netlify verbinden. `netlify.toml` enthält Build-Befehl und Header. Die Variablen `VITE_SUPABASE_URL` und `VITE_SUPABASE_ANON_KEY` kommen in die Netlify-Einstellungen.
 
 Die Netlify-Domain danach in den Supabase-Redirect-URLs eintragen (siehe oben).
+
+**Bestellsystem:** In Netlify zusätzlich `VITE_BESTELL_WEBHOOK_URL` (Produktions-URL des n8n-Webhooks) setzen, optional `VITE_IMPRESSUM_URL` und `VITE_DATENSCHUTZ_URL` für den Fuß der Gäste-Seite, danach neu bauen. Ohne die Webhook-URL zeigt `/p/<platz>` beim Absenden eine freundliche Fehlermeldung, die übrige Plattform ist nicht betroffen.
