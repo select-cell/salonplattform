@@ -1,0 +1,17 @@
+{
+  "name": "salon-qr-codes",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Druckbare QR-Codes für die Plätze (Bestellsystem). Bewusst getrennt von der Plattform: eigene Abhängigkeiten, kein Einfluss auf den Netlify-Build.",
+  "type": "module",
+  "scripts": {
+    "erzeugen": "node erzeugen.mjs"
+  },
+  "dependencies": {
+    "@fontsource/dm-sans": "^5.3.0",
+    "@fontsource/dm-serif-display": "^5.3.0",
+    "@resvg/resvg-js": "^2.6.2",
+    "opentype.js": "^2.0.0",
+    "qrcode": "^1.5.4"
+  }
+}
