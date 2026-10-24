@@ -16,7 +16,7 @@ Die vollständige Bauanleitung steht in [`docs/plattform-architektur.md`](docs/p
 | 4 | Abgabe-Status und Reminder-Popup | **fertig, in Supabase installiert** |
 | 5 | Chef-, Gäste- und Verantwortlichen-Umfrage | offen: die Fragen fehlen noch (Seiten sind als „Kommt bald“ vorbereitet) |
 | 6 | Jarvis | offen: braucht die n8n-Webhook-URL (Seite ist als „Kommt bald“ vorbereitet) |
-| – | Bestellsystem „Jetzt anfordern“ | Datenbank, Gäste-Seite (`/p/<platz>`) und QR-Skript fertig und getestet. **Offen:** Migration anwenden, Workflow in n8n bauen, QR-Codes mit der endgültigen Domain erzeugen. Details und Abnahme: [`docs/bestellsystem.md`](docs/bestellsystem.md) |
+| – | Bestellsystem „Jetzt anfordern“ | Datenbank (in Supabase angelegt), Gäste-Seite (`/p/<platz>`) und QR-Skript fertig und getestet. **Offen:** Workflow in n8n bauen, QR-Codes mit der endgültigen Domain erzeugen, Merge und Netlify-Variablen. Details und Abnahme: [`docs/bestellsystem.md`](docs/bestellsystem.md) |
 
 ### Was in der Umfrage noch fehlt
 
@@ -86,7 +86,7 @@ Alle Migrationen aus `supabase/migrations/` sind am 3. Oktober 2026 im Projekt `
 
 Die Dateinamen entsprechen den verbuchten Versionen. Das ist wichtig: Die GitHub-Integration (Supabase → **Project Settings → Integrations → GitHub**, Supabase directory `supabase`, **Deploy to production**) vergleicht Versionen und führt nur neue Dateien aus. Würden Datei und Datenbank abweichen, liefe dieselbe Migration ein zweites Mal und scheiterte an „already exists“.
 
-**Neu und noch nicht angewendet:** `20261024193000_bestellsystem` (Plätze, Artikel, Anfragen, Positionen). Sie läuft nach dem Merge in den Produktions-Branch über die GitHub-Integration, siehe [`docs/bestellsystem.md`](docs/bestellsystem.md).
+**Seit dem 24. Oktober 2026 angewendet:** `20261024201935_bestellsystem` (Plätze, Artikel, Anfragen, Positionen), direkt eingespielt und unter dieser Version verbucht. Die Datei trägt dieselbe Version, die GitHub-Integration überspringt sie deshalb nach dem Merge. Siehe [`docs/bestellsystem.md`](docs/bestellsystem.md).
 
 Für künftige Änderungen: neue Datei mit neuerem Zeitstempel in `supabase/migrations/` anlegen und pushen. Die Integration wendet sie nach dem Merge in den Produktions-Branch an. Wird eine Migration stattdessen direkt angewendet, muss der Dateiname danach zur verbuchten Version passen (`list_migrations` bzw. Tabelle `supabase_migrations.schema_migrations`).
 

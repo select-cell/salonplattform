@@ -8,7 +8,7 @@ Das System läuft **im selben Repo und im selben Supabase-Projekt** wie die Team
 
 | Teil | Wo | Stand |
 |---|---|---|
-| Datenbank | `supabase/migrations/20261024193000_bestellsystem.sql`, Tests in `supabase/tests/database/04_bestellsystem.test.sql` | geschrieben und lokal getestet, **noch nicht in Supabase** (läuft nach dem Merge über die GitHub-Integration) |
+| Datenbank | `supabase/migrations/20261024201935_bestellsystem.sql`, Tests in `supabase/tests/database/04_bestellsystem.test.sql` | **in Supabase angelegt** (24. Oktober 2026, Version `20261024201935`), Struktur identisch zur getesteten Datei, Zugriff als `anon` und eingeloggt geprüft |
 | Gäste-Seite | `src/pages/Bestellen.tsx`, `src/components/bestellung/`, `src/lib/bestellung.ts`, `src/lib/bestellApi.ts`, `src/styles/bestellung.css` | fertig, im Browser gegen ein simuliertes Backend getestet |
 | QR-Codes | `tools/qr-codes/` (eigene `package.json`) | fertig, Lesbarkeit mit einem unabhängigen Dekoder geprüft; **erst mit der endgültigen Domain erzeugen** |
 | n8n | `n8n/README.md`, Code-Node `n8n/anfrage-entscheiden.cjs` mit 47 Tests | Anleitung und getestete Logik; **der Workflow selbst ist in n8n noch zu bauen** |
@@ -205,7 +205,7 @@ Vier Tabellen:
 
 Beziehungen: `anfrage_positionen.anfrage_id` → `anfragen.id`, `anfrage_positionen.artikel_id` → `artikel.id`, `anfragen.platz` → `plaetze.platz`.
 
-**SQL:** `supabase/migrations/20261024193000_bestellsystem.sql` (Tabellen, Constraints, Row Level Security, Startdaten). Die Migration läuft nach dem Merge über die GitHub-Integration, nicht von Hand im SQL-Editor. Gegenüber dem ursprünglichen Entwurf:
+**SQL:** `supabase/migrations/20261024201935_bestellsystem.sql` (Tabellen, Constraints, Row Level Security, Startdaten). Die Migration wurde am 24. Oktober 2026 direkt in das Produktionsprojekt eingespielt und unter dieser Version verbucht. Die Dateiversion entspricht der verbuchten, die GitHub-Integration führt sie nach dem Merge deshalb nicht noch einmal aus. Vorher geprüft: keine Namenskollision, genau ein Salon „Dawiid“, keine bestehende Tabelle betroffen. Nachher: Struktur, Rechte und Startdaten stimmen mit der lokal getesteten Datenbank überein. Gegenüber dem ursprünglichen Entwurf:
 
 - `plaetze.salon_id` und `artikel.salon_id` (Pflicht, verweist auf `salons`)
 - `plaetze.platz > 0`, Artikel-ID nur aus `a-z`, `0-9`, `_`, Artikelname nicht leer
@@ -241,7 +241,7 @@ Stand: Alles, was ohne Salon, Telegram und die echte Datenbank prüfbar ist, ist
 - [ ] Ein Klick auf den Hauptbutton erzeugt genau eine Nachricht in der Telegram-Gruppe, auch bei Doppelklick oder Wiederholung *(Frontend sendet bei Doppelklick genau eine Anfrage, Wiederholung mit gleicher `anfrage_id`; Telegram und n8n noch nicht angeschlossen)*
 - [ ] Nachricht entspricht dem Format `Platz N: 2× Wasser, 1× Apfelschorle` *(Format im Code-Node getestet, noch nicht in Telegram gesehen)*
 - [ ] Nachricht erscheint auf den Apple Watches des Teams
-- [ ] Anfrage steht in Supabase (eine Zeile in `anfragen`, je Artikel eine Zeile in `anfrage_positionen`) *(Tabellen und Constraints lokal getestet, Migration noch nicht angewendet)*
+- [ ] Anfrage steht in Supabase (eine Zeile in `anfragen`, je Artikel eine Zeile in `anfrage_positionen`) *(Tabellen angelegt, Constraints getestet, Schreibschutz für Gäste in der Produktion geprüft; Schreiben durch n8n erst mit dem Workflow)*
 - [ ] Fällt Supabase aus, geht die Telegram-Nachricht trotzdem raus, und der Fehler-Workflow meldet sich *(Frontend-Notkarte und Code-Node-Ausfall getestet, Workflow und Ausfalltest in n8n offen)*
 - [x] Die Artikelliste kommt aus der Tabelle `artikel`, ein neuer Eintrag erscheint ohne Code-Änderung. Ohne Supabase greift die Notkarte.
 - [x] Zweite Anfrage am selben Platz innerhalb der Sperrzeit wird freundlich abgelehnt *(Frontend und Entscheidungslogik getestet, Ende-zu-Ende erst mit n8n)*
@@ -271,5 +271,5 @@ Jeweils als neue Artikel oder Kategorien im selben Webhook:
 - Supabase-Anon-Key für Netlify (`VITE_SUPABASE_ANON_KEY`, ist für die Plattform schon nötig); der Service-Key gehört nur in n8n
 - Links zu Impressum und Datenschutz für den Fuß → Netlify-Variablen `VITE_IMPRESSUM_URL` und `VITE_DATENSCHUTZ_URL` (die Datenschutzerklärung muss Supabase, n8n und Telegram nennen)
 - Endgültiger Text des Hauptbuttons (Standard: „Jetzt anfordern“, Konstante `HAUPTBUTTON_TEXT` in `src/lib/bestellung.ts`)
-- Migration anwenden (Merge in den Produktions-Branch) und den Workflow in n8n bauen
+- Den Workflow in n8n bauen (die Migration ist angewendet)
 
