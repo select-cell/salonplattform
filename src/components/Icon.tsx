@@ -75,6 +75,13 @@ const PFADE = {
     </>
   ),
   haken: <path d="M20 6 9 17l-5-5" />,
+  plus: (
+    <>
+      <path d="M5 12h14" />
+      <path d="M12 5v14" />
+    </>
+  ),
+  minus: <path d="M5 12h14" />,
   kalender: (
     <>
       <rect x="3" y="4" width="18" height="18" rx="2" />

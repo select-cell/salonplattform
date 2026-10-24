@@ -20,12 +20,18 @@ const ErgebnissePage = lazy(() => import('./pages/app/ErgebnissePage'))
 const TeamSeite = lazy(() => import('./pages/app/TeamSeite'))
 const MitgliederSeite = lazy(() => import('./pages/app/MitgliederSeite'))
 const MitgliedSeite = lazy(() => import('./pages/app/MitgliedSeite'))
+// Gäste-Seite „Jetzt anfordern“: eigener Chunk, damit die Plattform davon nichts mitlädt
+const Bestellen = lazy(() => import('./pages/Bestellen'))
 
 export default function App() {
   return (
     <AuthProvider>
       <Suspense fallback={<Ladeanzeige text="Wird geladen …" />}>
       <Routes>
+        {/* Gäste am Platz (QR-Code): ohne Login, mit eigenem Rahmen statt Plattform-Kopf */}
+        <Route path="p" element={<Bestellen />} />
+        <Route path="p/:platz" element={<Bestellen />} />
+
         {/* öffentlich */}
         <Route element={<OeffentlichLayout />}>
           <Route index element={<Start />} />

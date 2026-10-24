@@ -1,0 +1,208 @@
+/* ==========================================================================
+   Bestellsystem „Jetzt anfordern“ (Gäste-Seite /p/<platz>).
+   Nutzt nur die Tokens aus tokens.css, also hell und Nachtmodus ohne Zusatzarbeit.
+   Wird zusammen mit der Seite nachgeladen und belastet die Plattform nicht.
+   ========================================================================== */
+
+.seite__inhalt.bestell {
+  width: 100%;
+  max-width: 560px;
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.bestell__kopf {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.bestell h1 em {
+  font-style: italic;
+  color: var(--link);
+}
+
+/* Der Fokus springt beim Ansichtswechsel auf die Überschrift (Screenreader), ein Rahmen wäre Lärm */
+.bestell h1:focus {
+  outline: none;
+}
+
+/* ---- Platznummer ---------------------------------------------------------- */
+.platzmarke {
+  display: inline-flex;
+  align-items: baseline;
+  justify-self: start;
+  gap: 10px;
+  padding: 6px 24px 10px;
+  border: 1px solid var(--hero-line);
+  border-radius: 999px;
+  background: var(--tint);
+  color: var(--accent-text);
+}
+
+.platzmarke__label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.platzmarke__zahl {
+  font-family: var(--font-serif);
+  font-size: 3.25rem;
+  line-height: 1;
+}
+
+/* ---- Artikel ------------------------------------------------------------- */
+.artikel {
+  display: grid;
+  gap: 12px;
+}
+
+.artikel__zeile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 76px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-l);
+  background: var(--surface);
+  box-shadow: var(--shadow-s);
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+
+.artikel__zeile--gewaehlt {
+  border-color: var(--hero-line);
+  background: linear-gradient(135deg, var(--hero-von) 0%, var(--hero-bis) 100%);
+}
+
+.artikel__name {
+  display: grid;
+  gap: 2px;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.artikel__entfernen {
+  justify-self: start;
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+.artikel__entfernen:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---- Menge ---------------------------------------------------------------- */
+.menge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.menge__btn {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1.5px solid var(--cream-deep);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent-text);
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    transform 0.15s;
+}
+
+.menge__btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--tint);
+}
+
+.menge__btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.menge__btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.menge__zahl {
+  min-width: 2ch;
+  font-family: var(--font-serif);
+  font-size: 1.6rem;
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Feste Leiste unten ---------------------------------------------------- */
+.bestell__leiste {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 15;
+  padding: 12px var(--gutter) calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--cream); /* deckend: darunter liegt der Fuß, er darf nicht durchscheinen */
+}
+
+/* Solange die Leiste unten klebt, rückt der Fuß (Impressum, Datenschutz) darüber */
+.seite:has(.bestell__leiste) .fuss {
+  padding-bottom: calc(24px + 88px + env(safe-area-inset-bottom));
+}
+
+.bestell__leiste-innen {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 560px;
+  margin-inline: auto;
+}
+
+.bestell__summe {
+  font-size: 1.05rem;
+}
+
+.bestell__summe strong {
+  margin-right: 2px;
+  font-family: var(--font-serif);
+  font-size: 1.7rem;
+  font-weight: 400;
+  color: var(--accent-text);
+}
+
+/* ---- Deine Auswahl und Bestätigung ------------------------------------------ */
+.bestell__aktionen {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.bestaetigung {
+  gap: 14px;
+}
+
+.bestaetigung .platzmarke {
+  justify-self: center;
+}
+
+.bestaetigung__liste {
+  display: grid;
+  gap: 4px;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.fuss__links {
+  display: flex;
+  gap: 16px;
+}
