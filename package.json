@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "dev:bestellung": "vite --config vite.bestellung.config.ts",
+    "build:bestellung": "tsc -b && vite build --config vite.bestellung.config.ts",
+    "preview:bestellung": "vite preview --config vite.bestellung.config.ts"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.3.0",

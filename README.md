@@ -16,7 +16,7 @@ Die vollständige Bauanleitung steht in [`docs/plattform-architektur.md`](docs/p
 | 4 | Abgabe-Status und Reminder-Popup | **fertig, in Supabase installiert** |
 | 5 | Chef-, Gäste- und Verantwortlichen-Umfrage | offen: die Fragen fehlen noch (Seiten sind als „Kommt bald“ vorbereitet) |
 | 6 | Jarvis | offen: braucht die n8n-Webhook-URL (Seite ist als „Kommt bald“ vorbereitet) |
-| – | Bestellsystem „Jetzt anfordern“ | Datenbank (in Supabase angelegt), Gäste-Seite (`/p/<platz>`) und QR-Skript fertig und getestet. **Offen:** Workflow in n8n importieren und mit Telegram verbinden (`n8n/anfragen-workflow.json`), QR-Codes mit der endgültigen Domain erzeugen, Merge und Netlify-Variablen. Details und Abnahme: [`docs/bestellsystem.md`](docs/bestellsystem.md) |
+| – | Bestellsystem „Jetzt anfordern“ | **Eigene Seite, getrennt von der Bewertungsplattform** (`npm run build:bestellung`, eigene Netlify-Seite; der Quellcode der Plattform ist dafür unverändert). Datenbank (in Supabase angelegt), Bestell-Seite (`/p/<platz>`) und QR-Skript fertig und getestet. **Offen:** Workflow in n8n importieren und mit Telegram verbinden (`n8n/anfragen-workflow.json`), QR-Codes mit der endgültigen Domain erzeugen. Details und Abnahme: [`docs/bestellsystem.md`](docs/bestellsystem.md) |
 
 ### Was in der Umfrage noch fehlt
 
@@ -34,6 +34,8 @@ Das Nachtragen geht ohne Code, siehe „Inhalte der Umfrage pflegen“. Außerde
 
 ```
 src/                  React-App (pages, components, auth, lib, styles)
+  bestellung/         Einstieg der eigenständigen Bestell-Seite (nur sie, ohne Plattform)
+bestellung/           HTML-Rahmen und Netlify-Dateien der Bestell-Seite
   components/umfrage/ Ablauf der Monatsumfrage (Schritte, Video-Pflicht, Notenskala)
   lib/umfrage.ts      Ablauf, Prüfungen und Payload der Umfrage (ohne Oberfläche)
 supabase/
@@ -56,7 +58,9 @@ Die Migrationen heißen `JJJJMMTThhmmss_name.sql`. Nur dieses Format wird von Su
 npm install
 cp .env.example .env     # VITE_SUPABASE_ANON_KEY eintragen (Supabase → Project Settings → API)
 npm run dev              # http://localhost:5173
-npm run build            # Produktions-Build nach dist/
+npm run build            # Produktions-Build der Bewertungsplattform nach dist/
+npm run dev:bestellung   # Bestell-Seite: http://localhost:5174/p/4
+npm run build:bestellung # Bestell-Seite als eigenes Paket nach dist-bestellung/
 ```
 
 In die `.env` gehört **nur** der öffentliche anon-/publishable-Key. Den `service_role`-/secret-Key niemals ins Frontend oder ins Repo. Die App weigert sich zu starten, wenn sie einen geheimen Schlüssel erkennt.
@@ -207,4 +211,4 @@ supabase start && supabase test db
 
 Die Netlify-Domain danach in den Supabase-Redirect-URLs eintragen (siehe oben).
 
-**Bestellsystem:** In Netlify zusätzlich `VITE_BESTELL_WEBHOOK_URL` (Produktions-URL des n8n-Webhooks) setzen, optional `VITE_IMPRESSUM_URL` und `VITE_DATENSCHUTZ_URL` für den Fuß der Gäste-Seite, danach neu bauen. Ohne die Webhook-URL zeigt `/p/<platz>` beim Absenden eine freundliche Fehlermeldung, die übrige Plattform ist nicht betroffen.
+**Bestellsystem (eigene Seite):** Die Bestell-Seite ist ein eigenes Paket und läuft auf einer **eigenen Netlify-Seite**, nicht auf der der Bewertungsplattform. Sie liest dieselbe `.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) und braucht zusätzlich `VITE_BESTELL_WEBHOOK_URL` (n8n-Webhook), optional `VITE_IMPRESSUM_URL` und `VITE_DATENSCHUTZ_URL`. `npm run build:bestellung` erzeugt `dist-bestellung/`; dessen Inhalt (oder als ZIP) auf die neue Netlify-Seite hochladen. Die Bewertungsplattform wird dadurch nicht angefasst: Ihr Build ist Byte für Byte derselbe wie vor dem Bestellsystem. Eine eigene Seite hat außerdem eine eigene Adresse, Anmeldungen der Plattform und der Bestell-Seite mischen sich also nie.

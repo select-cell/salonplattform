@@ -4,18 +4,6 @@
 export const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL ?? '').trim().replace(/\/+$/, '')
 export const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim()
 
-// Bestellsystem: bewusst nicht in pruefeKonfiguration(), damit eine fehlende Webhook-URL
-// nur die Gäste-Seite betrifft und nicht die ganze Plattform lahmlegt.
-export const BESTELL_WEBHOOK_URL = (import.meta.env.VITE_BESTELL_WEBHOOK_URL ?? '').trim()
-
-function webLink(wert: string | undefined): string | null {
-  const link = (wert ?? '').trim()
-  return /^(https:\/\/|\/(?!\/))/.test(link) ? link : null
-}
-
-export const IMPRESSUM_URL = webLink(import.meta.env.VITE_IMPRESSUM_URL)
-export const DATENSCHUTZ_URL = webLink(import.meta.env.VITE_DATENSCHUTZ_URL)
-
 function jwtRolle(token: string): string | null {
   const teile = token.split('.')
   if (teile.length !== 3) return null

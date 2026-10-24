@@ -1,7 +1,7 @@
 // Netzwerk des Bestellsystems. Zwei Wege, bewusst getrennt (docs/bestellsystem.md):
 //  - Speisekarte lesen: direkt aus Supabase, mit dem öffentlichen Key (nur Lesen)
 //  - Anfrage senden: ausschließlich an den n8n-Webhook, nie direkt an Telegram
-import { BESTELL_WEBHOOK_URL } from './konfiguration'
+import { BESTELL_WEBHOOK_URL } from './bestellKonfiguration'
 import {
   leseAntwort,
   NOTKARTE,

@@ -9,7 +9,7 @@ Das System läuft **im selben Repo und im selben Supabase-Projekt** wie die Team
 | Teil | Wo | Stand |
 |---|---|---|
 | Datenbank | `supabase/migrations/20261024201935_bestellsystem.sql`, Tests in `supabase/tests/database/04_bestellsystem.test.sql` | **in Supabase angelegt** (24. Oktober 2026, Version `20261024201935`), Struktur identisch zur getesteten Datei, Zugriff als `anon` und eingeloggt geprüft |
-| Gäste-Seite | `src/pages/Bestellen.tsx`, `src/components/bestellung/`, `src/lib/bestellung.ts`, `src/lib/bestellApi.ts`, `src/styles/bestellung.css` | fertig, im Browser gegen ein simuliertes Backend getestet |
+| Bestell-Seite | Einstieg `src/bestellung/main.tsx`, `bestellung/` (HTML, Netlify-Dateien), `vite.bestellung.config.ts`; Seite und Logik in `src/pages/Bestellen.tsx`, `src/components/bestellung/`, `src/lib/bestellung.ts`, `src/lib/bestellApi.ts`, `src/lib/bestellKonfiguration.ts`, `src/styles/bestellung.css` | fertig, **eigenes Paket** (`npm run build:bestellung`), im Browser gegen ein simuliertes Backend getestet |
 | QR-Codes | `tools/qr-codes/` (eigene `package.json`) | fertig, Lesbarkeit mit einem unabhängigen Dekoder geprüft; **erst mit der endgültigen Domain erzeugen** |
 | n8n | `n8n/anfragen-workflow.json` (zum Importieren), `n8n/README.md`, Code-Node `n8n/anfrage-entscheiden.cjs`, zusammen 60 Tests | Workflow in n8n 2.44.6 lokal importiert und mit echtem Browser getestet, Telegram und Supabase dabei simuliert; **in der echten n8n-Instanz noch zu importieren und mit Telegram zu verbinden** |
 
@@ -17,9 +17,10 @@ Das System läuft **im selben Repo und im selben Supabase-Projekt** wie die Team
 
 - **Service-Key in n8n** ist bewusst akzeptiert (Supabase-Node, Key nur als n8n-Credential). Er öffnet das ganze Projekt, auch die Mitarbeiter-Auswertungen. Deshalb ein eigener Secret-Key nur für n8n, der sich einzeln widerrufen lässt. **Neu bewerten**, sobald jemand anderes Workflows in n8n bearbeiten darf oder Jarvis (Phase 6) dazukommt: Dann eine eigene Datenbank-Rolle nur für die vier Bestell-Tabellen und der Postgres-Node statt des Supabase-Nodes.
 - **`salon_id`** an `plaetze` und `artikel`, wie überall in der Plattform. `platz` bleibt der Schlüssel, weil er im QR-Link steht. Das gilt je Domain; teilen sich mehrere Salons eine Domain, muss der Schlüssel erweitert werden.
-- **Frontend in React** (wie die Plattform) statt reinem HTML. Die Gäste-Seite ist ein eigener, nachgeladener Chunk (rund 3 KB gzip), die Plattform lädt davon nichts mit. Insgesamt lädt ein Gast rund 160 KB JavaScript (gzip), das meiste davon React und der Supabase-Client.
+- **Eigene Seite, kein Konflikt mit der Bewertungsplattform:** Die Bestell-Seite ist ein eigenständiges Paket (`npm run build:bestellung`) mit eigenem Einstieg und läuft auf einer **eigenen Netlify-Seite**. Sie enthält keine Bewertungsplattform, kein Login und keine Diagramme; die Startseite zeigt nur den Hinweis, den QR-Code am Platz zu scannen. Der Quellcode der Plattform ist unverändert (kein Eintrag in `src/App.tsx`, `Icon.tsx`, `konfiguration.ts`), und ihr Build ist **Byte für Byte identisch** zu dem vor dem Bestellsystem (geprüft durch Vergleich der beiden Builds). Geteilt werden nur Repo, Supabase-Projekt, Design-Tokens und Basis-Styles. Die eigene Adresse trennt auch die Anmeldungen (Browser-Speicher gilt je Adresse).
+- **Frontend in React** (wie die Plattform) statt reinem HTML, rund 143 KB JavaScript (gzip), davon das meiste React und der Supabase-Client.
 - **Design:** keine zweite Farbpalette. Die Hex-Werte aus dem Master (§5a) sind durch die Tokens der Plattform ersetzt, Hell und Nachtmodus kommen von dort.
-- **Routing:** `/p/:platz` ist eine Route der App, der vorhandene Netlify-Fallback genügt.
+- **Routing:** `/p/:platz` (und `/p?platz=N`) gehört zur Bestell-Seite, alles andere zeigt den QR-Hinweis. `bestellung/public/_redirects` und `_headers` (Sicherheits-Kopfzeilen) liegen im Paket.
 - **Webhook-URL:** `https://tobitest2008.app.n8n.cloud/webhook/salondawiidbestellungen` (n8n-Cloud-Testinstanz). Sie steht in `.env.example` und wird beim Bauen als `VITE_BESTELL_WEBHOOK_URL` eingebacken. Wechselt die n8n-Instanz, genügt eine neue URL und ein neuer Build.
 - **Webhook:** Die Erfolgsantwort enthält zusätzlich `sperre_sekunden`, damit der Zähler im Frontend zur n8n-Einstellung passt. Sperre antwortet mit Status 200 und `ok: false`.
 - **Doppelung wird vor der Sperre geprüft:** Kam die Antwort auf eine erste Anfrage nie an, sieht der Gast beim Wiederholen die Bestätigung statt „gesperrt“.
@@ -82,7 +83,7 @@ https://<DOMAIN>/p/7
 ```
 
 - Das Frontend liest die Platznummer aus dem Pfad. Zusätzlich funktioniert `?platz=N` als Fallback. Der Gast tippt nichts ein.
-- Routing: `/p/:platz` ist eine Route der React-App. Der vorhandene Netlify-Fallback `/*  /index.html  200` genügt, eine zusätzliche Zeile in `_redirects` ist nicht nötig.
+- Routing: `/p/:platz` gehört zur eigenständigen Bestell-Seite; das Paket bringt sein `_redirects` (`/*  /index.html  200`) mit, damit `/p/4` direkt aufrufbar ist.
 - Gültig sind nur Plätze aus der Tabelle `plaetze`. Sonst Hinweis: "Bitte scanne den QR-Code an deinem Platz erneut."
 - **Platznummer groß** oben auf der Seite und in der Bestätigung anzeigen ("Platz 4"), damit der Gast einen falschen QR-Code sofort bemerkt.
 - QR-Codes: `tools/qr-codes` erzeugt für alle Plätze je ein Bild (SVG und PNG, 70 × 90 mm, 600 dpi), mit „Platz N“ beschriftet, Fehlerkorrektur Stufe H und 4 Modulen Rand, damit der Code auch laminiert zuverlässig scannt. Der Code ist rund 4 cm groß (empfohlen: mindestens ca. 3 cm). Aufruf und Hinweise: `tools/qr-codes/README.md`.
@@ -90,7 +91,7 @@ https://<DOMAIN>/p/7
 
 ## 5. Frontend
 
-**Technik:** Teil der React-Plattform (Vite, TypeScript), Hosting auf Netlify. Die Gäste-Seite ist ein eigener, nachgeladener Chunk mit eigenem Rahmen (ohne „Anmelden“ und ohne Link in den Mitarbeiterbereich), keine zusätzlichen Bibliotheken.
+**Technik:** React, Vite und TypeScript wie die Plattform, aber als **eigenständiges Paket** (`npm run build:bestellung`) mit eigenem Einstieg, Hosting auf einer eigenen Netlify-Seite. Eigener Rahmen ohne „Anmelden“ und ohne Link in den Mitarbeiterbereich, keine zusätzlichen Bibliotheken.
 
 **Verhalten:**
 - Mobile-first, Sprache Deutsch, schlicht und schnell.
@@ -267,10 +268,10 @@ Jeweils als neue Artikel oder Kategorien im selben Webhook:
 ## 13. Offene Platzhalter
 
 - `<DOMAIN>` der Bestellseite (vor dem Erzeugen der QR-Codes)
-- n8n-Webhook-URL → Netlify-Variable `VITE_BESTELL_WEBHOOK_URL` (aktuell die Testinstanz, siehe Abschnitt 0)
+- n8n-Webhook-URL → beim Bauen der Bestell-Seite als `VITE_BESTELL_WEBHOOK_URL` (aktuell die Testinstanz, siehe Abschnitt 0)
 - Telegram-Chat-ID der Anfragen-Gruppe und des Admin-Chats
 - Supabase-Anon-Key für Netlify (`VITE_SUPABASE_ANON_KEY`, ist für die Plattform schon nötig); der Service-Key gehört nur in n8n
-- Links zu Impressum und Datenschutz für den Fuß → Netlify-Variablen `VITE_IMPRESSUM_URL` und `VITE_DATENSCHUTZ_URL` (die Datenschutzerklärung muss Supabase, n8n und Telegram nennen)
+- Links zu Impressum und Datenschutz für den Fuß → beim Bauen als `VITE_IMPRESSUM_URL` und `VITE_DATENSCHUTZ_URL` (die Datenschutzerklärung muss Supabase, n8n und Telegram nennen)
 - Endgültiger Text des Hauptbuttons (Standard: „Jetzt anfordern“, Konstante `HAUPTBUTTON_TEXT` in `src/lib/bestellung.ts`)
 - Den Workflow in n8n importieren (`n8n/anfragen-workflow.json`) und mit Telegram verbinden (die Migration ist angewendet)
 

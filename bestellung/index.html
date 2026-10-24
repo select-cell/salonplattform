@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#FAF8F3" />
+    <meta name="robots" content="noindex" />
+    <meta name="description" content="Am Platz etwas anfordern." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // Hell oder Nacht festlegen, bevor die Seite gezeichnet wird (Wahl aus dem Browser, sonst Einstellung des Geräts)
+      try {
+        var t = localStorage.getItem('dawiid-theme')
+        if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        document.documentElement.dataset.theme = t
+        if (t === 'dark') document.querySelector('meta[name="theme-color"]').setAttribute('content', '#15110C')
+      } catch (e) {}
+    </script>
+    <title>Dawiid</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="../src/bestellung/main.tsx"></script>
+  </body>
+</html>

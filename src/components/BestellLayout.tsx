@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 import logo from '../assets/logo-dawiid.png'
-import { DATENSCHUTZ_URL, IMPRESSUM_URL } from '../lib/konfiguration'
-import { MARKE } from '../lib/marke'
+import { DATENSCHUTZ_URL, IMPRESSUM_URL } from '../lib/bestellKonfiguration'
 import { ThemaSchalter } from './ThemaSchalter'
 
 /**
@@ -13,14 +12,14 @@ export function BestellLayout({ children }: { children: ReactNode }) {
     <div className="seite">
       <header className="kopf">
         <div className="container kopf__innen">
-          <img className="marke__logo" src={logo} alt={MARKE.name} width={212} height={86} />
+          <img className="marke__logo" src={logo} alt="Dawiid" width={212} height={86} />
           <ThemaSchalter />
         </div>
       </header>
       <main className="seite__inhalt bestell">{children}</main>
       <footer className="fuss">
         <div className="container fuss__innen">
-          <span>{MARKE.name}</span>
+          <span>Dawiid</span>
           {(IMPRESSUM_URL || DATENSCHUTZ_URL) && (
             <span className="fuss__links">
               {IMPRESSUM_URL && <a href={IMPRESSUM_URL}>Impressum</a>}

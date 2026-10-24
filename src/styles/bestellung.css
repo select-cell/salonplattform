@@ -27,6 +27,27 @@
   outline: none;
 }
 
+/* ---- Kleinigkeiten (standen bisher in der Datei der Bewertungsplattform) --------- */
+.textlink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  font-size: 0.925rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.textlink:hover {
+  color: var(--accent-text);
+}
+
+.lade--kompakt {
+  min-height: 40vh;
+}
+
 /* ---- Platznummer ---------------------------------------------------------- */
 .platzmarke {
   display: inline-flex;
