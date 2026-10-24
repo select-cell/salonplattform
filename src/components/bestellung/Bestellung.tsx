@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { sendeAnfrage, type Karte } from '../../lib/bestellApi'
+import { sendeAnfrageMitDetails, type Karte, type SendeDetails } from '../../lib/bestellApi'
 import {
   aendereMenge,
   anfrageIdFuer,
@@ -12,9 +12,11 @@ import {
   type IdMerker,
   type Position,
 } from '../../lib/bestellung'
+import { zielUrl } from '../../lib/testversion'
 import { Icon } from '../Icon'
 import { Mengenwahl } from './Mengenwahl'
 import { Platzmarke } from './Platzmarke'
+import { TestDetails } from './TestDetails'
 
 type Ansicht = 'karte' | 'auswahl' | 'fertig'
 type Meldung = 'gesperrt' | 'fehler' | 'nicht_eingerichtet' | null
@@ -37,6 +39,7 @@ export function Bestellung({ platz, karte }: { platz: number; karte: Karte }) {
   const [meldung, setMeldung] = useState<Meldung>(null)
   const [sperreBis, setSperreBis] = useState<number | null>(null)
   const [abgeschickt, setAbgeschickt] = useState<Position[]>([])
+  const [details, setDetails] = useState<SendeDetails | null>(null) // nur Testversion
   const laeuft = useRef(false) // schützt vor Doppelklick, bevor React neu gezeichnet hat
   const idMerker = useRef<IdMerker | null>(null)
   const titel = useRef<HTMLHeadingElement>(null)
@@ -65,7 +68,11 @@ export function Bestellung({ platz, karte }: { platz: number; karte: Karte }) {
     setSendet(true)
     setMeldung(null)
     idMerker.current = anfrageIdFuer(idMerker.current, platz, positionen)
-    const antwort = await sendeAnfrage({ anfrage_id: idMerker.current.id, typ: 'anfrage', platz, positionen })
+    const { antwort, details: sendeDetails } = await sendeAnfrageMitDetails(
+      { anfrage_id: idMerker.current.id, typ: 'anfrage', platz, positionen },
+      __TESTVERSION__ ? zielUrl() : undefined,
+    )
+    if (__TESTVERSION__) setDetails(sendeDetails)
     laeuft.current = false
     setSendet(false)
 
@@ -86,6 +93,7 @@ export function Bestellung({ platz, karte }: { platz: number; karte: Karte }) {
     setAuswahl({})
     setMeldung(null)
     setAbgeschickt([])
+    setDetails(null)
     idMerker.current = null
     setAnsicht('karte')
   }
@@ -117,6 +125,7 @@ export function Bestellung({ platz, karte }: { platz: number; karte: Karte }) {
             Neue Anfrage
           </button>
         )}
+        {__TESTVERSION__ && details && <TestDetails details={details} />}
       </section>
     )
   }
@@ -169,7 +178,14 @@ export function Bestellung({ platz, karte }: { platz: number; karte: Karte }) {
               {(meldung === 'fehler' || meldung === 'nicht_eingerichtet') && (
                 <div className="hinweis hinweis--fehler" role="alert">
                   <Icon name="achtung" groesse={20} />
-                  <p>{meldung === 'fehler' ? TEXTE.fehler : TEXTE.nichtEingerichtet}</p>
+                  <div>
+                    <p>{meldung === 'fehler' ? TEXTE.fehler : TEXTE.nichtEingerichtet}</p>
+                    {__TESTVERSION__ && (
+                      <p style={{ marginTop: 6 }}>
+                        <strong>Testversion:</strong> Der genaue Grund steht unten unter „Testdetails“.
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
               <button
@@ -198,6 +214,7 @@ export function Bestellung({ platz, karte }: { platz: number; karte: Karte }) {
                 Weitere Artikel wählen
               </button>
             </div>
+            {__TESTVERSION__ && details && <TestDetails details={details} />}
           </>
         )}
       </>

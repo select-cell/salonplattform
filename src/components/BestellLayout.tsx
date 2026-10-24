@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import logo from '../assets/logo-dawiid.png'
 import { DATENSCHUTZ_URL, IMPRESSUM_URL } from '../lib/bestellKonfiguration'
 import { ThemaSchalter } from './ThemaSchalter'
+import { WebhookZiel } from './bestellung/WebhookZiel'
 
 /**
  * Rahmen der Gäste-Seite. Bewusst ohne „Anmelden“ und ohne Link in die Team-Plattform:
@@ -19,7 +20,10 @@ export function BestellLayout({ children }: { children: ReactNode }) {
       </header>
       {__TESTVERSION__ && (
         <div className="testband" role="note">
-          <strong>Testversion</strong> · Anfragen werden wirklich gesendet · <Link to="/">Platz wechseln</Link>
+          <div>
+            <strong>Testversion</strong> · Anfragen werden wirklich gesendet · <Link to="/">Platz wechseln</Link>
+          </div>
+          <WebhookZiel />
         </div>
       )}
       <main className="seite__inhalt bestell">{children}</main>

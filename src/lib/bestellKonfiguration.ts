@@ -11,3 +11,8 @@ function webLink(wert: string | undefined): string | null {
 
 export const IMPRESSUM_URL = webLink(import.meta.env.VITE_IMPRESSUM_URL)
 export const DATENSCHUTZ_URL = webLink(import.meta.env.VITE_DATENSCHUTZ_URL)
+
+/** Test-URL von n8n („Listen for test event“): derselbe Pfad, aber /webhook-test/ statt /webhook/. Nur die Testversion nutzt sie. */
+export function testWebhookUrl(url: string): string {
+  return url.replace('/webhook/', '/webhook-test/')
+}

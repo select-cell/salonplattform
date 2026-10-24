@@ -53,28 +53,57 @@ export async function ladeKarte(platz: number): Promise<Karte> {
   }
 }
 
+/** Alles, was beim Senden passiert ist. Die Testversion zeigt es an; produktiv wird es nicht angezeigt. */
+export interface SendeDetails {
+  url: string
+  gesendet: Nutzdaten
+  /** HTTP-Status der Antwort, null wenn keine lesbare Antwort kam */
+  status: number | null
+  antwortText: string | null
+  dauerMs: number
+  fehler: 'zeitlimit' | 'netzwerk' | 'nicht_eingerichtet' | null
+}
+
 /**
  * Sendet die Anfrage an den Webhook. Wirft nie: Netzwerkfehler und Zeitüberschreitung
  * (ca. 10 Sekunden) kommen als `fehler` zurück, damit die Oberfläche eine Meldung zeigen kann.
+ * `url` ist nur in der Testversion eine andere als die eingebaute (Test-URL von n8n).
  */
-export async function sendeAnfrage(nutzdaten: Nutzdaten): Promise<Antwort> {
-  if (!BESTELL_WEBHOOK_URL) {
+export async function sendeAnfrageMitDetails(
+  nutzdaten: Nutzdaten,
+  url: string = BESTELL_WEBHOOK_URL,
+): Promise<{ antwort: Antwort; details: SendeDetails }> {
+  const start = Date.now()
+  const details: SendeDetails = { url, gesendet: nutzdaten, status: null, antwortText: null, dauerMs: 0, fehler: null }
+  const fertig = (antwort: Antwort) => ({ antwort, details: { ...details, dauerMs: Date.now() - start } })
+
+  if (!url) {
     console.error('VITE_BESTELL_WEBHOOK_URL fehlt: Die Anfrage kann nicht gesendet werden.')
-    return { art: 'fehler', grund: 'nicht_eingerichtet' }
+    details.fehler = 'nicht_eingerichtet'
+    return fertig({ art: 'fehler', grund: 'nicht_eingerichtet' })
   }
   const abbruch = new AbortController()
   const timer = setTimeout(() => abbruch.abort(), ZEITLIMIT_SENDEN_MS)
   try {
-    const antwort = await fetch(BESTELL_WEBHOOK_URL, {
+    const antwort = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(nutzdaten),
       signal: abbruch.signal,
     })
-    const gelesen = leseAntwort(await antwort.json().catch(() => null))
-    return gelesen ?? { art: 'fehler', grund: antwort.ok ? 'antwort_unlesbar' : `status_${antwort.status}` }
+    details.status = antwort.status
+    details.antwortText = await antwort.text().catch(() => null)
+    let body: unknown = null
+    try {
+      body = JSON.parse(details.antwortText ?? '')
+    } catch {
+      // keine JSON-Antwort: wird unten als Fehler behandelt
+    }
+    const gelesen = leseAntwort(body)
+    return fertig(gelesen ?? { art: 'fehler', grund: antwort.ok ? 'antwort_unlesbar' : `status_${antwort.status}` })
   } catch {
-    return { art: 'fehler', grund: abbruch.signal.aborted ? 'zeitlimit' : 'netzwerk' }
+    details.fehler = abbruch.signal.aborted ? 'zeitlimit' : 'netzwerk'
+    return fertig({ art: 'fehler', grund: details.fehler })
   } finally {
     clearTimeout(timer)
   }

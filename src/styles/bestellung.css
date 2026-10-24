@@ -283,3 +283,86 @@
   font-size: 2.75rem;
   line-height: 1;
 }
+
+.webhookziel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 8px;
+  margin-top: 6px;
+}
+
+.webhookziel button {
+  min-height: 30px;
+  padding: 2px 12px;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.webhookziel button[aria-pressed='true'] {
+  background: var(--yel);
+  border-color: var(--yel);
+  color: var(--ybg);
+}
+
+.webhookziel button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.testdetails {
+  margin-top: 20px;
+  padding: 12px 14px;
+  border: 1px dashed var(--yel);
+  border-radius: var(--r-m);
+  background: var(--surface);
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.testdetails summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--yel);
+}
+
+.testdetails dl {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0;
+}
+
+.testdetails dt {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text2);
+}
+
+.testdetails dd {
+  margin: 0;
+}
+
+.testdetails code,
+.testdetails pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+}
+
+.testdetails pre {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  overflow-x: auto;
+  border-radius: var(--r-s);
+  background: var(--cream-mid);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
