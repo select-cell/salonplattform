@@ -6,8 +6,8 @@ export function TestDetails({ details }: { details: SendeDetails }) {
   const einordnung = ordneEin(details)
   const klasse = einordnung.stufe === 'ok' ? 'hinweis hinweis--ok' : einordnung.stufe === 'fehler' ? 'hinweis hinweis--fehler' : 'hinweis'
   return (
-    <details className="testdetails" open>
-      <summary>Testdetails: Was gesendet wurde und was zurückkam</summary>
+    <details className="testdetails">
+      <summary>Testdetails anzeigen: Was gesendet wurde und was zurückkam</summary>
       <dl>
         <dt>Ziel ({istTestUrl(details.url) ? 'Test-URL' : 'Produktions-URL'})</dt>
         <dd>

@@ -12,7 +12,7 @@ import {
   type IdMerker,
   type Position,
 } from '../../lib/bestellung'
-import { zielUrl } from '../../lib/testversion'
+import { hatWebhookErreicht, zielUrl } from '../../lib/testversion'
 import { Icon } from '../Icon'
 import { Mengenwahl } from './Mengenwahl'
 import { Platzmarke } from './Platzmarke'
@@ -78,6 +78,13 @@ export function Bestellung({ platz, karte }: { platz: number; karte: Karte }) {
 
     if (antwort.art === 'ok') {
       setSperreBis(Date.now() + antwort.sperreSekunden * 1000)
+      setAbgeschickt(positionen)
+      idMerker.current = null
+      setAnsicht('fertig')
+    } else if (__TESTVERSION__ && hatWebhookErreicht(sendeDetails, antwort)) {
+      // Testversion: Die Anfrage ist im Webhook angekommen, das zählt. Keine Fehlermeldung und keine
+      // Sperre, denn ein einfacher Test-Webhook sperrt nichts und soll mehrfach ansprechbar sein.
+      setSperreBis(null)
       setAbgeschickt(positionen)
       idMerker.current = null
       setAnsicht('fertig')

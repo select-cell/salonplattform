@@ -1,6 +1,7 @@
 // Nur für die Testversion (der produktive Build enthält diese Datei nicht):
 // Webhook-Ziel wählen und erklären, was beim Senden passiert ist.
 import type { SendeDetails } from './bestellApi'
+import type { Antwort } from './bestellung'
 import { BESTELL_WEBHOOK_URL, testWebhookUrl } from './bestellKonfiguration'
 
 export type Ziel = 'produktion' | 'test'
@@ -28,6 +29,17 @@ export function zielUrl(): string {
 }
 
 export const istTestUrl = (url: string) => url.includes('/webhook-test/')
+
+/**
+ * Testversion: Hat die Anfrage den Webhook erreicht, auch wenn der Workflow nicht mit { "ok": true } antwortete?
+ * Ja bei einer Antwort mit Status 2xx (z. B. „Workflow was started“) oder 5xx (Workflow nach dem Webhook gescheitert).
+ * Nein, wenn keine Antwort kam, der Webhook unbekannt ist (404/405) oder n8n die Anfrage ausdrücklich abgewiesen hat (4xx).
+ * Dann gilt sie in der Testversion als gesendet; die rote Fehlermeldung bleibt nur für Fälle, in denen nichts ankam.
+ */
+export function hatWebhookErreicht(d: SendeDetails, antwort: Antwort): boolean {
+  if (antwort.art !== 'fehler' || d.status === null) return false
+  return d.status < 400 || d.status >= 500
+}
 
 export interface Einordnung {
   stufe: 'ok' | 'warnung' | 'fehler'
@@ -65,6 +77,12 @@ export function ordneEin(d: SendeDetails): Einordnung {
       text: test
         ? 'n8n kennt diese Test-Adresse gerade nicht. Im Node Webhook auf „Listen for test event“ klicken und danach sofort erneut senden (die Test-Adresse gilt nur für eine Anfrage).'
         : 'n8n kennt diese Produktions-Adresse nicht: Der Workflow ist nicht veröffentlicht. In n8n „Publish“ klicken, oder oben das Ziel „Test“ wählen und im Node Webhook „Listen for test event“ nutzen.',
+    }
+  }
+  if (d.status !== null && d.status < 300 && !(body && typeof body.ok === 'boolean')) {
+    return {
+      stufe: 'ok',
+      text: `n8n hat die Anfrage angenommen (HTTP ${d.status}). Die Antwort hat nicht das Format { "ok": true }, das die Seite im Salon erwartet. Bei einem einfachen Test-Webhook ist das normal. Die Daten stehen in n8n unter Executions.`,
     }
   }
   if (d.status !== null && d.status >= 500) {
