@@ -169,6 +169,15 @@ test('Anfrage prüfen: ein Item je Auftrag, mit Strang, Prompt und Einstellungen
   assert.deepEqual([gesamt.length, gesamt[0].strang, gesamt[0].hinweisSchluessel, gesamt[0].system === SYSTEM_PROMPT_GESAMT], [1, 'Gesamtauswertung', 'datenlage_hinweis', true])
 })
 
+test('Anfrage prüfen: auch der reine Inhalt einer Testanfrage (ohne „body“) wird angenommen', async () => {
+  for (const name of Object.keys(anfragen)) {
+    const direkt = await laufeAlle('Anfrage prüfen', [anfragen[name]])
+    const verpackt = await laufeAlle('Anfrage prüfen', [eingang(anfragen[name])])
+    assert.deepEqual(direkt, verpackt, name)
+    assert.ok(direkt.every((i) => i.gueltig), name)
+  }
+})
+
 test('Anfrage prüfen: der Zusatzkontext der Aufgabe wird dem Prompt angehängt', async () => {
   const mit = await laufeAlle('Anfrage prüfen', [eingang(anfragen['einzelanalyse-anna'])], {}, (c) => c.replace("zusatzkontext: ''", "zusatzkontext: 'Der Salon legt Wert auf Ruhe am Waschplatz.'"))
   assert.equal(mit[0].system, SYSTEM_PROMPT + '\n\nZusätzlicher Kontext:\nDer Salon legt Wert auf Ruhe am Waschplatz.')

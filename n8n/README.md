@@ -83,21 +83,24 @@ Die Einzelfälle: **anna** hat alle Daten, **berta** keinen Vormonat und keine e
 
 Falls n8n beim Import einen Knoten nicht kennt (die KI-Knoten ändern sich von Version zu Version): den Agenten und das Claude-Modell neu hinzufügen und eintragen: Agent → *Source for Prompt*: Define below, *Prompt (User Message)* `{{ $json.nachricht }}`, *Options → System Message* `{{ $json.system }}`; Modell `claude-sonnet-5-5`, *Maximum Number of Tokens* 2000.
 
-## Einzeln testen
+## Einzeln testen: Schritt für Schritt
 
-**Im Editor (ohne Plattform):** Der Knoten **Webhook** hat die Anfrage `einzelanalyse-anna` angeheftet. **Execute workflow** läuft bis zum Agenten (kostet einen Aufruf). Jeden Knoten kannst du mit **Test step** für sich wiederholen:
+Die Dateien in `testanfragen/` sind **keine Workflows**. Es sind Beispielanfragen, so wie die Plattform sie an den Webhook schickt. Du fügst sie in den Test ein, der Workflow bearbeitet sie.
 
-| Knoten | Was du siehst |
-|---|---|
-| Anfrage prüfen | ein Item je Auftrag mit `strang`, `system`, `nachricht`; bei Fehlern `gueltig: false` und die Gründe |
-| Agent … | die Antwort des Agenten (`output`) |
-| Antwort lesen | `ausgabe` (das JSON mit den sechs Schlüsseln) und `meta.hinweise` (zum Beispiel „staerken: 5 Punkte (erwartet 2 bis 4)“) |
-| Zahlencheck | `meta.zahlen_nicht_in_daten`: Zahlen, die nicht in den Daten stehen. Das ist eine Orientierung; maßgeblich ist der Faktencheck der Datenbank. |
-| Antwort bündeln | die fertige Antwort an die Plattform |
+**Vorher (einmal):** Workflow importieren und an **beiden** Knoten „Claude …“ deine Anthropic-Zugangsdaten auswählen. Jeder Testlauf ruft die echte KI auf und kostet ein paar Cent (der Sammellauf drei Aufrufe).
 
-Um **Sammellauf** oder **Gesamtauswertung** im Editor zu testen, die angeheftete Anfrage im Webhook-Knoten durch den Inhalt von `testanfragen/sammellauf.json` oder `gesamtauswertung.json` ersetzen.
+### Weg A: im Editor (zum Anfangen, ohne Geheimnis und ohne URL)
 
-**Über die URL (mit Geheimnis, wie es die Plattform macht):** Zuerst im Knoten Webhook die angeheftete Anfrage lösen (**Unpin**), sonst nimmt n8n sie statt auf deine zu warten. Dann **Execute workflow** klicken (der Test-Webhook wartet jetzt auf eine Anfrage) und senden:
+1. Workflow öffnen und auf den Knoten **Webhook** doppelklicken. Rechts unter *Output* steht eine angeheftete Beispielanfrage (Pin-Symbol).
+2. Dort auf das Stift-Symbol (*Edit*) klicken. Je nach n8n-Version heißt es auch „Edit Output“. Den ganzen Inhalt der gewählten Testdatei einfügen (alles markieren, ersetzen) und speichern. Der Workflow nimmt die Datei direkt oder verpackt unter `body`.
+3. Fenster schließen und unten auf **Execute workflow** klicken.
+4. Nach dem Lauf auf die Knoten klicken und rechts die Ausgabe ansehen. Jeden Knoten kannst du mit *Test step* für sich wiederholen.
+
+### Weg B: über die URL (so, wie die Plattform es macht, mit Geheimnis)
+
+1. Im Knoten Webhook die angeheftete Anfrage lösen (**Unpin**), sonst nimmt n8n sie statt auf deine zu warten.
+2. Im Editor auf **Execute workflow** klicken: Der Test-Webhook wartet jetzt auf eine Anfrage. Die **Test URL** steht im Knoten Webhook.
+3. Aus einem Terminal senden (oder in Postman/Insomnia: POST, Header `x-webhook-secret` und `content-type: application/json`, Body = Dateiinhalt):
 
 ```bash
 curl -X POST "https://DEIN-N8N/webhook-test/dawiid-ki" \
@@ -106,7 +109,29 @@ curl -X POST "https://DEIN-N8N/webhook-test/dawiid-ki" \
   -d @n8n/testanfragen/gesamtauswertung.json
 ```
 
-Nach dem Aktivieren dieselbe Anfrage an `…/webhook/dawiid-ki`. Ohne oder mit falschem Header lehnt n8n selbst ab (`401` oder `403`); die Plattform schreibt dann „Der KI-Zugang wurde abgelehnt. Bitte den Schlüssel in den Secrets prüfen.“
+4. Das Ergebnis erscheint im Terminal und im Editor. Nach dem Aktivieren des Workflows dieselbe Anfrage an die **Production URL** (`…/webhook/dawiid-ki`). Ohne oder mit falschem Header lehnt n8n selbst ab (`401` oder `403`).
+
+### Was du mit welcher Datei prüfst
+
+| Datei | Strang | Darauf achten |
+|---|---|---|
+| `einzelanalyse-anna` | Agent Einzelanalyse | Normalfall. `ausgabe` hat sechs Schlüssel, `meta.hinweise` ist leer, `meta.zahlen_nicht_in_daten` ist leer. |
+| `einzelanalyse-berta` | Agent Einzelanalyse | **Kein Vormonat.** Der Text soll das offen sagen und keine Veränderung erfinden. |
+| `einzelanalyse-ludwig` | Agent Einzelanalyse | **Ein Verhalten ohne Selbstbild.** Der Text soll das offen sagen. |
+| `sammellauf` | Agent Einzelanalyse, dreimal | Die Antwort hat drei `ergebnisse` mit `ref` 1, 2 und 3, jedes mit eigener Analyse. |
+| `gesamtauswertung` | Agent Gesamtauswertung | Der Text spricht vom „Team“, ohne Namen und ohne Einzelpersonen. |
+
+### Woran du merkst, dass etwas nicht stimmt
+
+| Beobachtung | Bedeutung und Abhilfe |
+|---|---|
+| Ausführung bricht beim Webhook ab oder die Antwort ist `400` mit `details` | Die Anfrage ist unvollständig (zum Beispiel nur ein Teil der Datei eingefügt). Datei komplett einfügen. |
+| Agent-Knoten rot, Fehler zu Zugangsdaten | Anthropic-Zugangsdaten am Knoten „Claude …“ des **benutzten** Strangs auswählen (es sind zwei). |
+| `code: 502` mit `detail` im Ergebnis | Der Agent hat nicht geantwortet (Zeit, Schlüssel, Modellname). `detail` nennt den Grund. |
+| `code: 429` | Anthropic ist ausgelastet, später erneut. |
+| `meta.hinweise` nennt „kein gültiges JSON“ | Der Agent hat kein JSON geliefert. Die Plattform fragt dann selbst noch bis zu zweimal nach. Tritt es dauernd auf, den Prompt prüfen. |
+| `meta.zahlen_nicht_in_daten` nicht leer | Der Agent hat eine Zahl genannt, die nicht in den Daten steht. In der Plattform verlangt die Datenbank dann eine neue Fassung. Kommt es oft vor, im Prompt nachschärfen. |
+| `meta.hinweise` nennt „staerken: 5 Punkte (erwartet 2 bis 4)“ | Nur ein Hinweis zur Länge, kein Fehler. |
 
 ## Anpassen
 
