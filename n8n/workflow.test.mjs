@@ -32,6 +32,8 @@ const kontextFn = (kontext, i) => (n) => ({
 
 /** Code-Knoten im Modus „einmal für alle Items“ */
 async function laufeAlle(name, eingaben, kontext = {}, codeAendern = (c) => c) {
+  // „Anfrage prüfen“ liest den Webhook-Knoten ($('Webhook')); davor steht die Anmeldeprüfung
+  if (name === 'Anfrage prüfen' && !kontext.Webhook) kontext = { ...kontext, Webhook: eingaben }
   const f = new AsyncFunction('$input', '$', '$itemIndex', codeAendern(knoten(name).parameters.jsCode))
   const $input = { first: () => ({ json: eingaben[0] }), all: () => eingaben.map((json) => ({ json })) }
   return (await f($input, kontextFn(kontext, 0), 0)).map((x) => x.json)
@@ -108,15 +110,44 @@ test('Aufbau: eindeutige Namen, alle Verbindungen zeigen auf vorhandene Knoten, 
   assert.equal(workflow.active, false, 'wird erst nach dem Einrichten aktiviert')
 })
 
-test('Aufbau: ein Webhook mit Header-Prüfung, Antwort über „Respond to Webhook“, keine Zugangsdaten im Export', () => {
+test('Aufbau: ein Webhook, vom Browser aufrufbar (CORS), Antwort über „Respond to Webhook“, keine Zugangsdaten im Export', () => {
   const trigger = workflow.nodes.filter((n) => n.type === 'n8n-nodes-base.webhook')
   assert.deepEqual(trigger.map((n) => n.name), ['Webhook'], 'genau ein Webhook')
   const w = knoten('Webhook').parameters
-  assert.deepEqual([w.httpMethod, w.authentication, w.responseMode, w.path], ['POST', 'headerAuth', 'responseNode', 'dawiid-ki'])
+  assert.deepEqual([w.httpMethod, w.authentication, w.responseMode, w.path], ['POST', 'none', 'responseNode', 'dawiid-ki'])
+  assert.equal(w.options.allowedOrigins, '*', 'die Oberfläche ruft den Webhook aus dem Browser auf')
   assert.ok(workflow.nodes.every((n) => !('credentials' in n)), 'Zugangsdaten gehören nicht in den Export')
   assert.ok(!/sk-ant-/.test(JSON.stringify(workflow)))
   assert.equal(knoten('Antwort senden').parameters.responseBody, '={{ $json.body }}')
   assert.equal(knoten('Anfrage ungültig').parameters.options.responseCode, 400)
+})
+
+test('Anmeldung: ohne gültige Anmeldung bei Supabase geht nichts an die KI (401), im Editor-Test entfällt die Prüfung', () => {
+  const h = knoten('Anmeldung prüfen')
+  assert.equal(h.type, 'n8n-nodes-base.httpRequest')
+  assert.equal(h.onError, 'continueRegularOutput', 'ein Fehler bei Supabase ergibt „nicht angemeldet“, nicht einen Absturz')
+  assert.equal(h.parameters.url, 'https://hgtvlcucxzksvmvgvbgo.supabase.co/auth/v1/user')
+  assert.deepEqual(h.parameters.options.response.response, { fullResponse: true, neverError: true })
+  const kopf = Object.fromEntries(h.parameters.headerParameters.parameters.map((p) => [p.name, p.value]))
+  assert.equal(kopf.Authorization, "={{ $json.headers.authorization || '' }}", 'die Anmeldung der Person, nicht die der Plattform')
+  assert.match(kopf.apikey, /^eyJ/, 'der öffentliche anon-Schlüssel (steht auch in der Oberfläche)')
+  assert.equal(JSON.parse(Buffer.from(kopf.apikey.split('.')[1], 'base64url').toString()).role, 'anon', 'niemals der service_role-Schlüssel')
+  assert.ok(!/service_role/.test(JSON.stringify(workflow)))
+
+  const danach = (n) => workflow.connections[n].main.map((a) => a.map((z) => z.node))
+  assert.deepEqual(danach('Webhook'), [['Anmeldung prüfen']])
+  assert.deepEqual(danach('Anmeldung prüfen'), [['Angemeldet?']])
+  assert.deepEqual(danach('Angemeldet?'), [['Anfrage prüfen'], ['Nicht angemeldet']])
+  assert.deepEqual([knoten('Nicht angemeldet').parameters.options.responseCode, knoten('Nicht angemeldet').parameters.responseBody], [401, '={{ { "ok": false, "fehler": "Bitte melde dich an." } }}'])
+
+  // Die Bedingung des Knotens „Angemeldet?“ mit nachgebauten Werten
+  const bedingung = knoten('Angemeldet?').parameters.conditions.conditions[0].leftValue.replace(/^=\{\{\s*|\s*\}\}$/g, '')
+  const wert = (mode, json) => new Function('$execution', '$json', `return ${bedingung}`)({ mode }, json)
+  assert.equal(wert('production', { statusCode: 200 }), true)
+  assert.equal(wert('production', { statusCode: 401 }), false)
+  assert.equal(wert('production', { error: 'Netzwerkfehler' }), false, 'Supabase nicht erreichbar: nicht angemeldet')
+  assert.equal(wert('production', {}), false)
+  assert.equal(wert('test', { statusCode: 401 }), true, 'Execute workflow im Editor')
 })
 
 test('Aufbau: Stränge — der Schalter leitet jede Aufgabe an ihren Agenten, jeder Agent hat sein Claude-Modell', () => {
@@ -138,8 +169,8 @@ test('Aufbau: Stränge — der Schalter leitet jede Aufgabe an ihren Agenten, je
     assert.deepEqual(workflow.connections[agent].main[0].map((z) => z.node), ['Antwort lesen'])
   }
   const danach = (n) => workflow.connections[n].main[0].map((z) => z.node)
-  assert.deepEqual([danach('Webhook'), danach('Anfrage prüfen'), danach('Antwort lesen'), danach('Zahlencheck (Orientierung)'), danach('Antwort bündeln')], [
-    ['Anfrage prüfen'], ['Gültig?'], ['Zahlencheck (Orientierung)'], ['Antwort bündeln'], ['Antwort senden'],
+  assert.deepEqual([danach('Webhook'), danach('Anmeldung prüfen'), danach('Angemeldet?'), danach('Anfrage prüfen'), danach('Antwort lesen'), danach('Zahlencheck (Orientierung)'), danach('Antwort bündeln')], [
+    ['Anmeldung prüfen'], ['Angemeldet?'], ['Anfrage prüfen'], ['Gültig?'], ['Zahlencheck (Orientierung)'], ['Antwort bündeln'], ['Antwort senden'],
   ])
   assert.deepEqual([workflow.connections['Gültig?'].main[0][0].node, workflow.connections['Gültig?'].main[1][0].node], ['Aufgabe wählen', 'Anfrage ungültig'])
 })

@@ -130,6 +130,8 @@ export interface GesamtAusgabe {
 
 export class AnalyseFehler extends Error {
   status: number
+  /** Die Verbindung kam gar nicht zustande (kein Netz, vom Browser blockiert); der Anbieter hat nichts erhalten. Zeitüberschreitungen zählen nicht. */
+  netzwerk = false
   constructor(message: string, status: number) {
     super(message)
     this.name = 'AnalyseFehler'
@@ -278,7 +280,10 @@ export interface AnbieterConfig {
   modell: string | null
   schluessel?: string
   url?: string
+  /** Optionales gemeinsames Geheimnis (nur für Webhooks mit Header-Prüfung) */
   geheimnis?: string
+  /** Die Anmeldung (JWT) der Person, die die Analyse auslöst. Der Webhook lässt sie von Supabase prüfen. */
+  token?: string
 }
 
 export const NICHT_EINGERICHTET = 'Die KI ist noch nicht eingerichtet.'
@@ -318,11 +323,13 @@ async function anfrage(fetchFn: FetchFn, url: string, init: RequestInit, timeout
   let antwort: Response
   try {
     antwort = await fetchFn(url, { ...init, signal: AbortSignal.timeout(timeoutMs) })
-  } catch {
-    throw new AnalyseFehler(KEINE_ANTWORT, 502)
+  } catch (e) {
+    const fehler = new AnalyseFehler(KEINE_ANTWORT, 502)
+    fehler.netzwerk = e instanceof TypeError
+    throw fehler
   }
   if (antwort.status === 401 || antwort.status === 403) {
-    throw new AnalyseFehler('Der KI-Zugang wurde abgelehnt. Bitte den Schlüssel in den Secrets prüfen.', 502)
+    throw new AnalyseFehler('Der KI-Zugang wurde abgelehnt. Bitte neu anmelden und die Einrichtung des Webhooks (bzw. den Schlüssel in den Secrets) prüfen.', 502)
   }
   if (antwort.status === 429) {
     throw new AnalyseFehler('Die KI ist gerade ausgelastet. Bitte in ein paar Minuten erneut versuchen.', 503)
@@ -404,7 +411,9 @@ export async function rufeAnbieterBatch(
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      ...(config.geheimnis ? { authorization: `Bearer ${config.geheimnis}`, 'x-webhook-secret': config.geheimnis } : {}),
+      // Die Anmeldung der Person hat Vorrang: Der Webhook prüft sie bei Supabase. Ein Geheimnis ist nur noch ein Zusatz.
+      ...(config.token ? { authorization: `Bearer ${config.token}` } : config.geheimnis ? { authorization: `Bearer ${config.geheimnis}` } : {}),
+      ...(config.geheimnis ? { 'x-webhook-secret': config.geheimnis } : {}),
     },
     body: JSON.stringify({
       aufgabe,
@@ -899,7 +908,11 @@ export async function behandleAnfrage(req: Request, env: Record<string, string |
 
   const d: Abhaengigkeiten = {
     rpc,
-    anbieter: () => anbieterAusUmgebung(env),
+    // An den Webhook geht die Anmeldung der Person mit; er lässt sie von Supabase prüfen (kein Geheimnis in den Secrets nötig)
+    anbieter: () => {
+      const c = anbieterAusUmgebung(env)
+      return c.name === 'webhook' ? { ...c, token: token.replace(/^Bearer\s+/i, '') } : c
+    },
     ki: (c, n, e, o) => rufeAnbieter(c, n, e, fetchFn, o),
     kiBatch: (c, a, v, auftraege, o) => rufeAnbieterBatch(c, a, v, auftraege, fetchFn, o),
   }

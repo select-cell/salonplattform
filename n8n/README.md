@@ -1,16 +1,24 @@
 # n8n: ein Webhook für alle KI-Aufgaben (Einzelanalyse, Gesamtauswertung, Agenda)
 
-Alle KI-Anfragen der Plattform laufen über **einen** Webhook. Die Edge Function `analyse-erstellen` schickt sie dorthin, das Feld `aufgabe` entscheidet, in welchen **Strang** des Workflows die Anfrage läuft. In jedem Strang bearbeitet ein **KI-Agent** (Claude über die Anthropic-API, mit Kontext) die Aufträge, und die Antwort geht **direkt als Antwort des Webhooks** zurück an die Plattform.
+Alle KI-Anfragen der Plattform laufen über **einen** Webhook. Die **Oberfläche** schickt sie aus dem Browser des Admins dorthin (ersatzweise die Edge Function `analyse-erstellen`, wenn der Browser den Webhook nicht erreicht), das Feld `aufgabe` entscheidet, in welchen **Strang** des Workflows die Anfrage läuft. In jedem Strang bearbeitet ein **KI-Agent** (Claude über die Anthropic-API, mit Kontext) die Aufträge, und die Antwort geht **direkt als Antwort des Webhooks** zurück an die Plattform.
 
 ```
-Plattform (Edge Function) ── POST ──▶ Webhook ──▶ Anfrage prüfen ──▶ Aufgabe wählen ─┬─▶ Agent Einzelanalyse ───┐
-        ▲                                                                              ├─▶ Agent Gesamtauswertung ┤
-        │                                                                              └─▶ Agent Agenda           ┤
-        │                                                                                                          ▼
-        └────────── Antwort des Webhooks ◀── Antwort senden ◀── Antwort bündeln ◀── Zahlencheck ◀── Antwort lesen ◀──┘
+Plattform (Browser des Admins) ── POST ──▶ Webhook ──▶ Anmeldung prüfen ──▶ Angemeldet? ──▶ Anfrage prüfen ──▶ Aufgabe wählen ─┬─▶ Agent Einzelanalyse ───┐
+        ▲                                                       (bei Supabase)       └─ nein: 401                                  ├─▶ Agent Gesamtauswertung ┤
+        │                                                                                                                          └─▶ Agent Agenda           ┤
+        │                                                                                                                                                      ▼
+        └────────── Antwort des Webhooks ◀── Antwort senden ◀── Antwort bündeln ◀── Zahlencheck ◀── Antwort lesen ◀───────────────────────────────────────────┘
 ```
 
-Die Plattform schreibt **nichts** direkt aus n8n in die Datenbank. Sie nimmt die Antwort entgegen, lässt die **Datenbank jede Zahl prüfen** (Faktencheck, bei Abweichung bis zu zweimal neu fragen) und speichert dann als Entwurf. n8n braucht deshalb keinen Zugang zu Supabase.
+Die Plattform schreibt **nichts** direkt aus n8n in die Datenbank. Sie nimmt die Antwort entgegen, lässt die **Datenbank jede Zahl prüfen** (Faktencheck, bei Abweichung bis zu zweimal neu fragen) und speichert dann als Entwurf. n8n braucht deshalb keinen Zugang zu Supabase, nur die öffentliche Adresse, bei der es eine Anmeldung bestätigen lässt (siehe „Wer darf den Webhook aufrufen?“).
+
+Wer die Eingabe bekommt (nur der Admin), ob jede Zahl stimmt und wer speichert, entscheiden weiter die Datenbankfunktionen mit der Anmeldung des Admins. Der Browser ruft sie selbst auf (`src/lib/ki.ts`, dieselbe Logik wie die Edge Function). Nur die Eingabe ohne Namen und ohne Kommentartexte geht an n8n.
+
+### Wer darf den Webhook aufrufen?
+
+Der Webhook steht im Internet, und die Adresse steckt im Code. Deshalb schickt die Plattform bei jedem Aufruf die **Anmeldung des Admins** mit (`Authorization: Bearer …`). Der Knoten **Anmeldung prüfen** lässt sie bei Supabase bestätigen (`/auth/v1/user`). Ohne gültige Anmeldung antwortet der Webhook mit `401`, bevor etwas an die KI geht und Kosten entstehen. Es gibt kein gemeinsames Geheimnis, das irgendwo hinterlegt werden müsste. Im Editor-Test (*Execute workflow*) entfällt die Prüfung.
+
+Der Webhook erlaubt Aufrufe aus dem Browser (*Allowed Origins (CORS)* = `*`). Das ist unkritisch, weil die Anmeldung geprüft wird; wer will, trägt statt `*` die Adresse der Plattform (Netlify) ein.
 
 ## Aufgaben
 
@@ -64,24 +72,11 @@ Die Einzelfälle: **anna** hat alle Daten, **berta** keinen Vormonat und keine e
 ## Einrichten
 
 1. In n8n: **Workflows → Import from File** → `dawiid-ki.workflow.json`.
-2. **Zugangsdaten** anlegen und an den Knoten auswählen:
+2. **Zugangsdaten** anlegen und auswählen: **Anthropic** (API Key), dein Anthropic-Schlüssel, an **allen drei** Knoten „Claude …“. Mehr ist nicht nötig; die Zugangsdaten stehen bewusst nicht in der Datei.
+3. **Einzeln testen** (siehe unten), dann den Workflow **aktivieren** (Schalter oben rechts). Aufgerufen wird die **Production URL** `https://tobitest2008.app.n8n.cloud/webhook/dawiid-ki` (nicht `webhook-test`).
+4. **Die Adresse steht fest im Code** (`STANDARD_WEBHOOK_URL` in `supabase/functions/analyse-erstellen/analyse.ts`, die Oberfläche übernimmt sie von dort). Ändert sich die Adresse, ändert man diese eine Zeile. In Supabase ist **nichts** einzutragen. Optional überschreibt das Secret `AI_WEBHOOK_URL` die Adresse für den Weg über die Edge Function.
 
-   | Zugangsdaten | Typ | Inhalt | Knoten |
-   |---|---|---|---|
-   | DAWIID Webhook-Geheimnis | Header Auth | Name `x-webhook-secret`, Wert = selbst ausgedachtes Geheimnis (mindestens 24 Zeichen) | Webhook |
-   | Anthropic | Anthropic (API Key) | dein Anthropic-Schlüssel | **alle drei** Knoten „Claude …“ |
-
-   Die Zugangsdaten stehen bewusst nicht in der Datei.
-3. **Einzeln testen** (siehe unten), dann den Workflow **aktivieren**.
-4. **Die Adresse des Webhooks steht fest im Code** (`STANDARD_WEBHOOK_URL` in `supabase/functions/analyse-erstellen/analyse.ts`): `https://tobitest2008.app.n8n.cloud/webhook/dawiid-ki`. Dafür braucht es kein Secret und keinen Eintrag in Supabase. Ändert sich die Adresse, ändert man diese eine Zeile (oder setzt in Supabase optional `AI_WEBHOOK_URL`, das hat Vorrang).
-
-   Nur das **Geheimnis** gehört nicht in den Code, weil es im Repository sichtbar würde. Es ist der einzige Wert in Supabase (Edge Functions → Secrets):
-
-   | Secret | Wert |
-   |---|---|
-   | `AI_WEBHOOK_SECRET` | dasselbe Geheimnis wie in n8n (Header Auth) |
-
-   Ohne dieses Secret schickt die Plattform keinen Schlüssel mit; n8n lehnt die Anfrage dann ab („Der KI-Zugang wurde abgelehnt“). Soll der Webhook bewusst ohne Schlüssel laufen (nur zum Testen), im Knoten Webhook die Authentifizierung auf *None* stellen. Dann kann jeder, der die Adresse kennt, den Workflow auslösen und deine Anthropic-Kosten verursachen. Für den Betrieb also nicht empfohlen.
+   Läuft in der Plattform etwas schief, hilft der Weg über die Edge Function zum Vergleichen: Im Browser (Konsole) `localStorage.setItem('dawiid-ki-weg', 'edge')` und die Seite neu laden; zurück mit `localStorage.removeItem('dawiid-ki-weg')`.
 
 5. In der Plattform als **Admin**: Leitung → Monatsabschluss → Monat abschließen → „Alle fehlenden erstellen“ (Sammellauf), je Person „Erstellen“ oder bei der Gesamtauswertung „Erstellen“. Die Agenda: Leitung → Agenda → „Mit KI formulieren“.
 
@@ -100,20 +95,22 @@ Die Dateien in `testanfragen/` sind **keine Workflows**. Es sind Beispielanfrage
 3. Fenster schließen und unten auf **Execute workflow** klicken.
 4. Nach dem Lauf auf die Knoten klicken und rechts die Ausgabe ansehen. Jeden Knoten kannst du mit *Test step* für sich wiederholen.
 
-### Weg B: über die URL (so, wie die Plattform es macht, mit Geheimnis)
+### Weg B: über die URL (so, wie die Plattform es macht)
+
+Der Webhook verlangt eine gültige Anmeldung, auch beim Aufruf von Hand. Du brauchst dazu den Zugangstoken einer angemeldeten Person: in der Plattform angemeldet im Browser die Konsole öffnen und `JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k => k.endsWith('-auth-token')))).access_token` ausführen (der Token gilt etwa eine Stunde und gehört niemandem außer dir).
 
 1. Im Knoten Webhook die angeheftete Anfrage lösen (**Unpin**), sonst nimmt n8n sie statt auf deine zu warten.
-2. Im Editor auf **Execute workflow** klicken: Der Test-Webhook wartet jetzt auf eine Anfrage. Die **Test URL** steht im Knoten Webhook.
-3. Aus einem Terminal senden (oder in Postman/Insomnia: POST, Header `x-webhook-secret` und `content-type: application/json`, Body = Dateiinhalt):
+2. Im Editor auf **Execute workflow** klicken: Der Test-Webhook wartet jetzt auf eine Anfrage. Die **Test URL** steht im Knoten Webhook. (Im Test entfällt die Anmeldeprüfung.)
+3. Aus einem Terminal senden (oder in Postman/Insomnia: POST, Header `authorization: Bearer <Token>` und `content-type: application/json`, Body = Dateiinhalt):
 
 ```bash
-curl -X POST "https://DEIN-N8N/webhook-test/dawiid-ki" \
-  -H "x-webhook-secret: DEIN_GEHEIMNIS" \
+curl -X POST "https://tobitest2008.app.n8n.cloud/webhook-test/dawiid-ki" \
+  -H "authorization: Bearer DEIN_TOKEN" \
   -H "content-type: application/json" \
   -d @n8n/testanfragen/gesamtauswertung.json
 ```
 
-4. Das Ergebnis erscheint im Terminal und im Editor. Nach dem Aktivieren des Workflows dieselbe Anfrage an die **Production URL** (`…/webhook/dawiid-ki`). Ohne oder mit falschem Header lehnt n8n selbst ab (`401` oder `403`).
+4. Das Ergebnis erscheint im Terminal und im Editor. Nach dem Aktivieren des Workflows dieselbe Anfrage an die **Production URL** (`…/webhook/dawiid-ki`). Ohne oder mit abgelaufenem Token antwortet der Workflow mit `401` und `{"ok":false,"fehler":"Bitte melde dich an."}`.
 
 ### Was du mit welcher Datei prüfst
 
@@ -130,6 +127,8 @@ curl -X POST "https://DEIN-N8N/webhook-test/dawiid-ki" \
 
 | Beobachtung | Bedeutung und Abhilfe |
 |---|---|
+| Antwort `401` „Bitte melde dich an.“ | Der Token fehlt oder ist abgelaufen (neu anmelden), oder der Knoten **Anmeldung prüfen** erreicht Supabase nicht. In der Plattform steht dann „Der KI-Zugang wurde abgelehnt.“ |
+| Im Browser „Failed to fetch“, in der Plattform läuft es über die Edge Function | n8n erlaubt den Aufruf aus dem Browser nicht (CORS). Im Knoten Webhook unter *Options* muss *Allowed Origins (CORS)* gesetzt sein (Standard im Import: `*`). Die Plattform nimmt dann selbstständig den Weg über die Edge Function. |
 | Ausführung bricht beim Webhook ab oder die Antwort ist `400` mit `details` | Die Anfrage ist unvollständig (zum Beispiel nur ein Teil der Datei eingefügt). Datei komplett einfügen. |
 | Agent-Knoten rot, Fehler zu Zugangsdaten | Anthropic-Zugangsdaten am Knoten „Claude …“ des **benutzten** Strangs auswählen (es sind zwei). |
 | `code: 502` mit `detail` im Ergebnis | Der Agent hat nicht geantwortet (Zeit, Schlüssel, Modellname). `detail` nennt den Grund. |

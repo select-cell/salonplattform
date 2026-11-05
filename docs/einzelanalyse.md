@@ -49,11 +49,15 @@ Eine Analyse gilt als **„Daten geändert“** (veraltet), wenn sich die Eingab
 
 Eingabe holen → gleiche Eingabe **und** Prompt-Version wie gespeichert = **kein neuer KI-Aufruf** → Anbieter formuliert (JSON) → Faktencheck über `analyse_pruefen` → bei Abweichung bis zu zwei Wiederholungen (**höchstens 3 Aufrufe** je Analyse, in Runden: nur wer noch offen ist, kommt in die nächste) → Entwurf speichern (auch mit nicht bestandenem Faktencheck, mit Hinweis). Fehler kommen als deutsche Meldung.
 
+**Der Weg der KI-Aufgaben:** Die Oberfläche (`src/lib/ki.ts`) führt sie im Browser des Admins aus: Eingabe von der Datenbank holen → mit der Anmeldung des Admins an den n8n-Webhook (`STANDARD_WEBHOOK_URL` in `analyse.ts`) → Faktencheck und Speichern über die Datenbankfunktionen. Kommt der Browser nicht an den Webhook (kein Netz, CORS), nimmt dieselbe Aufgabe die Edge Function `analyse-erstellen` (gleiche Logik, dieselbe Anmeldung). Fehlersuche: `localStorage.setItem('dawiid-ki-weg', 'edge')` erzwingt die Edge Function.
+
+Secrets sind **nicht nötig**; alle sind optional und gelten nur für die Edge Function:
+
 | Secret | Bedeutung |
 |---|---|
-| `AI_WEBHOOK_SECRET` | das Geheimnis des n8n-Webhooks (optional; kommt als `Authorization: Bearer` und `x-webhook-secret`) |
-| `AI_PROVIDER` | optional; Standard ist `webhook`, `claude` ruft die Anthropic-API direkt |
-| `AI_WEBHOOK_URL` | optional; Standard ist die feste Adresse im Code (`STANDARD_WEBHOOK_URL`: `https://tobitest2008.app.n8n.cloud/webhook/dawiid-ki`), eine gesetzte Adresse hat Vorrang (https) |
+| `AI_PROVIDER` | Standard `webhook`; `claude` ruft die Anthropic-API direkt |
+| `AI_WEBHOOK_URL` | überschreibt die feste Adresse im Code (https) |
+| `AI_WEBHOOK_SECRET` | Zusatz für Webhooks mit Header-Prüfung (kommt als `x-webhook-secret`); der n8n-Workflow braucht ihn nicht |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | nur bei `claude` (Modell optional) |
 
 Die Adresse des Webhooks ist kein Geheimnis und steht im Code; ohne weitere Einstellung gehen alle KI-Aufgaben an diesen Webhook. Die Seite meldet „Die KI ist noch nicht eingerichtet.“ nur bei `claude` ohne Schlüssel, bei einer Adresse ohne `https` oder bei einem unbekannten Anbieter; alles andere läuft. Der Prompt liegt versioniert im Repo (`PROMPT_VERSION` in `analyse.ts`). Wer ihn ändert, erhöht die Version; dann gilt die Eingabe als neu. Die Branche („Friseursalon“) steht im ersten Satz von `SYSTEM_PROMPT`.
@@ -70,7 +74,7 @@ Feedbacktexte gehen **ohne Namen und ohne Absender** an den KI-Anbieter, bei der
 
 ## Tests
 
-pgTAP `07_monatsabschluss_analysen.test.sql` (151: Rechte, Abschluss, Eingabe ohne Namen über alle Namensteile, Faktencheck, Entwurf/Freigabe, Salon-Grenze, Schalter; mit `ki_nur_admin` aus), `09_ki_admin_gesamt.test.sql` (118: Standard nur Admin, Gesamtauswertung, Schalter, Salon-Grenze), `10_agenda_ki.test.sql` (75: Eingabe, Aufbau, Zeitbudget, Zahlen, Speichern, Bearbeiten), Logik der Edge Function `supabase/functions/analyse-erstellen/analyse.test.ts` (59, `npm run test:functions`), n8n-Workflow `n8n/workflow.test.mjs` (27, `npm run test:n8n`), Browser `phase-e.test.mjs` (85) und `phase-f.test.mjs` (107).
+pgTAP `07_monatsabschluss_analysen.test.sql` (151: Rechte, Abschluss, Eingabe ohne Namen über alle Namensteile, Faktencheck, Entwurf/Freigabe, Salon-Grenze, Schalter; mit `ki_nur_admin` aus), `09_ki_admin_gesamt.test.sql` (118: Standard nur Admin, Gesamtauswertung, Schalter, Salon-Grenze), `10_agenda_ki.test.sql` (75: Eingabe, Aufbau, Zeitbudget, Zahlen, Speichern, Bearbeiten), Logik der Edge Function `supabase/functions/analyse-erstellen/analyse.test.ts` (63, `npm run test:functions`), n8n-Workflow `n8n/workflow.test.mjs` (28, `npm run test:n8n`), Browser `phase-e.test.mjs` (85), `phase-f.test.mjs` (107) und `phase-g.test.mjs` (22, KI direkt aus der Oberfläche).
 
 ## Nicht live getestet
 

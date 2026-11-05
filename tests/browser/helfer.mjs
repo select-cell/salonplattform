@@ -8,6 +8,7 @@ import { preview } from 'vite'
 export const PORT = 4173
 export const BASE = `http://localhost:${PORT}`
 const SUPABASE = 'https://testref.supabase.co'
+const N8N = 'https://tobitest2008.app.n8n.cloud'
 const STORAGE_KEY = 'sb-testref-auth-token'
 const ZIEL = 'out/test-dist'
 
@@ -54,9 +55,25 @@ export const PERSONEN = {
  * Öffnet eine Seite mit nachgebautem Supabase.
  * antworten: { rpcName: Wert | (body, aufruf) => Wert | { status, body } }, aufrufe: Liste der RPC-Aufrufe (Name, Body).
  */
-export async function neueSeite(browser, { rolle = 'chef', viewport = { width: 1280, height: 900 }, antworten = {}, angemeldet = true, colorScheme = 'light', clock = false } = {}) {
+export async function neueSeite(browser, { rolle = 'chef', viewport = { width: 1280, height: 900 }, antworten = {}, angemeldet = true, colorScheme = 'light', clock = false, kiWeg = 'edge', webhook = null } = {}) {
   const context = await browser.newContext({ viewport, locale: 'de-DE', timezoneId: 'Europe/Berlin', colorScheme })
   const aufrufe = []
+  // Die KI-Aufgaben gehen aus der Oberfläche direkt an den n8n-Webhook. Die älteren Tests prüfen den Weg über die Edge Function
+  // (kiWeg = 'edge', Standard); phase-g prüft den direkten Weg (kiWeg = 'direkt').
+  if (kiWeg === 'edge') await context.addInitScript(() => localStorage.setItem('dawiid-ki-weg', 'edge'))
+  // Der n8n-Webhook: ohne `webhook` nicht erreichbar (der Browser blockiert, z. B. wegen CORS); sonst antwortet die Funktion.
+  await context.route(`${N8N}/**`, async (route) => {
+    if (!webhook) return route.abort('failed')
+    const req = route.request()
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type', 'access-control-allow-methods': 'POST, OPTIONS' }
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors })
+    let body = {}
+    try { body = req.postDataJSON() ?? {} } catch { body = {} }
+    aufrufe.push({ rpc: 'n8n', url: req.url(), body, kopf: req.headers() })
+    const wert = await webhook(body, req.headers(), aufrufe)
+    if (wert === 'netz') return route.abort('failed')
+    return route.fulfill({ status: wert.status ?? 200, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(wert.body ?? wert) })
+  })
   if (angemeldet) {
     await context.addInitScript(([k, v]) => { if (!localStorage.getItem(k)) localStorage.setItem(k, v) }, [STORAGE_KEY, JSON.stringify(sitzung())])
   }

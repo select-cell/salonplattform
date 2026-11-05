@@ -2,6 +2,7 @@
 // aus Plan §5.3 kommen hier mit den jeweiligen Phasen dazu.
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './konfiguration'
 import { supabase } from './supabase'
+import { kiDirekt } from './ki'
 import type { AbgabeStatus, Dashboard, PersonAuswertung, TeamAuswertung, Ueberfaellig, ZeitAuswertung, KommentarAuswertung } from './auswertung'
 import type { AgendaDaten, AgendaZeile, FokusListe, Rhythmus, TerminListe } from './agenda'
 import type { AbschlussInfo, AbschlussUebersicht, Analyse, AnalyseErgebnis, SammellaufErgebnis } from './abschluss'
@@ -227,7 +228,14 @@ async function funktionsFehler(error: unknown): Promise<Error> {
   return new Error(meldung)
 }
 
+/**
+ * Die KI-Aufgabe geht aus der Oberfläche direkt an den n8n-Webhook (mit der Anmeldung des Admins; die Datenbank liefert die
+ * Eingabe, prüft jede Zahl und speichert). Ist der Webhook vom Browser aus nicht erreichbar (z. B. CORS in n8n nicht erlaubt),
+ * nimmt dieselbe Aufgabe den Weg über die Edge Function `analyse-erstellen`.
+ */
 async function rufeKi(body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const direkt = await kiDirekt(body)
+  if (direkt) return direkt
   const { data, error } = await supabase.functions.invoke('analyse-erstellen', { body })
   if (error) throw await funktionsFehler(error)
   const r = data as { ok?: boolean; fehler?: string } & Record<string, unknown>

@@ -180,6 +180,54 @@ test('anbieterAusUmgebung: claude und webhook', () => {
   assert.deepEqual([w.name, w.url, w.geheimnis, w.modell], ['webhook', 'https://n8n.example/hook', 's', null])
 })
 
+test('Webhook: die Anmeldung der Person geht als Bearer mit (das Geheimnis ist nur ein Zusatz)', async () => {
+  const kopfe: Record<string, string>[] = []
+  const fetchFn = async (_url: string, init?: RequestInit) => {
+    kopfe.push(init?.headers as Record<string, string>)
+    return new Response(JSON.stringify({ ergebnisse: [{ ref: '1', code: 200, ausgabe: GUT }] }), { status: 200 })
+  }
+  const a = [{ ref: '1', system: 's', nachricht: 'n', eingabe: {} }]
+  await rufeAnbieterBatch({ name: 'webhook', modell: null, url: 'https://n8n.example/h', token: 'user-jwt' }, AUFGABE_EINZEL, PROMPT_VERSION, a, fetchFn)
+  await rufeAnbieterBatch({ name: 'webhook', modell: null, url: 'https://n8n.example/h', token: 'user-jwt', geheimnis: 'geheim' }, AUFGABE_EINZEL, PROMPT_VERSION, a, fetchFn)
+  await rufeAnbieterBatch({ name: 'webhook', modell: null, url: 'https://n8n.example/h', geheimnis: 'geheim' }, AUFGABE_EINZEL, PROMPT_VERSION, a, fetchFn)
+  await rufeAnbieterBatch({ name: 'webhook', modell: null, url: 'https://n8n.example/h' }, AUFGABE_EINZEL, PROMPT_VERSION, a, fetchFn)
+  assert.deepEqual(kopfe[0], { 'content-type': 'application/json', authorization: 'Bearer user-jwt' }, 'im Browser: nur die Anmeldung, kein Geheimnis')
+  assert.deepEqual(kopfe[1], { 'content-type': 'application/json', authorization: 'Bearer user-jwt', 'x-webhook-secret': 'geheim' })
+  assert.deepEqual(kopfe[2], { 'content-type': 'application/json', authorization: 'Bearer geheim', 'x-webhook-secret': 'geheim' }, 'wie bisher')
+  assert.deepEqual(kopfe[3], { 'content-type': 'application/json' })
+})
+
+test('Webhook: „netzwerk“ nur, wenn die Verbindung gar nicht zustande kam (nicht bei Zeitüberschreitung oder HTTP-Fehler)', async () => {
+  const a = [{ ref: '1', system: 's', nachricht: 'n', eingabe: {} }]
+  const cfg = { name: 'webhook' as const, modell: null, url: 'https://n8n.example/h' }
+  const mit = async (fetchFn: (u: string, i?: RequestInit) => Promise<Response>) => {
+    try {
+      await rufeAnbieterBatch(cfg, AUFGABE_EINZEL, PROMPT_VERSION, a, fetchFn)
+    } catch (e) {
+      return e as AnalyseFehler
+    }
+    throw new Error('kein Fehler')
+  }
+  const kein = await mit(async () => { throw new TypeError('Failed to fetch') })
+  assert.deepEqual([kein instanceof AnalyseFehler, kein.netzwerk, kein.status], [true, true, 502])
+  const zeit = await mit(async () => { throw new DOMException('timeout', 'TimeoutError') })
+  assert.deepEqual([zeit.netzwerk, zeit.status], [false, 502])
+  const http = await mit(async () => new Response('x', { status: 500 }))
+  assert.deepEqual([http.netzwerk, http.status], [false, 502])
+  assert.equal((await mit(async () => new Response('x', { status: 401 }))).netzwerk, false)
+  assert.equal(new AnalyseFehler('x', 500).netzwerk, false)
+})
+
+test('HTTP: an den Webhook geht die Anmeldung der Person, nicht der Header aus den Secrets', async () => {
+  const ENV_W = { SUPABASE_URL: 'https://p.supabase.co', SUPABASE_ANON_KEY: 'anon' }
+  const u = umgebung({}, (url) => (url === STANDARD_WEBHOOK_URL ? new Response(JSON.stringify({ ergebnisse: [{ ref: '1', code: 200, ausgabe: GESAMT_GUT }] }), { status: 200 }) : null))
+  const r = await behandleAnfrage(anfrage({ aufgabe: 'gesamt', monat: '2026-09' }), ENV_W, u.fetchFn)
+  assert.equal(r.status, 200)
+  const w = u.gesehen.find((g) => g.url === STANDARD_WEBHOOK_URL)!
+  assert.equal(w.kopf.authorization, 'Bearer jwt', 'dieselbe Anmeldung wie bei den Datenbankaufrufen')
+  assert.equal(w.kopf['x-webhook-secret'], undefined)
+})
+
 test('rufeAnbieter claude: Anfrage und Antwort', async () => {
   let gesehen: { url: string; init: RequestInit } | null = null
   const fetchFn = async (url: string, init?: RequestInit) => {

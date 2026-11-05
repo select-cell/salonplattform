@@ -152,8 +152,9 @@ export default function Info() {
             Gesamtauswertung gehen nur <strong>Teamwerte</strong> und die Zahl der Kommentare an die KI, keine Einzelpersonen und keine Kommentartexte.
           </li>
           <li>
-            <strong>Wohin es geht:</strong> Je nach Einrichtung direkt zum KI-Anbieter (Anthropic) oder über einen Automatisierungsdienst (n8n) dorthin.
-            Die Antwort kommt direkt zurück an die Plattform. Dort wird sie geprüft und gespeichert.
+            <strong>Wohin es geht:</strong> Vom Browser des Admins an einen Automatisierungsdienst (n8n), der die Anfrage an den KI-Anbieter (Anthropic)
+            weitergibt. Dabei weist sich der Admin mit seiner Anmeldung aus; ohne gültige Anmeldung nimmt der Dienst nichts an. Die Antwort kommt direkt
+            zurück an die Plattform. Dort wird sie von der Datenbank geprüft (jede Zahl) und gespeichert.
           </li>
           <li>
             <strong>Was daraus wird:</strong> ein Entwurf. Der Admin liest ihn, bearbeitet ihn und gibt ihn frei. Nur eine freigegebene Analyse kommt in

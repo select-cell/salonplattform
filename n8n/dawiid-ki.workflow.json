@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## DAWIID KI: ein Webhook, drei Stränge\nDie Plattform (Edge Function **analyse-erstellen**) schickt alles an diesen einen Webhook. Das Feld `aufgabe` entscheidet, in welchen Strang die Anfrage läuft. Dort bearbeitet ein **KI-Agent** (Claude über die Anthropic-API) jeden Auftrag mit seinem Kontext und die Antwort geht direkt als Antwort des Webhooks zurück an die Plattform. Die Plattform prüft die Zahlen (Faktencheck) und speichert.\n\n### Einrichten\n1. Zwei Zugangsdaten anlegen:\n   - **Header Auth** \"DAWIID Webhook-Geheimnis\": Name `x-webhook-secret`, Wert = dein Geheimnis. Am Knoten **Webhook** auswählen.\n   - **Anthropic** (API Key): dein Schlüssel. An **allen drei** Knoten **Claude …** auswählen.\n2. Workflow **aktivieren** (Schalter oben rechts).\n3. In Supabase (Edge Functions → Secrets): `AI_PROVIDER` = `webhook`, `AI_WEBHOOK_URL` = die **Production URL** des Knotens Webhook (…/webhook/dawiid-ki), `AI_WEBHOOK_SECRET` = dasselbe Geheimnis.\n\n### Einzeln testen\nDer Knoten **Webhook** enthält eine echte Beispielanfrage (angeheftet). **Execute workflow** läuft durch den Strang Einzelanalyse; jeden Knoten kannst du mit **Test step** wiederholen. Weitere Anfragen (Sammellauf, Gesamtauswertung) liegen im Ordner `n8n/testanfragen`.",
+        "content": "## DAWIID KI: ein Webhook, drei Stränge\nDie Plattform schickt alles an diesen einen Webhook: direkt aus der Oberfläche (Browser des Admins), ersatzweise über die Edge Function **analyse-erstellen**. Das Feld `aufgabe` entscheidet, in welchen Strang die Anfrage läuft. Dort bearbeitet ein **KI-Agent** (Claude über die Anthropic-API) jeden Auftrag mit seinem Kontext und die Antwort geht direkt als Antwort des Webhooks zurück an die Plattform. Die Plattform prüft die Zahlen (Faktencheck) und speichert.\n\n### Einrichten\n1. Eine Zugangsdaten anlegen: **Anthropic** (API Key), dein Schlüssel. An **allen drei** Knoten **Claude …** auswählen. Mehr nicht: Der Webhook braucht kein Geheimnis.\n2. Workflow **aktivieren** (Schalter oben rechts). Die Production URL des Knotens Webhook ist `…/webhook/dawiid-ki`; sie steht schon in der Plattform.\n\n### Wer darf den Webhook aufrufen?\nNur wer in der Plattform angemeldet ist. Die Plattform schickt die Anmeldung (Authorization: Bearer …) mit, der Knoten **Anmeldung prüfen** lässt sie bei Supabase bestätigen. Ohne gültige Anmeldung antwortet der Webhook mit 401, bevor etwas an die KI geht. Im Editor-Test (Execute workflow) entfällt die Prüfung.\n\n### Einzeln testen\nDer Knoten **Webhook** enthält eine echte Beispielanfrage (angeheftet). **Execute workflow** läuft durch den Strang Einzelanalyse; jeden Knoten kannst du mit **Test step** wiederholen. Weitere Anfragen (Sammellauf, Gesamtauswertung, Agenda) liegen im Ordner `n8n/testanfragen`.",
         "height": 760,
         "width": 560,
         "color": 4
@@ -35,7 +35,7 @@
     },
     {
       "parameters": {
-        "content": "### Was die Knoten tun\n- **Anfrage prüfen**: Aufgabe bekannt? Aufträge vollständig? Hier steht auch der **Zusatzkontext** je Aufgabe, der dem Agenten mitgegeben wird.\n- **Agent …**: bekommt `system` (Prompt aus der Plattform plus Zusatzkontext) und `nachricht` (die Daten).\n- **Antwort lesen**: holt das JSON aus der Agent-Antwort, prüft Form und Anzahl der Punkte.\n- **Zahlencheck**: zeigt schon beim Testen Zahlen, die nicht in den Daten stehen. Maßgeblich bleibt der Faktencheck der Datenbank.\n- **Antwort bündeln**: eine Antwort für alle Aufträge. Unter `meta` stehen die Hinweise; die Plattform ignoriert sie.",
+        "content": "### Was die Knoten tun\n- **Anmeldung prüfen** / **Angemeldet?**: fragt Supabase, ob die mitgeschickte Anmeldung gültig ist. Sonst Antwort 401.\n- **Anfrage prüfen**: Aufgabe bekannt? Aufträge vollständig? Hier steht auch der **Zusatzkontext** je Aufgabe, der dem Agenten mitgegeben wird.\n- **Agent …**: bekommt `system` (Prompt aus der Plattform plus Zusatzkontext) und `nachricht` (die Daten).\n- **Antwort lesen**: holt das JSON aus der Agent-Antwort, prüft Form und Anzahl der Punkte.\n- **Zahlencheck**: zeigt schon beim Testen Zahlen, die nicht in den Daten stehen. Maßgeblich bleibt der Faktencheck der Datenbank.\n- **Antwort bündeln**: eine Antwort für alle Aufträge. Unter `meta` stehen die Hinweise; die Plattform ignoriert sie.",
         "height": 380,
         "width": 560,
         "color": 7
@@ -53,9 +53,11 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "dawiid-ki",
-        "authentication": "headerAuth",
+        "authentication": "none",
         "responseMode": "responseNode",
-        "options": {}
+        "options": {
+          "allowedOrigins": "*"
+        }
       },
       "id": "d4a11d00-0000-4000-8000-000000000004",
       "name": "Webhook",
@@ -69,14 +71,14 @@
     },
     {
       "parameters": {
-        "jsCode": "// Einstellungen je Aufgabe (= je Strang). Eine neue Aufgabe: hier eintragen, im Knoten „Aufgabe wählen“ eine Regel\n// ergänzen und einen Strang (Agent + Claude-Modell) kopieren.\nconst AUFGABEN = {\n  einzelanalyse: {\n    strang: 'Einzelanalyse',\n    form: 'analyse',\n    hinweisSchluessel: 'kommentar_qualitaet_hinweis',\n    listen: { staerken: [2, 4], entwicklungsfelder: [2, 4], gespraechsfragen: [3, 4], vereinbarungen_vorschlaege: [2, 3] },\n    // Laut Prompt nicht erlaubt: Buchstaben-Bezeichnungen wie „Kollege A“\n    verbotenMuster: '\\\\bKollege\\\\s+[A-Z]\\\\b',\n    verbotenText: 'Enthält eine Buchstaben-Bezeichnung wie „Kollege A“ (laut Prompt nicht erlaubt)',\n    // Zusätzlicher Kontext für den Agenten (Salon, Begriffe). Keine Zahlen hineinschreiben: Der Faktencheck der Datenbank lehnt Zahlen ab, die nicht in den Daten stehen.\n    zusatzkontext: '',\n  },\n  gesamtauswertung: {\n    strang: 'Gesamtauswertung',\n    form: 'analyse',\n    hinweisSchluessel: 'datenlage_hinweis',\n    listen: { staerken: [2, 4], entwicklungsfelder: [2, 4], gespraechsfragen: [3, 4], vereinbarungen_vorschlaege: [2, 3] },\n    verbotenMuster: '',\n    verbotenText: '',\n    zusatzkontext: '',\n  },\n  agenda: {\n    strang: 'Agenda',\n    form: 'agenda',\n    // Reihenfolge, Minuten (von, bis) und Gesamtdauer der Agenda; die Datenbank prüft sie verbindlich\n    bloecke: [['einstieg', 2, 2], ['kennzahlen', 3, 3], ['fokus', 6, 8], ['entwicklung', 3, 4], ['vereinbarungen', 2, 3]],\n    gesamt: [15, 20],\n    punkteProBlock: [2, 4],\n    zusatzkontext: '',\n  },\n};\nconst MAX_AUFTRAEGE = 10;\n\n// Die Anfrage steckt im Body des Webhooks. Beim Testen im Editor darf auch der reine Inhalt einer Testanfrage\n// (n8n/testanfragen/*.json) eingefügt werden: Dann steht sie direkt im Datensatz.\nconst eingang = $input.first().json;\nconst b = eingang.body ?? eingang;\nconst fehler = [];\nconst aufgabe = AUFGABEN[b.aufgabe];\nif (!aufgabe) fehler.push('aufgabe ist unbekannt (erlaubt: ' + Object.keys(AUFGABEN).join(', ') + ')');\nif (!Array.isArray(b.auftraege) || b.auftraege.length === 0) fehler.push('auftraege fehlt oder ist leer');\nelse if (b.auftraege.length > MAX_AUFTRAEGE) fehler.push('auftraege: höchstens ' + MAX_AUFTRAEGE);\nelse {\n  const refs = new Set();\n  b.auftraege.forEach((a, i) => {\n    const wo = 'auftraege[' + i + ']';\n    if (!a || typeof a !== 'object') return fehler.push(wo + ' ist kein Objekt');\n    if (typeof a.ref !== 'string' || !a.ref) fehler.push(wo + ': ref fehlt');\n    else if (refs.has(a.ref)) fehler.push(wo + ': ref ist doppelt');\n    else refs.add(a.ref);\n    if (typeof a.nachricht !== 'string' || !a.nachricht.trim()) fehler.push(wo + ': nachricht fehlt');\n    else if (a.nachricht.length > 60000) fehler.push(wo + ': nachricht ist zu lang');\n    if (typeof a.system !== 'string' || !a.system.trim()) fehler.push(wo + ': system fehlt');\n    if (!a.eingabe || typeof a.eingabe !== 'object' || Array.isArray(a.eingabe)) fehler.push(wo + ': eingabe fehlt');\n  });\n}\n\nif (fehler.length > 0) return [{ json: { gueltig: false, fehler } }];\n\nreturn b.auftraege.map((a) => ({\n  json: {\n    gueltig: true,\n    fehler: [],\n    aufgabe: b.aufgabe,\n    strang: aufgabe.strang,\n    ref: a.ref,\n    prompt_version: b.prompt_version ?? null,\n    // Prompt aus der Plattform, danach der Kontext aus diesem Workflow\n    system: aufgabe.zusatzkontext ? a.system + '\\n\\nZusätzlicher Kontext:\\n' + aufgabe.zusatzkontext : a.system,\n    nachricht: a.nachricht,\n    eingabe: a.eingabe,\n    form: aufgabe.form,\n    hinweisSchluessel: aufgabe.hinweisSchluessel ?? null,\n    listen: aufgabe.listen ?? null,\n    verbotenMuster: aufgabe.verbotenMuster ?? '',\n    verbotenText: aufgabe.verbotenText ?? '',\n    bloecke: aufgabe.bloecke ?? null,\n    gesamt: aufgabe.gesamt ?? null,\n    punkteProBlock: aufgabe.punkteProBlock ?? null,\n  },\n}));\n"
+        "jsCode": "// Einstellungen je Aufgabe (= je Strang). Eine neue Aufgabe: hier eintragen, im Knoten „Aufgabe wählen“ eine Regel\n// ergänzen und einen Strang (Agent + Claude-Modell) kopieren.\nconst AUFGABEN = {\n  einzelanalyse: {\n    strang: 'Einzelanalyse',\n    form: 'analyse',\n    hinweisSchluessel: 'kommentar_qualitaet_hinweis',\n    listen: { staerken: [2, 4], entwicklungsfelder: [2, 4], gespraechsfragen: [3, 4], vereinbarungen_vorschlaege: [2, 3] },\n    // Laut Prompt nicht erlaubt: Buchstaben-Bezeichnungen wie „Kollege A“\n    verbotenMuster: '\\\\bKollege\\\\s+[A-Z]\\\\b',\n    verbotenText: 'Enthält eine Buchstaben-Bezeichnung wie „Kollege A“ (laut Prompt nicht erlaubt)',\n    // Zusätzlicher Kontext für den Agenten (Salon, Begriffe). Keine Zahlen hineinschreiben: Der Faktencheck der Datenbank lehnt Zahlen ab, die nicht in den Daten stehen.\n    zusatzkontext: '',\n  },\n  gesamtauswertung: {\n    strang: 'Gesamtauswertung',\n    form: 'analyse',\n    hinweisSchluessel: 'datenlage_hinweis',\n    listen: { staerken: [2, 4], entwicklungsfelder: [2, 4], gespraechsfragen: [3, 4], vereinbarungen_vorschlaege: [2, 3] },\n    verbotenMuster: '',\n    verbotenText: '',\n    zusatzkontext: '',\n  },\n  agenda: {\n    strang: 'Agenda',\n    form: 'agenda',\n    // Reihenfolge, Minuten (von, bis) und Gesamtdauer der Agenda; die Datenbank prüft sie verbindlich\n    bloecke: [['einstieg', 2, 2], ['kennzahlen', 3, 3], ['fokus', 6, 8], ['entwicklung', 3, 4], ['vereinbarungen', 2, 3]],\n    gesamt: [15, 20],\n    punkteProBlock: [2, 4],\n    zusatzkontext: '',\n  },\n};\nconst MAX_AUFTRAEGE = 10;\n\n// Die Anfrage steckt im Body des Webhooks. Beim Testen im Editor darf auch der reine Inhalt einer Testanfrage\n// (n8n/testanfragen/*.json) eingefügt werden: Dann steht sie direkt im Datensatz.\nconst eingang = $('Webhook').first().json;\nconst b = eingang.body ?? eingang;\nconst fehler = [];\nconst aufgabe = AUFGABEN[b.aufgabe];\nif (!aufgabe) fehler.push('aufgabe ist unbekannt (erlaubt: ' + Object.keys(AUFGABEN).join(', ') + ')');\nif (!Array.isArray(b.auftraege) || b.auftraege.length === 0) fehler.push('auftraege fehlt oder ist leer');\nelse if (b.auftraege.length > MAX_AUFTRAEGE) fehler.push('auftraege: höchstens ' + MAX_AUFTRAEGE);\nelse {\n  const refs = new Set();\n  b.auftraege.forEach((a, i) => {\n    const wo = 'auftraege[' + i + ']';\n    if (!a || typeof a !== 'object') return fehler.push(wo + ' ist kein Objekt');\n    if (typeof a.ref !== 'string' || !a.ref) fehler.push(wo + ': ref fehlt');\n    else if (refs.has(a.ref)) fehler.push(wo + ': ref ist doppelt');\n    else refs.add(a.ref);\n    if (typeof a.nachricht !== 'string' || !a.nachricht.trim()) fehler.push(wo + ': nachricht fehlt');\n    else if (a.nachricht.length > 60000) fehler.push(wo + ': nachricht ist zu lang');\n    if (typeof a.system !== 'string' || !a.system.trim()) fehler.push(wo + ': system fehlt');\n    if (!a.eingabe || typeof a.eingabe !== 'object' || Array.isArray(a.eingabe)) fehler.push(wo + ': eingabe fehlt');\n  });\n}\n\nif (fehler.length > 0) return [{ json: { gueltig: false, fehler } }];\n\nreturn b.auftraege.map((a) => ({\n  json: {\n    gueltig: true,\n    fehler: [],\n    aufgabe: b.aufgabe,\n    strang: aufgabe.strang,\n    ref: a.ref,\n    prompt_version: b.prompt_version ?? null,\n    // Prompt aus der Plattform, danach der Kontext aus diesem Workflow\n    system: aufgabe.zusatzkontext ? a.system + '\\n\\nZusätzlicher Kontext:\\n' + aufgabe.zusatzkontext : a.system,\n    nachricht: a.nachricht,\n    eingabe: a.eingabe,\n    form: aufgabe.form,\n    hinweisSchluessel: aufgabe.hinweisSchluessel ?? null,\n    listen: aufgabe.listen ?? null,\n    verbotenMuster: aufgabe.verbotenMuster ?? '',\n    verbotenText: aufgabe.verbotenText ?? '',\n    bloecke: aufgabe.bloecke ?? null,\n    gesamt: aufgabe.gesamt ?? null,\n    punkteProBlock: aufgabe.punkteProBlock ?? null,\n  },\n}));\n"
       },
       "id": "d4a11d00-0000-4000-8000-000000000005",
       "name": "Anfrage prüfen",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        240,
+        720,
         0
       ]
     },
@@ -110,7 +112,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        480,
+        960,
         0
       ]
     },
@@ -199,7 +201,7 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
       "position": [
-        740,
+        1220,
         -100
       ]
     },
@@ -216,7 +218,7 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 1.7,
       "position": [
-        1020,
+        1500,
         -260
       ],
       "onError": "continueRegularOutput"
@@ -237,7 +239,7 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
       "position": [
-        1020,
+        1500,
         -60
       ]
     },
@@ -254,7 +256,7 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 1.7,
       "position": [
-        1020,
+        1500,
         140
       ],
       "onError": "continueRegularOutput"
@@ -275,7 +277,7 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
       "position": [
-        1020,
+        1500,
         340
       ]
     },
@@ -292,7 +294,7 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 1.7,
       "position": [
-        1020,
+        1500,
         540
       ],
       "onError": "continueRegularOutput"
@@ -313,7 +315,7 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
       "position": [
-        1020,
+        1500,
         740
       ]
     },
@@ -327,7 +329,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1340,
+        1820,
         -60
       ]
     },
@@ -341,7 +343,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1580,
+        2060,
         -60
       ]
     },
@@ -354,7 +356,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1820,
+        2300,
         -60
       ]
     },
@@ -371,7 +373,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        2060,
+        2540,
         -60
       ]
     },
@@ -388,8 +390,96 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        740,
+        1220,
         160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://hgtvlcucxzksvmvgvbgo.supabase.co/auth/v1/user",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.headers.authorization || '' }}"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhndHZsY3VjeHprc3Ztdmd2YmdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5NDk3OTQsImV4cCI6MjEwNjUyNTc5NH0.AahBzJHtomOspC_bCUTixiZNz_1NqA_lA7-NBf96vK4"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "d4a11d00-0000-4000-8000-000000000020",
+      "name": "Anmeldung prüfen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4a11d00-0000-4000-8000-000000000025",
+              "leftValue": "={{ $execution.mode === 'test' || $json.statusCode === 200 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4a11d00-0000-4000-8000-000000000024",
+      "name": "Angemeldet?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"ok\": false, \"fehler\": \"Bitte melde dich an.\" } }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "d4a11d00-0000-4000-8000-000000000023",
+      "name": "Nicht angemeldet",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        300
       ]
     }
   ],
@@ -400,7 +490,7 @@
           "headers": {
             "host": "n8n.example",
             "content-type": "application/json",
-            "x-webhook-secret": "nur-zum-testen"
+            "authorization": "Bearer nur-zum-testen"
           },
           "params": {},
           "query": {},
@@ -547,7 +637,7 @@
       "main": [
         [
           {
-            "node": "Anfrage prüfen",
+            "node": "Anmeldung prüfen",
             "type": "main",
             "index": 0
           }
@@ -702,6 +792,35 @@
           {
             "node": "Agent Agenda",
             "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anmeldung prüfen": {
+      "main": [
+        [
+          {
+            "node": "Angemeldet?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Angemeldet?": {
+      "main": [
+        [
+          {
+            "node": "Anfrage prüfen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nicht angemeldet",
+            "type": "main",
             "index": 0
           }
         ]
