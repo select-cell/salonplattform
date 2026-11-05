@@ -701,3 +701,75 @@
   align-items: center;
   gap: 8px;
 }
+
+/* Monatsabschluss und Analyse (Erweiterung E) */
+.aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+}
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.analyse-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  background: var(--surface);
+  overflow: hidden;
+}
+.analyse-liste li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 12px 14px;
+}
+.analyse-liste li + li {
+  border-top: 1px solid var(--line);
+}
+.analyse-liste li.aktiv {
+  background: var(--tint-soft);
+}
+.analyse-liste__name {
+  flex: 1 1 200px;
+  font-weight: 600;
+}
+.analyse-liste .badges {
+  flex: 2 1 240px;
+}
+@media (max-width: 479px) {
+  .kennzahlen--abschluss {
+    grid-template-columns: 1fr;
+  }
+}
+.md p,
+.md ul {
+  margin: 0 0 10px;
+}
+.md__titel {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  margin: 18px 0 6px;
+}
+.md__titel:first-child {
+  margin-top: 0;
+}
+.md__liste {
+  padding-left: 20px;
+  list-style: disc;
+}
+.md__liste li + li {
+  margin-top: 4px;
+}
+.analyse-editor {
+  min-height: 320px;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+}

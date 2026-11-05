@@ -29,7 +29,7 @@ export default async function (browser) {
     await page.getByRole('link', { name: 'Leitung', exact: true }).first().click()
     await page.waitForURL('**/app/leitung/kommentare')
     t.check(true, '/app/leitung führt auf Kommentare')
-    t.check((await page.locator('.unternav__link').allInnerTexts()).join('|') === 'Kommentare', 'Unter-Navigation zeigt Kommentare')
+    t.check((await page.locator('.unternav__link').allInnerTexts()).includes('Kommentare'), 'Unter-Navigation zeigt Kommentare')
     await context.close()
   }
   {

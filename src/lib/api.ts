@@ -3,6 +3,7 @@
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './konfiguration'
 import { supabase } from './supabase'
 import type { AbgabeStatus, Dashboard, PersonAuswertung, TeamAuswertung, Ueberfaellig, ZeitAuswertung, KommentarAuswertung } from './auswertung'
+import type { AbschlussInfo, AbschlussUebersicht, Analyse, AnalyseErgebnis } from './abschluss'
 import type { Person } from './types'
 import type { MonatStatus, UmfrageInhalt, UmfrageNutzdaten } from './umfrage'
 
@@ -176,4 +177,60 @@ export async function holePdfProtokoll(limit = 50): Promise<PdfProtokollZeile[]>
   const { data, error } = await supabase.rpc('pdf_export_protokoll', { p_limit: limit })
   if (error) throw new Error(error.message)
   return (data ?? []) as PdfProtokollZeile[]
+}
+
+// ---- Monatsabschluss und Einzelanalyse (Erweiterung E) -------------------------------------------
+
+export async function holeAbschlussUebersicht(monat?: string): Promise<AbschlussUebersicht> {
+  const { data, error } = await supabase.rpc('abschluss_uebersicht', monat ? { p_monat: `${monat}-01` } : {})
+  if (error) throw new Error(error.message)
+  return data as AbschlussUebersicht
+}
+
+export async function schliesseMonatAb(monat: string): Promise<AbschlussInfo> {
+  const { data, error } = await supabase.rpc('monat_abschliessen', { p_monat: `${monat}-01` })
+  if (error) throw new Error(error.message)
+  return data as AbschlussInfo
+}
+
+export async function holeAnalyse(personId: string, monat: string): Promise<Analyse | null> {
+  const { data, error } = await supabase.rpc('analyse_lesen', { p_person: personId, p_monat: `${monat}-01` })
+  if (error) throw new Error(error.message)
+  return (data as Analyse | null) ?? null
+}
+
+export async function bearbeiteAnalyse(personId: string, monat: string, text: string): Promise<Analyse> {
+  const { data, error } = await supabase.rpc('analyse_bearbeiten', { p_person: personId, p_monat: `${monat}-01`, p_text: text })
+  if (error) throw new Error(error.message)
+  return data as Analyse
+}
+
+export async function gibAnalyseFrei(personId: string, monat: string, frei = true): Promise<Analyse> {
+  const { data, error } = await supabase.rpc('analyse_freigeben', { p_person: personId, p_monat: `${monat}-01`, p_freigeben: frei })
+  if (error) throw new Error(error.message)
+  return data as Analyse
+}
+
+/**
+ * Lässt die KI eine Analyse formulieren (Edge Function `analyse-erstellen`, mit der Anmeldung der Leitung).
+ * Gleiche Daten wie beim letzten Mal ergeben keinen neuen KI-Aufruf, außer `neu` ist gesetzt.
+ */
+export async function erstelleAnalyse(personId: string, monat: string, neu = false): Promise<AnalyseErgebnis> {
+  const { data, error } = await supabase.functions.invoke('analyse-erstellen', { body: { person_id: personId, monat, neu } })
+  if (error) {
+    let meldung = 'Die Analyse konnte nicht erstellt werden.'
+    const antwort = (error as { context?: unknown }).context
+    if (antwort instanceof Response) {
+      try {
+        const j = (await antwort.json()) as { fehler?: unknown }
+        if (typeof j.fehler === 'string' && j.fehler) meldung = j.fehler
+      } catch {
+        // Antwort ohne lesbaren Inhalt: bei der allgemeinen Meldung bleiben
+      }
+    }
+    throw new Error(meldung)
+  }
+  const r = data as { ok?: boolean; fehler?: string } & Partial<AnalyseErgebnis>
+  if (!r?.ok || !r.analyse) throw new Error(r?.fehler ?? 'Die Analyse konnte nicht erstellt werden.')
+  return { uebersprungen: !!r.uebersprungen, versuche: r.versuche ?? 0, analyse: r.analyse }
 }

@@ -139,6 +139,26 @@ export default function Info() {
         </p>
       </Abschnitt>
 
+      <Abschnitt titel="KI-Analyse im Monatsabschluss">
+        <p>
+          Verantwortliche und Admin können nach dem Monatsabschluss für jede Person eine <strong>Gesprächsgrundlage</strong> erstellen lassen. Alle
+          Zahlen kommen aus der Datenbank; die KI formuliert nur den Text. Jede Zahl im Text wird automatisch mit den Daten verglichen.
+        </p>
+        <ul className="platzhalter__liste">
+          <li>
+            <strong>Was an die KI geht:</strong> Kennzahlen und die Kommentare der Kollegen <strong>ohne Namen und ohne Absender</strong>. Die bewertete
+            Person heißt dort „die bewertete Person“, alle anderen „Kollege A, B …“. E-Mail-Adressen und Kennungen werden nicht mitgeschickt.
+          </li>
+          <li>
+            <strong>Was daraus wird:</strong> ein Entwurf. Die Leitung liest ihn, bearbeitet ihn und gibt ihn frei. Nur eine freigegebene Analyse
+            kommt in den Personenbericht (PDF).
+          </li>
+          <li>
+            <strong>Mitarbeiter</strong> bekommen keine Analysen. Auf Wunsch sehen Verantwortliche auch ihre eigene Analyse nicht (nur der Admin).
+          </li>
+        </ul>
+      </Abschnitt>
+
       {person.rolle === 'admin' && <ExportProtokoll />}
     </div>
   )

@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "test:db": "bash supabase/tests/lokal/reset_db.sh && bash supabase/tests/lokal/run_tests.sh",
-    "test:browser": "node tests/browser/alle.mjs"
+    "test:browser": "node tests/browser/alle.mjs",
+    "test:functions": "node --test supabase/functions/*/*.test.ts"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.3.0",

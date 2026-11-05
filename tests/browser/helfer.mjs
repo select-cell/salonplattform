@@ -64,7 +64,8 @@ export async function neueSeite(browser, { rolle = 'chef', viewport = { width: 1
     const req = route.request()
     const pfad = new URL(req.url()).pathname
     const json = (status, body) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
-    const rpc = pfad.split('/rpc/')[1]
+    // RPC-Aufrufe heißen wie die Funktion, Edge Functions „fn:<name>“
+    const rpc = pfad.split('/rpc/')[1] ?? (pfad.includes('/functions/v1/') ? `fn:${pfad.split('/functions/v1/')[1]}` : undefined)
     if (rpc) {
       let body = {}
       try { body = req.postDataJSON() ?? {} } catch { body = {} }

@@ -8,4 +8,5 @@ export interface LeitungSeite {
 
 export const LEITUNG_SEITEN: readonly LeitungSeite[] = [
   { pfad: 'kommentare', label: 'Kommentare' },
+  { pfad: 'abschluss', label: 'Monatsabschluss' },
 ]

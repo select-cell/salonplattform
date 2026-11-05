@@ -2,6 +2,7 @@ import { Document, Line, Polyline, Svg, Circle, Text, View } from '@react-pdf/re
 import { pdfFarben as f } from '../config/brand'
 import type { Schwellen, VerhaltenZeile } from '../lib/auswertung'
 import { einordnung, mittel, monatName } from '../lib/auswertung'
+import { AnalyseAbschnitt, type FreigegebeneAnalyse } from './AnalyseAbschnitt'
 import { Balken, Kennzahl, Legende, Seite, stile, vz, z1 } from './bausteine'
 
 export interface PersonenberichtDaten {
@@ -14,7 +15,8 @@ export interface PersonenberichtDaten {
   kommentare: { monat: string; nr: number; kommentar: string; note: number }[]
   selbst_kommentare: { monat: string; nr: number; kommentar: string; note: number }[]
   entwicklung: { begruendung: string | null }[]
-  analyse: unknown
+  /** nur eine freigegebene Analyse; sonst null */
+  analyse: FreigegebeneAnalyse | null
 }
 
 function Verlauf({ punkte }: { punkte: { monat: string; sb: number | null; fb: number | null }[] }) {
@@ -98,6 +100,8 @@ export function Personenbericht({ daten, logo }: { daten: PersonenberichtDaten; 
             <Verlauf punkte={monate.map(proMonat)} />
           </View>
         )}
+
+        {d.analyse && <AnalyseAbschnitt analyse={d.analyse} />}
 
         <View style={stile.abschnitt}>
           <Text style={stile.abschnittTitel}>Selbst- und Fremdbild je Verhalten</Text>
