@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { PLATZHALTER_VIDEO_SEKUNDEN } from '../../lib/umfrage'
+import { AKTIVITAET_EREIGNIS } from '../../lib/zeiterfassung'
 import { klassifiziere } from '../../lib/videoQuelle'
 import { Icon } from '../Icon'
 
@@ -104,6 +105,8 @@ function VimeoVideo({ src, titel, onEnde }: { src: string; titel: string; onEnde
       // Vorspulen sperren: Springt jemand über die weiteste gesehene Stelle hinaus, geht es dorthin zurück
       let weiteste = 0
       p.on('timeupdate', (d: { seconds: number }) => {
+        // ein laufendes Video zählt als aktive Zeit (der Browser sieht die Eingaben im iframe nicht)
+        window.dispatchEvent(new Event(AKTIVITAET_EREIGNIS))
         if (d.seconds > weiteste && d.seconds - weiteste < 2) weiteste = d.seconds
       })
       p.on('seeked', (d: { seconds: number }) => {

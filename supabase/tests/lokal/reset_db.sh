@@ -1,6 +1,7 @@
 #!/bin/bash
 # Frische Test-Datenbank mit Stub und allen Migrationen (Dateien per stdin, da der Benutzer postgres das Repo nicht lesen darf)
 set -e
+(pg_ctlcluster 16 main start 2>/dev/null || true); sleep 2
 HIER="$(cd "$(dirname "$0")" && pwd)"
 MIG="$HIER/../../migrations"
 P="su postgres -c"

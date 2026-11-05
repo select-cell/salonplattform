@@ -48,6 +48,24 @@ export default function Info() {
           </li>
         </ul>
       </Abschnitt>
+
+      <Abschnitt titel="Ausfüllzeit der Umfrage">
+        <p>
+          Wir messen, wie lange du <strong>aktiv</strong> an der Umfrage arbeitest. Aktiv heißt: Die Seite ist sichtbar und du hast in den
+          letzten 45 Sekunden etwas getippt, geklickt, gescrollt oder ein Video läuft. Pausen, andere Tabs und ein gesperrter
+          Bildschirm zählen nicht. Die Uhr ist die des Servers, deine Geräteuhr spielt keine Rolle.
+        </p>
+        <ul className="platzhalter__liste">
+          <li>
+            <strong>Du siehst:</strong> am Ende deine eigene aktive Zeit, sonst nichts.
+          </li>
+          <li>
+            <strong>Verantwortliche und Admin sehen:</strong> Median und Spanne des Teams, die Zeit je Person und je Verhalten.
+            Auffällige Abgaben (zu schnell, sehr lang, ohne Messung) werden gekennzeichnet und zählen nicht in Median und Spanne.
+            Es wird nichts verworfen und niemand wird dadurch gesperrt.
+          </li>
+        </ul>
+      </Abschnitt>
     </div>
   )
 }

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { sendeUmfrage } from '../../lib/api'
+import { holeMeineAusfuellzeit, sendeUmfrage } from '../../lib/api'
 import { monatLabel } from '../../lib/monat'
+import { formatDauer } from '../../lib/zeitmesser'
+import { useZeiterfassung } from '../../lib/zeiterfassung'
 import type { Entwurf, UmfrageInhalt } from '../../lib/umfrage'
 import {
   baueNutzdaten,
@@ -33,11 +35,18 @@ export function Umfrage({ inhalt, monat, userId }: Props) {
   const [sendet, setSendet] = useState(false)
   const [sendeFehler, setSendeFehler] = useState<string | null>(null)
   const [abgeschickt, setAbgeschickt] = useState(false)
+  const [aktiveSek, setAktiveSek] = useState<number | null>(null)
+  const [neuBegonnen, setNeuBegonnen] = useState(false)
   const bereich = useRef<HTMLDivElement>(null)
 
   const index = Math.min(entwurf.schritt, schritte.length - 1)
   const schritt = schritte[index]
   const letzter = schritte.length - 1
+
+  // Zeiterfassung: aktive Zeit je Schritt (Server-Uhr), nie Voraussetzung für die Umfrage
+  const schrittSchluessel =
+    schritt.art === 'verhalten' ? `v${schritt.verhalten.nr}` : schritt.art === 'entwicklung' ? 'entwicklung' : null
+  const zeit = useZeiterfassung(monat, schrittSchluessel)
 
   // Zwischenstand sichern, damit beim versehentlichen Schließen nichts verloren geht
   useEffect(() => {
@@ -68,8 +77,12 @@ export function Umfrage({ inhalt, monat, userId }: Props) {
     setSendet(true)
     setSendeFehler(null)
     try {
-      await sendeUmfrage(baueNutzdaten(inhalt, entwurf))
+      const z = await zeit.abschluss()
+      await sendeUmfrage(baueNutzdaten(inhalt, entwurf), z)
       loescheEntwurf(userId, monat)
+      // Die geprüfte Zeit aus der Datenbank, sonst der eigene Zählerstand
+      setAktiveSek(z.aktiveSek)
+      void holeMeineAusfuellzeit(monat).then((r) => setAktiveSek(r ? r.aktive_sek : null)).catch(() => undefined)
       setAbgeschickt(true)
     } catch (e) {
       setSendeFehler(e instanceof Error ? e.message : 'Das Absenden hat nicht geklappt.')
@@ -78,7 +91,7 @@ export function Umfrage({ inhalt, monat, userId }: Props) {
     }
   }
 
-  if (abgeschickt) return <Danke vorname={inhalt.person.name.split(/\s+/)[0]} monat={monat} />
+  if (abgeschickt) return <Danke vorname={inhalt.person.name.split(/\s+/)[0]} monat={monat} aktiveSek={aktiveSek} />
 
   const titelFuerScreenreader =
     schritt.art === 'verhalten'
@@ -113,7 +126,17 @@ export function Umfrage({ inhalt, monat, userId }: Props) {
 
       <div ref={bereich} tabIndex={-1} className="umfrage__inhalt">
         {schritt.art === 'start' && (
-          <StartSchritt inhalt={inhalt} monat={monat} wiederaufgenommen={!!gespeichert && gespeichert.schritt > 0} />
+          <StartSchritt
+            inhalt={inhalt}
+            monat={monat}
+            wiederaufgenommen={!neuBegonnen && !!gespeichert && gespeichert.schritt > 0}
+            onNeuBeginnen={() => {
+              loescheEntwurf(userId, monat)
+              setEntwurf(neuerEntwurf(monat))
+              setNeuBegonnen(true)
+              void zeit.neuBeginnen()
+            }}
+          />
         )}
         {schritt.art === 'verhalten' && (
           <VerhaltenSchritt
@@ -186,11 +209,14 @@ function StartSchritt({
   inhalt,
   monat,
   wiederaufgenommen,
+  onNeuBeginnen,
 }: {
   inhalt: UmfrageInhalt
   monat: string
   wiederaufgenommen: boolean
+  onNeuBeginnen: () => void
 }) {
+  const [rueckfrage, setRueckfrage] = useState(false)
   const kolleginnen = inhalt.kolleginnen.length
   return (
     <article className="stack" aria-labelledby="schritt-titel">
@@ -218,13 +244,40 @@ function StartSchritt({
         </li>
         {kolleginnen > 0 && <li>Vorab eine Frage zur Entwicklung des Monats.</li>}
         <li>Dein Zwischenstand wird auf diesem Gerät gespeichert. Du kannst jederzeit später weitermachen.</li>
+        <li>
+          Wir messen, wie lange du aktiv an der Umfrage arbeitest. Pausen zählen nicht.{' '}
+          <Link to="/app/info" className="textlink">
+            Mehr dazu
+          </Link>
+        </li>
       </ul>
 
       {wiederaufgenommen && (
-        <p className="hinweis hinweis--ok">
-          <Icon name="haken" groesse={18} />
-          <span>Willkommen zurück. Du machst da weiter, wo du aufgehört hast.</span>
-        </p>
+        <div className="stack-s">
+          <p className="hinweis hinweis--ok">
+            <Icon name="haken" groesse={18} />
+            <span>Willkommen zurück. Du machst da weiter, wo du aufgehört hast.</span>
+          </p>
+          {rueckfrage ? (
+            <div className="hinweis hinweis--fehler" role="alertdialog" aria-label="Neu beginnen">
+              <Icon name="achtung" groesse={18} />
+              <span>
+                Wirklich neu beginnen? Deine bisherigen Antworten gehen verloren.{' '}
+                <button type="button" className="textlink" onClick={onNeuBeginnen}>
+                  Ja, neu beginnen
+                </button>{' '}
+                ·{' '}
+                <button type="button" className="textlink" onClick={() => setRueckfrage(false)}>
+                  Abbrechen
+                </button>
+              </span>
+            </div>
+          ) : (
+            <button type="button" className="textlink" onClick={() => setRueckfrage(true)}>
+              Neu beginnen
+            </button>
+          )}
+        </div>
       )}
       {kolleginnen === 0 && (
         <p className="hinweis">
@@ -236,7 +289,7 @@ function StartSchritt({
   )
 }
 
-function Danke({ vorname, monat }: { vorname: string; monat: string }) {
+function Danke({ vorname, monat, aktiveSek }: { vorname: string; monat: string; aktiveSek: number | null }) {
   return (
     <section className="karte erfolg" aria-live="polite">
       <div className="erfolg__icon">
@@ -244,6 +297,7 @@ function Danke({ vorname, monat }: { vorname: string; monat: string }) {
       </div>
       <h2 className="umfrage__titel">Danke, {vorname}!</h2>
       <p className="muted">Deine Umfrage für {monatLabel(monat)} ist angekommen.</p>
+      {aktiveSek !== null && <p className="klein muted">Ausgefüllt in {formatDauer(aktiveSek)} aktiver Zeit.</p>}
       <Link to="/app" className="btn">
         Zur Übersicht
       </Link>

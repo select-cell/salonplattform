@@ -8,6 +8,7 @@ import { DifferenzDiagramm, SbFbDiagramm, VerlaufDiagramm, type VerlaufDaten } f
 import { Heatmap, Rangliste, TopFlop } from './Listen'
 import { PersonenAnsicht } from './PersonenAnsicht'
 import { TeamTabelle } from './Tabellen'
+import { ZeitAbschnitt } from './ZeitAbschnitt'
 
 /** Team-Dashboard für Verantwortliche und Admins (Plan §3, §5.6). Umschalter Team ↔ Person. */
 export function LeitungsTeam() {
@@ -134,6 +135,8 @@ function TeamDashboard({ d, verlauf, onPerson }: { d: Dashboard; verlauf: TeamAu
       <Abschnitt titel="Alle Verhalten im Detail">
         <TeamTabelle verhalten={d.verhalten} matrix={d.matrix} personen={d.personen} schwellen={schwellen} />
       </Abschnitt>
+
+      <ZeitAbschnitt monat={d.monat} />
 
       {(d.entwicklung.length > 0) && (
         <Abschnitt titel="Entwicklung des Monats">

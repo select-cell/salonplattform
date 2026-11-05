@@ -207,3 +207,35 @@ export function monatKurz(schluessel: string): string {
     new Date(Date.UTC(jahr, monat - 1, 1)),
   )
 }
+
+// ---- Zeiterfassung (Erweiterung B) ----------------------------------------------------
+
+export interface ZeitPerson {
+  id: string
+  name: string
+  aktive_sek: number
+  gesamt_sek: number
+  kennzeichen: string[]
+  zaehlt: boolean
+}
+
+export interface ZeitAuswertung {
+  monat: string
+  monate: string[]
+  einstellungen: { min_sek_pro_verhalten: number; sehr_lang_sek: number; pausen_quote: number; heartbeat_luecke_sek: number }
+  abgaben_ohne_zeit: number
+  personen: ZeitPerson[]
+  zusammenfassung: { abgegeben: number; zaehlt: number; median_sek: number | null; min_sek: number | null; max_sek: number | null }
+  verhalten: { nr: number; schritt: string; titel: string | null; median_sek: number; mittel_sek: number; anzahl: number }[]
+  heatmap: { person_id: string; schritt: string; sek: number }[]
+}
+
+export const KENNZEICHEN_LABEL: Record<string, string> = {
+  zu_schnell: 'zu schnell',
+  sehr_lang: 'sehr lang',
+  viele_pausen: 'viele Pausen',
+  wiederaufgenommen: 'fortgesetzt',
+  heartbeat_luecke: 'Lücke in der Messung',
+  neu_begonnen: 'neu begonnen',
+  ohne_sitzung: 'ohne Zeitmessung',
+}

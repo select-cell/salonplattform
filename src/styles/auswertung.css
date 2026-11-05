@@ -614,3 +614,78 @@
   fill: var(--cream-mid);
   fill-opacity: 0.5;
 }
+
+/* ---- Ausfüllzeit (Erweiterung B) ------------------------------------------------- */
+.zeit-zeile--aus td {
+  color: var(--text2);
+}
+
+.zeit-kennzeichen {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.zeit-balken {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.zeit-balken li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(60px, 120px) 3.5em;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .zeit-balken li {
+    grid-template-columns: 1fr 3.5em;
+  }
+
+  .zeit-balken__spur {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+.zeit-balken__spur {
+  display: block;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--cream-mid);
+  overflow: hidden;
+}
+
+.zeit-balken__spur span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--accent);
+}
+
+.zeit-balken__wert {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text2);
+}
+
+.zeit-heatmap > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--link);
+}
+
+.zeit-heatmap .tabelle-scroll {
+  margin-top: 12px;
+}
+
+.zeit-zelle {
+  font-variant-numeric: tabular-nums;
+  background: color-mix(in srgb, var(--accent) var(--intensitaet, 0%), transparent);
+}
