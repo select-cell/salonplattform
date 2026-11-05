@@ -141,17 +141,23 @@ export default function Info() {
 
       <Abschnitt titel="KI-Analyse im Monatsabschluss">
         <p>
-          Verantwortliche und Admin können nach dem Monatsabschluss für jede Person eine <strong>Gesprächsgrundlage</strong> erstellen lassen. Alle
-          Zahlen kommen aus der Datenbank; die KI formuliert nur den Text. Jede Zahl im Text wird automatisch mit den Daten verglichen.
+          Nach dem Monatsabschluss kann der <strong>Admin</strong> für jede Person eine <strong>Gesprächsgrundlage</strong> und für das ganze Team eine{' '}
+          <strong>Gesamtauswertung</strong> erstellen lassen. Zurzeit ist das nur dem Admin vorbehalten. Alle Zahlen kommen aus der Datenbank; die KI
+          formuliert nur den Text. Jede Zahl im Text wird automatisch mit den Daten verglichen.
         </p>
         <ul className="platzhalter__liste">
           <li>
             <strong>Was an die KI geht:</strong> Kennzahlen und die Kommentare der Kollegen <strong>ohne Namen und ohne Absender</strong>. Die bewertete
-            Person heißt dort „die bewertete Person“, alle anderen „Kollege A, B …“. E-Mail-Adressen und Kennungen werden nicht mitgeschickt.
+            Person heißt dort „die bewertete Person“, alle anderen „Kollege A, B …“. E-Mail-Adressen und Kennungen werden nicht mitgeschickt. Für die
+            Gesamtauswertung gehen nur <strong>Teamwerte</strong> und die Zahl der Kommentare an die KI, keine Einzelpersonen und keine Kommentartexte.
           </li>
           <li>
-            <strong>Was daraus wird:</strong> ein Entwurf. Die Leitung liest ihn, bearbeitet ihn und gibt ihn frei. Nur eine freigegebene Analyse
-            kommt in den Personenbericht (PDF).
+            <strong>Wohin es geht:</strong> Je nach Einrichtung direkt zum KI-Anbieter (Anthropic) oder über einen Automatisierungsdienst (n8n) dorthin.
+            Die Antwort kommt direkt zurück an die Plattform. Dort wird sie geprüft und gespeichert.
+          </li>
+          <li>
+            <strong>Was daraus wird:</strong> ein Entwurf. Der Admin liest ihn, bearbeitet ihn und gibt ihn frei. Nur eine freigegebene Analyse kommt in
+            den Personenbericht (PDF).
           </li>
           <li>
             <strong>Mitarbeiter</strong> bekommen keine Analysen. Auf Wunsch sehen Verantwortliche auch ihre eigene Analyse nicht (nur der Admin).

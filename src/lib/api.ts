@@ -4,7 +4,7 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL } from './konfiguration'
 import { supabase } from './supabase'
 import type { AbgabeStatus, Dashboard, PersonAuswertung, TeamAuswertung, Ueberfaellig, ZeitAuswertung, KommentarAuswertung } from './auswertung'
 import type { AgendaDaten, AgendaZeile, FokusListe, Rhythmus, TerminListe } from './agenda'
-import type { AbschlussInfo, AbschlussUebersicht, Analyse, AnalyseErgebnis } from './abschluss'
+import type { AbschlussInfo, AbschlussUebersicht, Analyse, AnalyseErgebnis, SammellaufErgebnis } from './abschluss'
 import type { Person } from './types'
 import type { MonatStatus, UmfrageInhalt, UmfrageNutzdaten } from './umfrage'
 
@@ -212,27 +212,72 @@ export async function gibAnalyseFrei(personId: string, monat: string, frei = tru
   return data as Analyse
 }
 
+/** Die deutsche Meldung aus der Antwort einer Edge Function (`{ ok: false, fehler }`) */
+async function funktionsFehler(error: unknown): Promise<Error> {
+  let meldung = 'Die Analyse konnte nicht erstellt werden.'
+  const antwort = (error as { context?: unknown }).context
+  if (antwort instanceof Response) {
+    try {
+      const j = (await antwort.json()) as { fehler?: unknown }
+      if (typeof j.fehler === 'string' && j.fehler) meldung = j.fehler
+    } catch {
+      // Antwort ohne lesbaren Inhalt: bei der allgemeinen Meldung bleiben
+    }
+  }
+  return new Error(meldung)
+}
+
+async function rufeKi(body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { data, error } = await supabase.functions.invoke('analyse-erstellen', { body })
+  if (error) throw await funktionsFehler(error)
+  const r = data as { ok?: boolean; fehler?: string } & Record<string, unknown>
+  if (!r?.ok) throw new Error(r?.fehler ?? 'Die Analyse konnte nicht erstellt werden.')
+  return r
+}
+
 /**
- * Lässt die KI eine Analyse formulieren (Edge Function `analyse-erstellen`, mit der Anmeldung der Leitung).
+ * Lässt die KI eine Analyse formulieren (Edge Function `analyse-erstellen`, mit der Anmeldung des Admins).
  * Gleiche Daten wie beim letzten Mal ergeben keinen neuen KI-Aufruf, außer `neu` ist gesetzt.
  */
 export async function erstelleAnalyse(personId: string, monat: string, neu = false): Promise<AnalyseErgebnis> {
-  const { data, error } = await supabase.functions.invoke('analyse-erstellen', { body: { person_id: personId, monat, neu } })
-  if (error) {
-    let meldung = 'Die Analyse konnte nicht erstellt werden.'
-    const antwort = (error as { context?: unknown }).context
-    if (antwort instanceof Response) {
-      try {
-        const j = (await antwort.json()) as { fehler?: unknown }
-        if (typeof j.fehler === 'string' && j.fehler) meldung = j.fehler
-      } catch {
-        // Antwort ohne lesbaren Inhalt: bei der allgemeinen Meldung bleiben
-      }
-    }
-    throw new Error(meldung)
-  }
-  const r = data as { ok?: boolean; fehler?: string } & Partial<AnalyseErgebnis>
-  if (!r?.ok || !r.analyse) throw new Error(r?.fehler ?? 'Die Analyse konnte nicht erstellt werden.')
+  const r = (await rufeKi({ person_id: personId, monat, neu })) as Partial<AnalyseErgebnis>
+  if (!r.analyse) throw new Error('Die Analyse konnte nicht erstellt werden.')
+  return { uebersprungen: !!r.uebersprungen, versuche: r.versuche ?? 0, analyse: r.analyse }
+}
+
+/**
+ * Sammellauf: erstellt die Einzelanalysen der nächsten Personen ohne Analyse (die Edge Function bearbeitet je Aufruf
+ * ein Paket und meldet, wie viele noch fehlen). `ausgenommen`: Personen, die schon gescheitert sind.
+ */
+export async function erstelleAlleAnalysen(monat: string, ausgenommen: string[] = []): Promise<SammellaufErgebnis> {
+  const r = (await rufeKi({ aufgabe: 'alle', monat, ausgenommen })) as Partial<SammellaufErgebnis>
+  return { erstellt: r.erstellt ?? [], fehlgeschlagen: r.fehlgeschlagen ?? [], verbleibend: r.verbleibend ?? 0 }
+}
+
+// ---- Gesamtauswertung des Teams -------------------------------------------------------------------
+
+export async function holeGesamt(monat: string): Promise<Analyse | null> {
+  const { data, error } = await supabase.rpc('gesamt_lesen', { p_monat: `${monat}-01` })
+  if (error) throw new Error(error.message)
+  return (data as Analyse | null) ?? null
+}
+
+export async function bearbeiteGesamt(monat: string, text: string): Promise<Analyse> {
+  const { data, error } = await supabase.rpc('gesamt_bearbeiten', { p_monat: `${monat}-01`, p_text: text })
+  if (error) throw new Error(error.message)
+  return data as Analyse
+}
+
+export async function gibGesamtFrei(monat: string, frei = true): Promise<Analyse> {
+  const { data, error } = await supabase.rpc('gesamt_freigeben', { p_monat: `${monat}-01`, p_freigeben: frei })
+  if (error) throw new Error(error.message)
+  return data as Analyse
+}
+
+/** Lässt die KI die Gesamtauswertung des Teams formulieren (nur Teamwerte). */
+export async function erstelleGesamt(monat: string, neu = false): Promise<AnalyseErgebnis> {
+  const r = (await rufeKi({ aufgabe: 'gesamt', monat, neu })) as Partial<AnalyseErgebnis>
+  if (!r.analyse) throw new Error('Die Auswertung konnte nicht erstellt werden.')
   return { uebersprungen: !!r.uebersprungen, versuche: r.versuche ?? 0, analyse: r.analyse }
 }
 

@@ -3,9 +3,10 @@ import { Abschnitt, DatenZustand, Kennzahl, Leer, Monatswahl } from '../../../co
 import { Icon } from '../../../components/Icon'
 import { Markdown } from '../../../components/leitung/Markdown'
 import {
-  bearbeiteAnalyse, erstelleAnalyse, gibAnalyseFrei, holeAbschlussUebersicht, holeAnalyse, schliesseMonatAb,
+  bearbeiteAnalyse, bearbeiteGesamt, erstelleAlleAnalysen, erstelleAnalyse, erstelleGesamt, gibAnalyseFrei, gibGesamtFrei,
+  holeAbschlussUebersicht, holeAnalyse, holeGesamt, schliesseMonatAb,
 } from '../../../lib/api'
-import { abschlussVeraltet, analyseStatus, datumKurz, uhrzeit, zeitpunkt, type AbschlussUebersicht, type Analyse } from '../../../lib/abschluss'
+import { abschlussVeraltet, analyseStatus, datumKurz, kiErlaubt, uhrzeit, zeitpunkt, type AbschlussUebersicht, type Analyse } from '../../../lib/abschluss'
 import { monatName } from '../../../lib/auswertung'
 import { useDaten } from '../../../lib/useDaten'
 
@@ -16,7 +17,13 @@ interface Meldung {
 
 const fehlertext = (e: unknown) => (e instanceof Error && e.message ? e.message : 'Das hat nicht geklappt. Bitte versuche es erneut.')
 
-/** Leitung → Monatsabschluss: Monat abschließen, KI-Analysen je Person lesen, bearbeiten und freigeben (Erweiterung E). */
+/** Kennung der Gesamtauswertung in `offen` und `arbeitet` (keine Personen-ID sieht so aus) */
+const GESAMT = 'gesamt'
+
+/**
+ * Leitung → Monatsabschluss: Monat abschließen (Verantwortliche und Admin). Die KI-Analysen je Person und die Gesamtauswertung
+ * des Teams erstellt, liest, bearbeitet und gibt zurzeit nur der Admin frei (Erweiterung E, Version 1.3).
+ */
 export default function Abschluss() {
   const [gewaehlt, setGewaehlt] = useState<string | undefined>(undefined)
   const [offen, setOffen] = useState<string | null>(null)
@@ -79,27 +86,57 @@ export default function Abschluss() {
     }
   }
 
+  /** Sammellauf: die Edge Function bearbeitet je Aufruf ein Paket Personen; wir rufen auf, bis alle fertig sind. */
   async function alleFehlenden(u: AbschlussUebersicht) {
     const fehlend = u.personen.filter((p) => !p.analyse)
+    const name = (id: string) => u.personen.find((p) => p.id === id)?.name ?? 'Person'
     setMeldung(null)
     setArbeitet('alle')
     let fertig = 0
+    const gescheitert: { person_id: string; fehler: string }[] = []
     try {
-      for (const p of fehlend) {
-        setFortschritt(`Erstelle ${fertig + 1} von ${fehlend.length}: ${p.name} …`)
-        await erstelleAnalyse(p.id, u.monat, false)
-        fertig++
+      setFortschritt(`Erstelle ${fehlend.length} ${fehlend.length === 1 ? 'Entwurf' : 'Entwürfe'} …`)
+      for (let runde = 0; runde < fehlend.length + 1; runde++) {
+        const r = await erstelleAlleAnalysen(u.monat, gescheitert.map((g) => g.person_id))
+        fertig += r.erstellt.length
+        gescheitert.push(...r.fehlgeschlagen)
+        setFortschritt(`${fertig + gescheitert.length} von ${fehlend.length} bearbeitet …`)
+        if (r.verbleibend === 0 || r.erstellt.length + r.fehlgeschlagen.length === 0) break
       }
-      setMeldung({ art: 'ok', text: `${fertig} ${fertig === 1 ? 'Entwurf' : 'Entwürfe'} erstellt. Bitte jeden Entwurf lesen, bevor du ihn freigibst.` })
+      if (gescheitert.length === 0) {
+        setMeldung({ art: 'ok', text: `${fertig} ${fertig === 1 ? 'Entwurf' : 'Entwürfe'} erstellt. Bitte jeden Entwurf lesen, bevor du ihn freigibst.` })
+      } else {
+        setMeldung({
+          art: 'fehler',
+          text: `${fertig} von ${fehlend.length} erstellt. Nicht erstellt: ${gescheitert.map((g) => `${name(g.person_id)} (${g.fehler})`).join('; ')}`,
+        })
+      }
     } catch (e) {
-      setMeldung({
-        art: 'fehler',
-        text: `${fertig} von ${fehlend.length} erstellt. ${fehlertext(e)}`,
-      })
+      setMeldung({ art: 'fehler', text: `${fertig} von ${fehlend.length} erstellt. ${fehlertext(e)}` })
     } finally {
       setFortschritt(null)
       setArbeitet(null)
       geaendert()
+    }
+  }
+
+  async function gesamtErstellen(u: AbschlussUebersicht, neu: boolean) {
+    setArbeitet(GESAMT)
+    setMeldung(null)
+    try {
+      const r = await erstelleGesamt(u.monat, neu)
+      setMeldung({
+        art: 'ok',
+        text: r.uebersprungen
+          ? 'Für das Team hat sich nichts geändert, die vorhandene Auswertung bleibt.'
+          : `Entwurf der Gesamtauswertung erstellt${r.analyse.geprueft ? '' : ', der Faktencheck ist nicht bestanden. Bitte genau lesen'}.`,
+      })
+      setOffen(GESAMT)
+      geaendert()
+    } catch (e) {
+      setMeldung({ art: 'fehler', text: fehlertext(e) })
+    } finally {
+      setArbeitet(null)
     }
   }
 
@@ -108,16 +145,28 @@ export default function Abschluss() {
       <header className="seitenkopf">
         <p className="overline">Leitung</p>
         <h1 style={{ marginTop: 8 }}>Monatsabschluss</h1>
-        <p>Monat abschließen und für jede Person eine Gesprächsgrundlage erstellen lassen. Die Zahlen kommen aus der Datenbank, die KI formuliert nur den Text.</p>
+        <p>
+          {daten && !kiErlaubt(daten)
+            ? 'Monat abschließen. Die Zahlen kommen aus der Datenbank.'
+            : 'Monat abschließen und für jede Person und für das Team eine Gesprächsgrundlage erstellen lassen. Die Zahlen kommen aus der Datenbank, die KI formuliert nur den Text.'}
+        </p>
       </header>
 
-      <p className="hinweis" data-testid="datenschutz-hinweis">
-        <Icon name="schloss" groesse={18} />
-        <span>
-          <strong>Datenschutz:</strong> An die KI gehen die Feedbacktexte <strong>ohne Namen und ohne Absender</strong>. Die bewertete Person heißt dort
-          „die bewertete Person“, alle anderen „Kollege A, B …“. Mitarbeiter bekommen keine Analysen.
-        </span>
-      </p>
+      {daten && !kiErlaubt(daten) ? (
+        <p className="hinweis" data-testid="ki-nur-admin">
+          <Icon name="schloss" groesse={18} />
+          <span>Die KI-Analysen sind zurzeit nur für Admins. Den Monat kannst du wie gewohnt abschließen.</span>
+        </p>
+      ) : (
+        <p className="hinweis" data-testid="datenschutz-hinweis">
+          <Icon name="schloss" groesse={18} />
+          <span>
+            <strong>Datenschutz:</strong> An die KI gehen die Feedbacktexte <strong>ohne Namen und ohne Absender</strong>. Die bewertete Person heißt dort
+            „die bewertete Person“, alle anderen „Kollege A, B …“. Mitarbeiter bekommen keine Analysen. Für die Gesamtauswertung gehen nur
+            Teamwerte und die Zahl der Kommentare an die KI.
+          </span>
+        </p>
+      )}
 
       {meldung && (
         <p className={`hinweis hinweis--${meldung.art === 'ok' ? 'ok' : 'fehler'}`} role={meldung.art === 'ok' ? 'status' : 'alert'}>
@@ -199,7 +248,7 @@ export default function Abschluss() {
                 )}
               </Abschnitt>
 
-              {daten.abschluss && (
+              {daten.abschluss && kiErlaubt(daten) && (
                 <Abschnitt titel="Analysen" kurz="Entwurf, dann lesen, bearbeiten und freigeben. Nur freigegebene Analysen kommen in den Personenbericht (PDF).">
                   {daten.personen.length === 0 ? (
                     <p className="muted">Für diesen Monat gibt es keine Person mit Bewertungen.</p>
@@ -248,9 +297,14 @@ export default function Abschluss() {
                       {offen && daten.personen.some((p) => p.id === offen) && (
                         <AnalysePanel
                           key={`${offen}-${daten.monat}`}
-                          personId={offen}
-                          name={daten.personen.find((p) => p.id === offen)?.name ?? ''}
-                          monat={daten.monat}
+                          testid="analyse-panel"
+                          titel={daten.personen.find((p) => p.id === offen)?.name ?? ''}
+                          ariaLabel={`Analyse ${daten.personen.find((p) => p.id === offen)?.name ?? ''}`}
+                          schluessel={`${offen}-${daten.monat}`}
+                          lade={() => holeAnalyse(offen, daten.monat)}
+                          speichere={(text) => bearbeiteAnalyse(offen, daten.monat, text)}
+                          gibFrei={(frei) => gibAnalyseFrei(offen, daten.monat, frei)}
+                          freigabeText={`Freigegeben. Die Analyse für ${daten.personen.find((p) => p.id === offen)?.name ?? 'die Person'} steht jetzt im Personenbericht (PDF).`}
                           stand={stand}
                           beschaeftigt={arbeitet !== null}
                           arbeitetHier={arbeitet === offen}
@@ -263,6 +317,56 @@ export default function Abschluss() {
                   )}
                 </Abschnitt>
               )}
+
+              {daten.abschluss && kiErlaubt(daten) && (
+                <Abschnitt
+                  titel="Gesamtauswertung"
+                  kurz="Eine KI-Auswertung für das ganze Team: nur Teamwerte, keine Namen und keine Einzelpersonen. Sie ist eine Gesprächsgrundlage für dich und erscheint noch in keinem PDF."
+                >
+                  <ul className="analyse-liste" data-testid="gesamt-tabelle">
+                    <li className={offen === GESAMT ? 'aktiv' : undefined} data-testid="gesamt-zeile">
+                      <span className="analyse-liste__name">Team, {monatName(daten.monat)}</span>
+                      <span className="badges">
+                        {(() => {
+                          const s = analyseStatus(daten.gesamt ?? null)
+                          return <span className={`badge${s.ton === 'neutral' ? '' : ` badge--${s.ton}`}`}>{daten.gesamt ? s.text : 'Noch keine Auswertung'}</span>
+                        })()}
+                        {daten.gesamt && !daten.gesamt.geprueft && <span className="badge badge--rot">Faktencheck nicht bestanden</span>}
+                        {daten.gesamt?.bearbeitet && <span className="badge">bearbeitet</span>}
+                        {daten.gesamt?.veraltet && <span className="badge badge--akzent">Daten geändert</span>}
+                      </span>
+                      {daten.gesamt ? (
+                        <button type="button" className="btn btn--ghost" onClick={() => setOffen(offen === GESAMT ? null : GESAMT)}>
+                          {offen === GESAMT ? 'Schließen' : 'Öffnen'}
+                        </button>
+                      ) : (
+                        <button type="button" className="btn btn--ghost" disabled={arbeitet !== null} onClick={() => gesamtErstellen(daten, false)}>
+                          {arbeitet === GESAMT ? 'Wird erstellt …' : 'Erstellen'}
+                        </button>
+                      )}
+                    </li>
+                  </ul>
+                  {offen === GESAMT && daten.gesamt && (
+                    <AnalysePanel
+                      key={`${GESAMT}-${daten.monat}`}
+                      testid="gesamt-panel"
+                      titel="Gesamtauswertung des Teams"
+                      ariaLabel="Gesamtauswertung"
+                      schluessel={`${GESAMT}-${daten.monat}`}
+                      lade={() => holeGesamt(daten.monat)}
+                      speichere={(text) => bearbeiteGesamt(daten.monat, text)}
+                      gibFrei={(frei) => gibGesamtFrei(daten.monat, frei)}
+                      freigabeText="Freigegeben. Die Gesamtauswertung ist als freigegeben markiert."
+                      stand={stand}
+                      beschaeftigt={arbeitet !== null}
+                      arbeitetHier={arbeitet === GESAMT}
+                      onNeu={(neu) => gesamtErstellen(daten, neu)}
+                      onGeaendert={geaendert}
+                      onMeldung={setMeldung}
+                    />
+                  )}
+                </Abschnitt>
+              )}
             </div>
           ))}
       </DatenZustand>
@@ -271,11 +375,17 @@ export default function Abschluss() {
 }
 
 function AnalysePanel({
-  personId, name, monat, stand, beschaeftigt, arbeitetHier, onNeu, onGeaendert, onMeldung,
+  testid, titel, ariaLabel, schluessel, lade, speichere, gibFrei, freigabeText, stand, beschaeftigt, arbeitetHier, onNeu, onGeaendert, onMeldung,
 }: {
-  personId: string
-  name: string
-  monat: string
+  testid: string
+  titel: string
+  ariaLabel: string
+  /** Wechselt, wenn eine andere Analyse gemeint ist (dann wird neu geladen) */
+  schluessel: string
+  lade: () => Promise<Analyse | null>
+  speichere: (text: string) => Promise<Analyse>
+  gibFrei: (frei: boolean) => Promise<Analyse>
+  freigabeText: string
   stand: number
   beschaeftigt: boolean
   arbeitetHier: boolean
@@ -283,7 +393,7 @@ function AnalysePanel({
   onGeaendert: () => void
   onMeldung: (m: Meldung | null) => void
 }) {
-  const { laedt, daten, fehler, neuLaden } = useDaten(() => holeAnalyse(personId, monat), [personId, monat, stand])
+  const { laedt, daten, fehler, neuLaden } = useDaten(lade, [schluessel, stand])
   const [bearbeiten, setBearbeiten] = useState(false)
   const [text, setText] = useState('')
   const [speichert, setSpeichert] = useState(false)
@@ -293,7 +403,7 @@ function AnalysePanel({
     setSpeichert(true)
     onMeldung(null)
     try {
-      const neu = await bearbeiteAnalyse(personId, monat, text)
+      const neu = await speichere(text)
       onMeldung({
         art: 'ok',
         text:
@@ -316,8 +426,8 @@ function AnalysePanel({
     setSpeichert(true)
     onMeldung(null)
     try {
-      await gibAnalyseFrei(personId, monat, frei)
-      onMeldung({ art: 'ok', text: frei ? `Freigegeben. Die Analyse für ${name} steht jetzt im Personenbericht (PDF).` : 'Freigabe zurückgenommen, die Analyse ist wieder ein Entwurf.' })
+      await gibFrei(frei)
+      onMeldung({ art: 'ok', text: frei ? freigabeText : 'Freigabe zurückgenommen, die Analyse ist wieder ein Entwurf.' })
       onGeaendert()
     } catch (e) {
       onMeldung({ art: 'fehler', text: fehlertext(e) })
@@ -327,8 +437,8 @@ function AnalysePanel({
   }
 
   return (
-    <section className="karte karte--creme stack" aria-label={`Analyse ${name}`} data-testid="analyse-panel">
-      <h3 className="ausw-titel">{name}</h3>
+    <section className="karte karte--creme stack" aria-label={ariaLabel} data-testid={testid}>
+      <h3 className="ausw-titel">{titel}</h3>
       <DatenZustand laedt={laedt && !daten} fehler={fehler} onNeu={neuLaden}>
         {daten && (
           <>

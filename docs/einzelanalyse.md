@@ -1,6 +1,16 @@
-# Erweiterung E: Monatsabschluss und Einzelanalyse
+# Erweiterung E: Monatsabschluss und Einzelanalyse (ab Version 1.3 mit Sammellauf und Gesamtauswertung)
 
 **Ziel:** Einen Monat abschließen und für jede Person eine KI-Analyse als Gesprächsgrundlage erzeugen. **Alle Zahlen kommen aus SQL, die KI formuliert nur den Text.**
+
+## Wer darf (Version 1.3)
+
+**Zurzeit nur der Admin.** Der Schalter `salons.ki_nur_admin` (Standard an) regelt das für alle KI-Funktionen: Verantwortliche bekommen `42501` „Nur für Admins.“, Mitarbeiter und Anmeldungen ohne Rolle weiter „Nur für Verantwortliche und Admins.“. Der Monatsabschluss selbst und das PDF mit **freigegebenen** Analysen bleiben für Verantwortliche. In der Übersicht (`abschluss_uebersicht`) steht `ki` (darf die aufrufende Person die KI nutzen?); ohne KI-Recht zeigt die Seite einen Hinweis und keine Analysen.
+
+Später für Verantwortliche öffnen (je Salon, ohne neue Version):
+
+```sql
+update public.salons set ki_nur_admin = false where id = '<Salon-ID>';
+```
 
 ## Ablauf
 
@@ -21,35 +31,43 @@ Jede Zahl im Text und in der strukturierten Ausgabe muss in der Eingabe vorkomme
 
 `analyse_speichern` und `analyse_bearbeiten` ermitteln `geprueft` **selbst**; die Edge Function kann es nicht fälschen. **Bekannte Grenze:** Eine erfundene Zahl, die zufällig einer Zahl der Eingabe gleicht (etwa einer Verhaltensnummer), fällt nicht auf. Deshalb liest die Leitung jeden Entwurf.
 
-## Datenbank (`20261105104052_monatsabschluss_analysen.sql`)
+## Sammellauf und Gesamtauswertung (Version 1.3)
 
-Tabellen `monatsabschluesse`, `analysen` (Typ `person`, auch `team_agenda` für die Agenda; eine Zeile je Salon, Monat, Typ, Person), beide gesperrt. Öffentliche Funktionen: `monat_abschliessen`, `abschluss_uebersicht`, `analyse_eingabe`, `analyse_pruefen`, `analyse_speichern`, `analyse_lesen`, `analyse_bearbeiten`, `analyse_freigeben`. Interne Hilfen (nicht aufrufbar): `analyse_zugriff`, `analyse_anonymisieren`, `analyse_zahlen`, `analyse_json_zahlen`, `analyse_faktencheck`, `analyse_eingabe_bauen`, `analyse_zeile`.
+**Sammellauf** („Alle fehlenden erstellen“): Die Oberfläche ruft die Edge Function mit `aufgabe: "alle"` auf. Sie bearbeitet je Aufruf die nächsten **3 Personen** ohne Analyse (`PAKET_GROESSE`), schickt sie **in einer Anfrage** an die KI und speichert jede Analyse einzeln (mit eigenem Faktencheck und eigenen Wiederholungen, nur für die betroffene Person). Die Antwort nennt `erstellt`, `fehlgeschlagen` (mit Grund) und `verbleibend`; die Oberfläche ruft erneut auf, bis nichts mehr fehlt, und nimmt gescheiterte Personen aus (`ausgenommen`).
+
+**Gesamtauswertung** (`aufgabe: "gesamt"`): ein KI-Text für das **ganze Team** mit `gesamt_eingabe`, `gesamt_pruefen`, `gesamt_speichern`, `gesamt_lesen`, `gesamt_bearbeiten`, `gesamt_freigeben` (gleicher Ablauf wie bei der Einzelanalyse, Typ `team_gesamt` in `analysen`). Die Eingabe enthält nur **Teamwerte**: Kennzahlen und Vormonat, je Verhalten Selbst-/Fremdbild, Stärken und Entwicklungsfelder, die größten Differenzen und Veränderungen, die Fokus-Verhalten des Monats (nur Nummer und Titel) und die **Zahl** der Kommentare (`kommentare.fremdbild_bewertungen`, `davon_mit_kommentar`). Keine Namen, keine Einzelpersonen, keine Kommentartexte, keine Begründungen. Prompt: `SYSTEM_PROMPT_GESAMT`, Version `gesamt-v1`. Die Gesamtauswertung erscheint noch in keinem PDF.
+
+## Datenbank (`20261105104052_monatsabschluss_analysen.sql`, erweitert durch `…_ki_admin_gesamtauswertung.sql`)
+
+Tabellen `monatsabschluesse`, `analysen` (Typ `person`, `team_agenda` für die Agenda und `team_gesamt` für die Gesamtauswertung; eine Zeile je Salon, Monat, Typ, Person), beide gesperrt. Öffentliche Funktionen: `monat_abschliessen`, `abschluss_uebersicht`, `analyse_eingabe`, `analyse_pruefen`, `analyse_speichern`, `analyse_lesen`, `analyse_bearbeiten`, `analyse_freigeben` und die sechs `gesamt_*`-Funktionen. Interne Hilfen (nicht aufrufbar): `analyse_zugriff`, `analyse_anonymisieren`, `analyse_zahlen`, `analyse_json_zahlen`, `analyse_faktencheck`, `analyse_eingabe_bauen`, `analyse_zeile`.
 
 Eine Analyse gilt als **„Daten geändert“** (veraltet), wenn sich die Eingabe seit dem Erstellen geändert hat (neuer Hash).
 
 ## Edge Function `analyse-erstellen` (`verify_jwt` AN, kein `service_role`)
 
-Eingabe holen → gleiche Eingabe **und** Prompt-Version wie gespeichert = **kein neuer KI-Aufruf** → Anbieter formuliert (JSON) → Faktencheck über `analyse_pruefen` → bei Abweichung bis zu zwei Wiederholungen (**höchstens 3 Aufrufe**) → Entwurf speichern (auch mit nicht bestandenem Faktencheck, mit Hinweis). Fehler kommen als deutsche Meldung.
+Eingabe holen → gleiche Eingabe **und** Prompt-Version wie gespeichert = **kein neuer KI-Aufruf** → Anbieter formuliert (JSON) → Faktencheck über `analyse_pruefen` → bei Abweichung bis zu zwei Wiederholungen (**höchstens 3 Aufrufe** je Analyse, in Runden: nur wer noch offen ist, kommt in die nächste) → Entwurf speichern (auch mit nicht bestandenem Faktencheck, mit Hinweis). Fehler kommen als deutsche Meldung.
 
 | Secret | Bedeutung |
 |---|---|
 | `AI_PROVIDER` | `claude` oder `webhook` |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | bei `claude` (Modell optional) |
-| `AI_WEBHOOK_URL`, `AI_WEBHOOK_SECRET` | bei `webhook` (https; Secret optional, kommt als `Authorization: Bearer` und `x-webhook-secret`) |
+| `AI_WEBHOOK_URL`, `AI_WEBHOOK_SECRET` | bei `webhook`: die Production URL des n8n-Webhooks (https; Secret optional, kommt als `Authorization: Bearer` und `x-webhook-secret`) |
 
 Ohne Einrichtung meldet die Seite „Die KI ist noch nicht eingerichtet.“; alles andere läuft. Der Prompt liegt versioniert im Repo (`PROMPT_VERSION` in `analyse.ts`). Wer ihn ändert, erhöht die Version; dann gilt die Eingabe als neu. Die Branche („Friseursalon“) steht im ersten Satz von `SYSTEM_PROMPT`.
 
-**Webhook-Format:** POST mit `{ prompt_version, system, nachricht, eingabe }`; Antwort ein JSON-Objekt mit den sechs Schlüsseln (`zusammenfassung`, `staerken`, `entwicklungsfelder`, `gespraechsfragen`, `vereinbarungen_vorschlaege`, `kommentar_qualitaet_hinweis`), direkt oder unter `ausgabe`, `output`, `text` oder `antwort`.
+**Ein Webhook für alles:** Mit `AI_PROVIDER=webhook` geht jede KI-Anfrage an den **einen** Webhook. Anfrage: `{ aufgabe, prompt_version, auftraege: [{ ref, system, nachricht, eingabe }] }` mit `aufgabe` = `einzelanalyse` (auch für den Sammellauf mit mehreren Aufträgen) oder `gesamtauswertung`. Antwort **direkt als Antwort des Webhooks**: `{ ergebnisse: [{ ref, code, ausgabe | fehler }] }`, die `ausgabe` ein JSON-Objekt mit den Schlüsseln des jeweiligen Prompts (Einzelanalyse: `zusammenfassung`, `staerken`, `entwicklungsfelder`, `gespraechsfragen`, `vereinbarungen_vorschlaege`, `kommentar_qualitaet_hinweis`; Gesamtauswertung: dieselben, statt des letzten `datenlage_hinweis`). `ref` ist eine laufende Nummer, nie eine Kennung aus der Datenbank. n8n schreibt nichts in die Datenbank: Die Edge Function lässt jede Antwort von der Datenbank prüfen und speichern.
 
-**Fertiger n8n-Workflow:** `n8n/dawiid-analyse.workflow.json` (Import, Einrichtung, drei Testanfragen und Anleitung zum Einzeltest in [n8n/README.md](../n8n/README.md)). Er ruft Claude auf, liest das JSON und zeigt schon beim Testen, welche Zahlen nicht in den Daten stehen.
+**Fertiger n8n-Workflow:** `n8n/dawiid-ki.workflow.json` mit einem Webhook, einem Strang je Aufgabe und je einem KI-Agenten (Anthropic) mit Kontext (Import, Einrichtung, Testanfragen und Anleitung zum Einzeltest in [n8n/README.md](../n8n/README.md)).
+
+**Zeit:** höchstens 135 Sekunden je Anfrage und 120 Sekunden je Aufruf des Anbieters (Supabase bricht nach 150 Sekunden ab). Deshalb höchstens 3 Personen je Sammellauf-Aufruf.
 
 ## Datenschutz
 
-Feedbacktexte gehen **ohne Namen und ohne Absender** an den KI-Anbieter. Der Hinweis steht auf „Monatsabschluss“ und auf „Info und Datenschutz“. Mitarbeiter bekommen keine Analysen (`42501`). Ist `eigene_analyse_nur_admin` an, sehen Verantwortliche ihre eigene Analyse nicht.
+Feedbacktexte gehen **ohne Namen und ohne Absender** an den KI-Anbieter, bei der Gesamtauswertung nur Teamwerte und die Zahl der Kommentare. Bei `AI_PROVIDER=webhook` läuft das über n8n (eine zusätzliche Station). Der Hinweis steht auf „Monatsabschluss“ und auf „Info und Datenschutz“. Mitarbeiter bekommen keine Analysen (`42501`). Ist `eigene_analyse_nur_admin` an, sehen Verantwortliche ihre eigene Analyse nicht (für Verantwortliche gilt das nur, wenn `ki_nur_admin` aus ist).
 
 ## Tests
 
-pgTAP `07_monatsabschluss_analysen.test.sql` (151: Rechte, Abschluss, Eingabe ohne Namen über alle Namensteile, Faktencheck, Entwurf/Freigabe, Salon-Grenze, Schalter), Logik der Edge Function `supabase/functions/analyse-erstellen/analyse.test.ts` (23, `npm run test:functions`), Browser `phase-e.test.mjs` (53).
+pgTAP `07_monatsabschluss_analysen.test.sql` (151: Rechte, Abschluss, Eingabe ohne Namen über alle Namensteile, Faktencheck, Entwurf/Freigabe, Salon-Grenze, Schalter; mit `ki_nur_admin` aus), `09_ki_admin_gesamt.test.sql` (118: Standard nur Admin, Gesamtauswertung, Schalter, Salon-Grenze), Logik der Edge Function `supabase/functions/analyse-erstellen/analyse.test.ts` (50, `npm run test:functions`), n8n-Workflow `n8n/workflow.test.mjs` (22, `npm run test:n8n`), Browser `phase-e.test.mjs` (85).
 
 ## Nicht live getestet
 

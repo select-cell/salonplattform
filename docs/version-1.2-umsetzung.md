@@ -37,7 +37,7 @@ Die Reihenfolge war A, B, D, C, E, F (D vor C, damit der Monatsbericht die Komme
 1. **Neue Oberfläche veröffentlichen.** `npm run build` mit der echten `.env` (oder die gebaute ZIP-Datei), `dist` auf Netlify hochladen. Auf den ersten Blick prüfen: Anmeldung, Umfrage ausfüllen (am Ende steht die eigene aktive Zeit).
 2. **Alte Abgabe-Funktion sperren:** `supabase/nach_dem_deploy.sql` im SQL-Editor ausführen. Erst wenn die neue Oberfläche online ist und eine Abgabe geklappt hat, sonst bricht die noch laufende alte Oberfläche beim Abgeben ab.
 3. **E-Mail-Vorlagen** aus `supabase/email-vorlagen/` im Supabase-Dashboard einfügen (Magic Link und Einladung), damit die Mails „DAWIID“ sagen.
-4. **KI einrichten** (für die Einzelanalyse), Supabase → Edge Functions → Secrets: `AI_PROVIDER` (`claude` oder `webhook`) und bei `claude` `ANTHROPIC_API_KEY` (optional `ANTHROPIC_MODEL`), bei `webhook` `AI_WEBHOOK_URL` und `AI_WEBHOOK_SECRET`. Für `webhook` liegt ein fertiger n8n-Workflow in `n8n/` (Anleitung: [n8n/README.md](../n8n/README.md)). Ohne diese Secrets läuft alles andere trotzdem.
+4. **KI einrichten** (für Einzelanalyse, Sammellauf und Gesamtauswertung; zurzeit nur für den Admin, Version 1.3), Supabase → Edge Functions → Secrets: `AI_PROVIDER` (`claude` oder `webhook`) und bei `claude` `ANTHROPIC_API_KEY` (optional `ANTHROPIC_MODEL`), bei `webhook` `AI_WEBHOOK_URL` und `AI_WEBHOOK_SECRET`. Für `webhook` liegt ein fertiger n8n-Workflow in `n8n/` (ein Webhook, ein Strang je Aufgabe, je ein KI-Agent; Anleitung: [n8n/README.md](../n8n/README.md)). Ohne diese Secrets läuft alles andere trotzdem.
 5. **Mailversand einrichten** (für Agenda und Erinnerung):
    - Bei Resend ein Konto anlegen, die Absender-Domain bestätigen, einen API-Schlüssel erzeugen.
    - Secrets setzen: `RESEND_API_KEY`, `MAIL_ABSENDER` (zum Beispiel `Salon <agenda@deine-domain.de>`), `PLATTFORM_URL` (Adresse der Plattform), `CRON_SECRET` (selbst ausgedacht, mindestens 24 Zeichen).
@@ -51,9 +51,9 @@ Die Reihenfolge war A, B, D, C, E, F (D vor C, damit der Monatsbericht die Komme
 
 **Mitarbeiter:** kein Menüpunkt „Leitung“; `/app/leitung/fokus`, `/agenda`, `/termine` leiten auf `/app` um. Umfrage abgeben: am Ende steht die eigene aktive Zeit, keine Kennzahlen anderer. „Info und Datenschutz“ zeigt die Absätze zu Kommentaren, Ausfüllzeit, PDF, KI, Agenda und Mails.
 
-**Verantwortlicher:** Team-Dashboard mit Abschnitt „Ausfüllzeit“; „Monatsbericht als PDF“ lädt ein PDF. Leitung → Kommentare: Kennzahlen, keine Texte. Leitung → Monatsabschluss: Monat abschließen; „Erstellen“ liefert einen Entwurf oder (ohne KI) „Die KI ist noch nicht eingerichtet.“. Leitung → Fokus: ein Verhalten zum Fokus machen. Leitung → Agenda: erzeugen, bearbeiten, freigeben; das nächste Monatsbericht-PDF enthält sie. Kein Menüpunkt „Termine“.
+**Verantwortlicher:** Team-Dashboard mit Abschnitt „Ausfüllzeit“; „Monatsbericht als PDF“ lädt ein PDF. Leitung → Kommentare: Kennzahlen, keine Texte. Leitung → Monatsabschluss: Monat abschließen; der Abschnitt „Analysen“ fehlt, stattdessen steht dort „Die KI-Analysen sind zurzeit nur für Admins.“ (seit Version 1.3). Leitung → Fokus: ein Verhalten zum Fokus machen. Leitung → Agenda: erzeugen, bearbeiten, freigeben; das nächste Monatsbericht-PDF enthält sie. Kein Menüpunkt „Termine“.
 
-**Admin:** Leitung → Termine: Termin und Serie anlegen, ändern, pausieren, entfernen. „Info und Datenschutz“: Export-Protokoll. Versand-Probelauf wie oben.
+**Admin:** Leitung → Monatsabschluss: Einzelanalysen („Erstellen“ liefert einen Entwurf oder ohne KI „Die KI ist noch nicht eingerichtet.“), „Alle fehlenden erstellen“ (Sammellauf) und die Gesamtauswertung des Teams. Leitung → Termine: Termin und Serie anlegen, ändern, pausieren, entfernen. „Info und Datenschutz“: Export-Protokoll. Versand-Probelauf wie oben.
 
 ## Hinweise und offene Punkte
 

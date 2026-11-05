@@ -20,6 +20,10 @@ insert into public.salons (id, name, start_monat, erstellt_am, schwelle_ausgewog
   ('cccccccc-0000-0000-0000-00000000000c', 'Analysesalon P', '2026-08-01', '2020-01-01', 0.3, 2.5, 3.5),
   ('dddddddd-0000-0000-0000-00000000000d', 'Analysesalon Q', '2026-08-01', '2020-02-01', 0.3, 2.5, 3.5);
 
+-- Seit Version 1.3 dürfen standardmäßig nur Admins die KI nutzen (salons.ki_nur_admin, Standard an). Dieser Test prüft
+-- die Logik der Analysen mit eingeschaltetem Zugriff für Verantwortliche; der Standard steht in 09_ki_admin_gesamt.test.sql.
+update public.salons set ki_nur_admin = false;
+
 insert into public.personen (id, salon_id, name, email, rolle, nimmt_an_teamumfrage, aktiv) values
   ('11111111-0000-0000-0000-00000000000a', 'cccccccc-0000-0000-0000-00000000000c', 'Anna Berger',           'anna@test.example',   'mitarbeiter',      true,  true),
   ('11111111-0000-0000-0000-00000000000b', 'cccccccc-0000-0000-0000-00000000000c', 'Berta Hollmann-Kranz',  'berta@test.example',  'mitarbeiter',      true,  true),

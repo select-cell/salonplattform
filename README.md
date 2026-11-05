@@ -22,6 +22,7 @@ Die vollständige Bauanleitung steht in [`docs/plattform-architektur.md`](docs/p
 | 1.2 D | Kommentar-Auswertung ([`docs/kommentar-auswertung.md`](docs/kommentar-auswertung.md)) | **fertig, in Supabase installiert** |
 | 1.2 E | Monatsabschluss und KI-Einzelanalyse mit Faktencheck ([`docs/einzelanalyse.md`](docs/einzelanalyse.md)) | **fertig, in Supabase installiert**; die KI braucht noch Secrets |
 | 1.2 F | Fokus, Agenda, Termine, Mailversand ([`docs/agenda-termine.md`](docs/agenda-termine.md)) | **fertig, in Supabase installiert**; der Versand braucht noch Secrets, Resend und den Zeitplan |
+| 1.3 | KI nur für den Admin, Sammellauf, Gesamtauswertung des Teams, ein n8n-Webhook für alle KI-Aufgaben ([`docs/einzelanalyse.md`](docs/einzelanalyse.md), [`n8n/README.md`](n8n/README.md)) | **fertig**; der n8n-Workflow braucht noch Import, Zugangsdaten und Secrets |
 
 Was bei Version 1.2 noch zu tun ist (Secrets, Versand, Deploy-Reihenfolge), steht in [`docs/version-1.2-umsetzung.md`](docs/version-1.2-umsetzung.md).
 
@@ -49,7 +50,7 @@ src/                  React-App (pages, components, auth, lib, styles)
   lib/umfrage.ts      Ablauf, Prüfungen und Payload der Umfrage (ohne Oberfläche)
 supabase/
   migrations/         SQL-Migrationen, werden von der GitHub-Integration angewendet
-  functions/          Edge Functions: analyse-erstellen (KI), agenda-versand (Mails), je mit Tests
+  functions/          Edge Functions: analyse-erstellen (KI: Einzelanalyse, Sammellauf, Gesamtauswertung), agenda-versand (Mails), je mit Tests
   tests/database/     pgTAP-Tests (supabase test db)
   tests/lokal/        dieselben Tests gegen ein lokales Postgres (npm run test:db)
   versand_einrichten.sql   Zeitplan für die Mails (von Hand, enthält ein Geheimnis)
@@ -57,6 +58,7 @@ supabase/
   email-vorlagen/     Magic-Link- und Einladungs-Mail auf Deutsch
   config.toml         Supabase-CLI
 tests/browser/        Playwright-Tests je Erweiterung (npm run test:browser)
+n8n/                  n8n-Workflow für die KI (ein Webhook, Stränge je Aufgabe), Testanfragen und Tests
 docs/                 Architektur, Version 1.2 und je ein Dokument je Erweiterung
 public/_redirects     SPA-Routing für Netlify
 netlify.toml          Build-Einstellungen und Sicherheits-Header
@@ -103,6 +105,7 @@ Alle Migrationen aus `supabase/migrations/` sind im Projekt `hgtvlcucxzksvmvgvbg
 | `…_pdf_export` | Version 1.2 C: `pdf_monatsbericht`, `pdf_personenbericht`, Export-Protokoll |
 | `…_monatsabschluss_analysen` | Version 1.2 E: Abschluss, Analysen, Faktencheck, Namen aus der KI-Eingabe entfernen |
 | `…_fokus_agenda_termine` | Version 1.2 F: Fokus, Agenda, Termine, Versandfunktionen (nur `service_role`) |
+| `…_ki_admin_gesamtauswertung` | Version 1.3: Schalter `ki_nur_admin` (KI nur für Admins), Gesamtauswertung des Teams (`gesamt_*`), `abschluss_uebersicht` mit `ki` und `gesamt` |
 
 Die Dateinamen entsprechen den verbuchten Versionen. Das ist wichtig: Die GitHub-Integration (Supabase → **Project Settings → Integrations → GitHub**, Supabase directory `supabase`, **Deploy to production**) vergleicht Versionen und führt nur neue Dateien aus. Würden Datei und Datenbank abweichen, liefe dieselbe Migration ein zweites Mal und scheiterte an „already exists“.
 
@@ -214,11 +217,11 @@ Die Rechte stecken in Row Level Security und Datenbank-Funktionen. Die Routen-Sp
 
 | Was | Befehl | Umfang |
 |---|---|---|
-| Datenbank (pgTAP) | `supabase start && supabase test db`, lokal ohne Docker `npm run test:db` | 694 Prüfungen: Rechte, Verknüpfung, Umfrage, Auswertungen, Zeiterfassung, Kommentare, PDF, Analyse (Namen aus der Eingabe, Faktencheck), Agenda, Termine, Versand über die Zeitumstellung |
-| Edge Functions | `npm run test:functions` | 46 Tests der Logik (KI-Ablauf, Versand), Datenbank und Anbieter sind nachgebaut |
+| Datenbank (pgTAP) | `supabase start && supabase test db`, lokal ohne Docker `npm run test:db` | 812 Prüfungen: Rechte, Verknüpfung, Umfrage, Auswertungen, Zeiterfassung, Kommentare, PDF, Analyse (Namen aus der Eingabe, Faktencheck), Agenda, Termine, Versand über die Zeitumstellung, KI nur für Admins, Gesamtauswertung |
+| Edge Functions | `npm run test:functions` | 73 Tests der Logik (KI-Ablauf mit Sammellauf und Gesamtauswertung, Webhook-Protokoll, Versand), Datenbank und Anbieter sind nachgebaut |
 | Hilfen im Frontend | `npm run test:unit` | 5 Tests (Zahlenlisten, Zeitbudget, Mail-Zustände) |
-| n8n-Workflow | `npm run test:n8n` | 17 Tests (Aufbau, Code-Knoten, Zusammenspiel mit der Edge Function) |
-| Browser (Playwright) | `npm run test:browser` | 280 Prüfungen je Erweiterung, auch mit echt erzeugten PDFs (poppler: A4, Schriften eingebettet, Fußzeile) |
+| n8n-Workflow | `npm run test:n8n` | 22 Tests (Aufbau mit Strängen, Code-Knoten, ganzer Durchlauf mit nachgebautem Agenten, Zusammenspiel mit der Edge Function) |
+| Browser (Playwright) | `npm run test:browser` | 312 Prüfungen je Erweiterung, auch mit echt erzeugten PDFs (poppler: A4, Schriften eingebettet, Fußzeile) |
 | Typen | `npm run typecheck` | |
 
 Das Supabase-Werkzeug im Browser-Test wird nachgebaut (es spricht nie mit der echten Datenbank). **Nicht live getestet**, weil dafür Schlüssel oder Netzzugang fehlten: die echte KI, der echte Versand über Resend und der Zeitplan (pg_cron). Das sind die ersten Punkte nach der Einrichtung.

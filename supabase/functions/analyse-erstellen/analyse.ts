@@ -1,15 +1,37 @@
-// Logik der Edge Function `analyse-erstellen` (Erweiterung E): reines TypeScript ohne Deno-Bezug,
+// Logik der Edge Function `analyse-erstellen` (Erweiterung E, Version 1.3): reines TypeScript ohne Deno-Bezug,
 // damit sie sich mit Node testen lässt (analyse.test.ts). index.ts verdrahtet sie nur mit Deno.serve.
+//
+// Aufgaben (Feld `aufgabe` der Anfrage):
+//   person   Einzelanalyse für eine Person (Standard, wie bisher)
+//   alle     Sammellauf: die Einzelanalysen aller Personen eines Monats, die noch keine haben (in Paketen)
+//   gesamt   Gesamtauswertung des Teams
 //
 // Alle Zahlen kommen aus SQL, die KI formuliert nur den Text. Die Datenbank baut die Eingabe (ohne Namen),
 // prüft jede Zahl im Text gegen die Eingabe (Faktencheck) und ermittelt „geprueft“ selbst. Diese Function
-// hat keinen service_role-Schlüssel: Sie ruft die Funktionen im Namen der angemeldeten Leitung auf.
+// hat keinen service_role-Schlüssel: Sie ruft die Funktionen im Namen der angemeldeten Person auf (nur Admin,
+// solange salons.ki_nur_admin an ist; das prüft die Datenbank).
+//
+// Mit AI_PROVIDER=webhook geht alles an EINEN Webhook (n8n). Dort entscheidet das Feld `aufgabe`, welcher Strang
+// die Anfrage bearbeitet; die Antwort geht direkt als Antwort des Webhooks zurück an diese Function, die sie prüfen
+// und speichern lässt.
 
-/** Wer den Prompt ändert, erhöht die Version: dann gilt die Eingabe als neu und die KI wird erneut gefragt. */
+/** Wer einen Prompt ändert, erhöht die Version: dann gilt die Eingabe als neu und die KI wird erneut gefragt. */
 export const PROMPT_VERSION = 'analyse-v1'
+export const PROMPT_VERSION_GESAMT = 'gesamt-v1'
 
 /** Höchstens so viele KI-Aufrufe je Analyse (ein erster Versuch und bis zu zwei Wiederholungen). */
 export const MAX_AUFRUFE = 3
+
+/** Wie viele Personen ein Aufruf des Sammellaufs höchstens bearbeitet (die Oberfläche ruft so lange auf, bis alle fertig sind). */
+export const PAKET_GROESSE = 3
+
+/** Gesamtzeit für eine Anfrage. Die Edge Function antwortet spätestens nach 150 Sekunden, sonst bricht Supabase ab. */
+export const ZEITBUDGET_MS = 135_000
+const MIN_RUNDE_MS = 20_000
+const MAX_KI_ZEIT_MS = 120_000
+
+export const AUFGABE_EINZEL = 'einzelanalyse'
+export const AUFGABE_GESAMT = 'gesamtauswertung'
 
 // Branche: Friseursalon. Für einen anderen Salontyp den ersten Satz anpassen und PROMPT_VERSION erhöhen.
 export const SYSTEM_PROMPT = `Du unterstützt die Leitung eines Friseursalons bei Mitarbeitergesprächen. Du bekommst die Auswertung einer Feedback-Umfrage (Selbstbild und Fremdbild, Noten von 1 bis 5) für eine Person. Alle Namen sind entfernt: Die bewertete Person heißt „die bewertete Person“, andere heißen „Kollege A“, „Kollege B“ und so weiter.
@@ -34,6 +56,28 @@ Antworte ausschließlich mit einem JSON-Objekt, ohne weiteren Text und ohne Code
   "kommentar_qualitaet_hinweis": "ein Satz, falls Kommentare auffallend kurz oder unspezifisch sind, sonst null"
 }`
 
+export const SYSTEM_PROMPT_GESAMT = `Du unterstützt die Leitung eines Friseursalons bei der Vorbereitung eines Teamgesprächs. Du bekommst die Auswertung einer Feedback-Umfrage (Selbstbild und Fremdbild, Noten von 1 bis 5) für das gesamte Team in einem Monat. Es gibt nur Teamwerte: keine Namen, keine Einzelpersonen und keine Kommentartexte.
+
+Formuliere daraus eine sachliche, wertschätzende Auswertung für die Leitung auf Deutsch.
+
+Regeln:
+- Verwende ausschließlich Zahlen, die in den Daten stehen (Noten, Differenzen, Veränderungen, Anzahlen, Monat und Jahr). Rechne nichts selbst nach, runde nicht anders und erfinde keine Prozentwerte. Schreibe Zahlen im deutschen Format mit Komma, so wie in den Daten.
+- Sprich vom „Team“. Leite nichts über einzelne Personen ab, auch nicht aus der Beteiligung oder aus der Zahl der Kommentare.
+- Beschreibe Verhalten mit der Nummer und dem Titel aus den Daten.
+- Fehlen Daten (zum Beispiel kein Vormonat oder eine geringe Beteiligung), sage das offen.
+- Keine Aussagen zu Gehalt, Kündigung, Gesundheit oder Recht.
+- Schreibe kurz und konkret. Die Leitung liest den Entwurf, bearbeitet ihn und gibt ihn frei.
+
+Antworte ausschließlich mit einem JSON-Objekt, ohne weiteren Text und ohne Code-Block, mit genau diesen Schlüsseln:
+{
+  "zusammenfassung": "2 bis 4 Sätze",
+  "staerken": ["2 bis 4 Punkte"],
+  "entwicklungsfelder": ["2 bis 4 Punkte"],
+  "gespraechsfragen": ["3 bis 4 offene Fragen für das Teamgespräch"],
+  "vereinbarungen_vorschlaege": ["2 bis 3 konkrete Vorschläge"],
+  "datenlage_hinweis": "ein Satz, falls die Datenlage dünn ist (geringe Beteiligung, kein Vormonat, kaum Kommentare), sonst null"
+}`
+
 export interface Ausgabe {
   zusammenfassung: string
   staerken: string[]
@@ -41,6 +85,15 @@ export interface Ausgabe {
   gespraechsfragen: string[]
   vereinbarungen_vorschlaege: string[]
   kommentar_qualitaet_hinweis: string | null
+}
+
+export interface GesamtAusgabe {
+  zusammenfassung: string
+  staerken: string[]
+  entwicklungsfelder: string[]
+  gespraechsfragen: string[]
+  vereinbarungen_vorschlaege: string[]
+  datenlage_hinweis: string | null
 }
 
 export class AnalyseFehler extends Error {
@@ -88,26 +141,39 @@ function liste(wert: unknown, name: string): string[] {
   return punkte
 }
 
-/** Liest die Antwort der KI (Text oder Objekt) und prüft die Form. Wirft bei Abweichung. */
-export function parseAusgabe(roh: unknown): Ausgabe {
+/** Gemeinsamer Kern beider Ausgaben: fünf Teile und ein Hinweis unter dem angegebenen Schlüssel. */
+function leseAusgabe(roh: unknown, hinweisSchluessel: string) {
   const o = typeof roh === 'string' ? ersteJsonStelle(roh) : roh
   if (!o || typeof o !== 'object' || Array.isArray(o)) throw new Error('keine Objekt-Antwort')
   const r = o as Record<string, unknown>
   if (typeof r.zusammenfassung !== 'string' || !kurz(r.zusammenfassung)) throw new Error('zusammenfassung fehlt')
-  const hinweis = typeof r.kommentar_qualitaet_hinweis === 'string' ? kurz(r.kommentar_qualitaet_hinweis) : ''
+  const hinweis = typeof r[hinweisSchluessel] === 'string' ? kurz(r[hinweisSchluessel] as string) : ''
   return {
     zusammenfassung: kurz(r.zusammenfassung),
     staerken: liste(r.staerken, 'staerken'),
     entwicklungsfelder: liste(r.entwicklungsfelder, 'entwicklungsfelder'),
     gespraechsfragen: liste(r.gespraechsfragen, 'gespraechsfragen'),
     vereinbarungen_vorschlaege: liste(r.vereinbarungen_vorschlaege, 'vereinbarungen_vorschlaege'),
-    kommentar_qualitaet_hinweis: hinweis && hinweis.toLowerCase() !== 'null' ? hinweis : null,
+    hinweis: hinweis && hinweis.toLowerCase() !== 'null' ? hinweis : null,
   }
 }
 
+/** Liest die Antwort der KI (Text oder Objekt) und prüft die Form. Wirft bei Abweichung. */
+export function parseAusgabe(roh: unknown): Ausgabe {
+  const { hinweis, ...kern } = leseAusgabe(roh, 'kommentar_qualitaet_hinweis')
+  return { ...kern, kommentar_qualitaet_hinweis: hinweis }
+}
+
+/** Wie parseAusgabe, für die Gesamtauswertung (Hinweis zur Datenlage). */
+export function parseGesamtAusgabe(roh: unknown): GesamtAusgabe {
+  const { hinweis, ...kern } = leseAusgabe(roh, 'datenlage_hinweis')
+  return { ...kern, datenlage_hinweis: hinweis }
+}
+
+const punkte = (l: string[]) => l.map((p) => `- ${p}`).join('\n')
+
 /** Der Text, den die Leitung liest, bearbeitet und freigibt (Markdown, nur Überschriften und Aufzählungen). */
 export function textAusAusgabe(a: Ausgabe): string {
-  const punkte = (l: string[]) => l.map((p) => `- ${p}`).join('\n')
   const teile = [
     `## Zusammenfassung\n${a.zusammenfassung}`,
     `## Stärken\n${punkte(a.staerken)}`,
@@ -116,6 +182,18 @@ export function textAusAusgabe(a: Ausgabe): string {
     `## Vorschläge für Vereinbarungen\n${punkte(a.vereinbarungen_vorschlaege)}`,
   ]
   if (a.kommentar_qualitaet_hinweis) teile.push(`## Hinweis zu den Kommentaren\n${a.kommentar_qualitaet_hinweis}`)
+  return teile.join('\n\n')
+}
+
+export function textAusGesamt(a: GesamtAusgabe): string {
+  const teile = [
+    `## Zusammenfassung\n${a.zusammenfassung}`,
+    `## Stärken des Teams\n${punkte(a.staerken)}`,
+    `## Entwicklungsfelder des Teams\n${punkte(a.entwicklungsfelder)}`,
+    `## Fragen für das Teamgespräch\n${punkte(a.gespraechsfragen)}`,
+    `## Vorschläge für Vereinbarungen\n${punkte(a.vereinbarungen_vorschlaege)}`,
+  ]
+  if (a.datenlage_hinweis) teile.push(`## Hinweis zur Datenlage\n${a.datenlage_hinweis}`)
   return teile.join('\n\n')
 }
 
@@ -158,10 +236,10 @@ type FetchFn = (url: string, init?: RequestInit) => Promise<Response>
 
 const KEINE_ANTWORT = 'Die KI hat nicht geantwortet. Bitte später erneut versuchen.'
 
-async function anfrage(fetchFn: FetchFn, url: string, init: RequestInit): Promise<Response> {
+async function anfrage(fetchFn: FetchFn, url: string, init: RequestInit, timeoutMs = 90_000): Promise<Response> {
   let antwort: Response
   try {
-    antwort = await fetchFn(url, { ...init, signal: AbortSignal.timeout(90_000) })
+    antwort = await fetchFn(url, { ...init, signal: AbortSignal.timeout(timeoutMs) })
   } catch {
     throw new AnalyseFehler(KEINE_ANTWORT, 502)
   }
@@ -175,23 +253,73 @@ async function anfrage(fetchFn: FetchFn, url: string, init: RequestInit): Promis
   return antwort
 }
 
-/** Ein KI-Aufruf. Liefert die rohe Antwort (Text oder Objekt); parseAusgabe prüft sie. */
-export async function rufeAnbieter(config: AnbieterConfig, nachricht: string, eingabe: unknown, fetchFn: FetchFn): Promise<unknown> {
+/** Ein Auftrag an die KI. `ref` ordnet die Antwort zu; es ist nie eine Kennung aus der Datenbank. */
+export interface Auftrag {
+  ref: string
+  system: string
+  nachricht: string
+  eingabe: unknown
+}
+
+export type KiAntwort = { roh: unknown } | { fehler: AnalyseFehler }
+
+export interface AnbieterOptionen {
+  /** Standard: der Prompt der Einzelanalyse */
+  system?: string
+  promptVersion?: string
+  /** Welcher Strang im Webhook die Anfrage bearbeitet. Standard: einzelanalyse */
+  aufgabe?: string
+  timeoutMs?: number
+}
+
+async function rufeClaude(config: AnbieterConfig, a: Auftrag, fetchFn: FetchFn, timeoutMs: number): Promise<unknown> {
+  const antwort = await anfrage(fetchFn, 'https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-api-key': config.schluessel ?? '', 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: config.modell,
+      max_tokens: 2000,
+      system: a.system,
+      messages: [{ role: 'user', content: a.nachricht }],
+    }),
+  }, timeoutMs)
+  const daten = (await antwort.json().catch(() => null)) as { content?: { type?: string; text?: string }[] } | null
+  const text = (daten?.content ?? []).filter((b) => b.type === 'text' && typeof b.text === 'string').map((b) => b.text).join('')
+  if (!text) throw new AnalyseFehler(KEINE_ANTWORT, 502)
+  return text
+}
+
+const WEBHOOK_FELDER = ['ausgabe', 'output', 'text', 'antwort']
+
+function ausgabeAusFeldern(daten: Record<string, unknown>): unknown {
+  for (const feld of WEBHOOK_FELDER) {
+    if (daten[feld] !== undefined && daten[feld] !== null) return daten[feld]
+  }
+  return undefined
+}
+
+/**
+ * Mehrere Aufträge einer Aufgabe. Claude direkt: ein Aufruf je Auftrag, gleichzeitig. Webhook: EIN Aufruf mit allen Aufträgen,
+ *   Anfrage:  { aufgabe, prompt_version, auftraege: [{ ref, system, nachricht, eingabe }] }
+ *   Antwort:  { ergebnisse: [{ ref, code?, ausgabe | fehler }] }
+ * Fehler des Anbieters für die ganze Anfrage (Zugang, Auslastung, Zeitüberschreitung) werden geworfen, Fehler einzelner
+ * Aufträge kommen als { fehler } zurück.
+ */
+export async function rufeAnbieterBatch(
+  config: AnbieterConfig, aufgabe: string, promptVersion: string, auftraege: Auftrag[], fetchFn: FetchFn, optionen: { timeoutMs?: number } = {},
+): Promise<Record<string, KiAntwort>> {
+  const timeoutMs = optionen.timeoutMs ?? 90_000
+  const ergebnis: Record<string, KiAntwort> = {}
+
   if (config.name === 'claude') {
-    const antwort = await anfrage(fetchFn, 'https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-api-key': config.schluessel ?? '', 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model: config.modell,
-        max_tokens: 2000,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: nachricht }],
-      }),
-    })
-    const daten = (await antwort.json().catch(() => null)) as { content?: { type?: string; text?: string }[] } | null
-    const text = (daten?.content ?? []).filter((b) => b.type === 'text' && typeof b.text === 'string').map((b) => b.text).join('')
-    if (!text) throw new AnalyseFehler(KEINE_ANTWORT, 502)
-    return text
+    await Promise.all(auftraege.map(async (a) => {
+      try {
+        ergebnis[a.ref] = { roh: await rufeClaude(config, a, fetchFn, timeoutMs) }
+      } catch (e) {
+        ergebnis[a.ref] = { fehler: e instanceof AnalyseFehler ? e : new AnalyseFehler(KEINE_ANTWORT, 502) }
+      }
+    }))
+    return ergebnis
   }
 
   const antwort = await anfrage(fetchFn, config.url ?? '', {
@@ -200,15 +328,44 @@ export async function rufeAnbieter(config: AnbieterConfig, nachricht: string, ei
       'content-type': 'application/json',
       ...(config.geheimnis ? { authorization: `Bearer ${config.geheimnis}`, 'x-webhook-secret': config.geheimnis } : {}),
     },
-    body: JSON.stringify({ prompt_version: PROMPT_VERSION, system: SYSTEM_PROMPT, nachricht, eingabe }),
-  })
+    body: JSON.stringify({
+      aufgabe,
+      prompt_version: promptVersion,
+      auftraege: auftraege.map(({ ref, system, nachricht, eingabe }) => ({ ref, system, nachricht, eingabe })),
+    }),
+  }, timeoutMs)
   const daten = (await antwort.json().catch(() => null)) as Record<string, unknown> | null
-  if (!daten) throw new AnalyseFehler(KEINE_ANTWORT, 502)
-  // Der Webhook darf die Ausgabe direkt oder verpackt liefern
-  for (const feld of ['ausgabe', 'output', 'text', 'antwort']) {
-    if (daten[feld] !== undefined && daten[feld] !== null) return daten[feld]
+  if (!daten || typeof daten !== 'object') throw new AnalyseFehler(KEINE_ANTWORT, 502)
+
+  if (Array.isArray(daten.ergebnisse)) {
+    for (const e of daten.ergebnisse as Record<string, unknown>[]) {
+      if (!e || typeof e !== 'object' || typeof e.ref !== 'string') continue
+      const code = typeof e.code === 'number' ? e.code : 200
+      const roh = ausgabeAusFeldern(e)
+      ergebnis[e.ref] = code >= 400 || e.fehler || roh === undefined
+        ? { fehler: new AnalyseFehler(KEINE_ANTWORT, code === 429 ? 503 : 502) }
+        : { roh }
+    }
+  } else if (auftraege.length === 1) {
+    // ältere Webhooks antworten direkt oder verpackt
+    ergebnis[auftraege[0].ref] = { roh: ausgabeAusFeldern(daten) ?? daten }
   }
-  return daten
+  for (const a of auftraege) {
+    ergebnis[a.ref] ??= { fehler: new AnalyseFehler(KEINE_ANTWORT, 502) }
+  }
+  return ergebnis
+}
+
+/** Ein KI-Aufruf. Liefert die rohe Antwort (Text oder Objekt); parseAusgabe prüft sie. */
+export async function rufeAnbieter(
+  config: AnbieterConfig, nachricht: string, eingabe: unknown, fetchFn: FetchFn, optionen: AnbieterOptionen = {},
+): Promise<unknown> {
+  const a: Auftrag = { ref: '1', system: optionen.system ?? SYSTEM_PROMPT, nachricht, eingabe }
+  const r = (await rufeAnbieterBatch(
+    config, optionen.aufgabe ?? AUFGABE_EINZEL, optionen.promptVersion ?? PROMPT_VERSION, [a], fetchFn, { timeoutMs: optionen.timeoutMs },
+  ))['1']
+  if ('fehler' in r) throw r.fehler
+  return r.roh
 }
 
 // ---- Ablauf ---------------------------------------------------------------------------------------------------
@@ -222,7 +379,13 @@ export interface Abhaengigkeiten {
   rpc: (name: string, args: Record<string, unknown>) => Promise<RpcAntwort>
   /** Wirft 503, wenn die KI nicht eingerichtet ist; wird nur gerufen, wenn wirklich ein KI-Aufruf nötig ist. */
   anbieter: () => AnbieterConfig
-  ki: (config: AnbieterConfig, nachricht: string, eingabe: unknown) => Promise<unknown>
+  ki: (config: AnbieterConfig, nachricht: string, eingabe: unknown, optionen?: AnbieterOptionen) => Promise<unknown>
+  /** Mehrere Aufträge auf einmal. Fehlt sie, wird `ki` je Auftrag gerufen. */
+  kiBatch?: (
+    config: AnbieterConfig, aufgabe: string, promptVersion: string, auftraege: Auftrag[], optionen: { timeoutMs: number },
+  ) => Promise<Record<string, KiAntwort>>
+  /** Für Tests: die Uhr */
+  jetzt?: () => number
 }
 
 export interface Ergebnis {
@@ -244,6 +407,152 @@ async function rpcOderFehler(d: Abhaengigkeiten, name: string, args: Record<stri
   return r.data
 }
 
+/** Ein Ziel ist eine Analyse, die entstehen soll: ihre Eingabe, ihr Prompt und wie ihre Ausgabe gelesen und geprüft wird. */
+export interface Ziel {
+  schluessel: string
+  system: string
+  eingabe: unknown
+  parse: (roh: unknown) => { ausgabe: unknown; text: string }
+  pruefen: (text: string, ausgabe: unknown) => Promise<{ geprueft: boolean; abweichungen?: string[] }>
+}
+
+export type ZielErgebnis = { ok: true; text: string; ausgabe: unknown; versuche: number } | { ok: false; fehler: AnalyseFehler }
+
+const KEIN_JSON = 'Deine letzte Antwort war kein gültiges JSON im vorgegebenen Format. Antworte nur mit dem JSON-Objekt und allen Schlüsseln.'
+
+/**
+ * Alle Ziele einer Aufgabe in Runden: Jede Runde schickt die noch offenen Ziele gemeinsam an die KI (bei einem Webhook in
+ * einem Aufruf). Stimmt die Form nicht oder der Faktencheck nicht, kommt das Ziel in die nächste Runde, mit Hinweis.
+ * Höchstens MAX_AUFRUFE Runden und höchstens ZEITBUDGET_MS. Die letzte lesbare Fassung zählt auch ohne bestandenen Faktencheck.
+ * Scheitern in einer Runde alle Aufträge am Anbieter, wird dessen Fehler geworfen.
+ */
+export async function arbeiteZiele(
+  d: Abhaengigkeiten, config: AnbieterConfig, aufgabe: string, promptVersion: string, ziele: Ziel[],
+): Promise<Map<string, ZielErgebnis>> {
+  const jetzt = d.jetzt ?? Date.now
+  const start = jetzt()
+  const kiBatch: NonNullable<Abhaengigkeiten['kiBatch']> =
+    d.kiBatch ??
+    (async (c, a, v, auftraege, o) => {
+      const r: Record<string, KiAntwort> = {}
+      await Promise.all(auftraege.map(async (x) => {
+        try {
+          r[x.ref] = { roh: await d.ki(c, x.nachricht, x.eingabe, { system: x.system, promptVersion: v, aufgabe: a, timeoutMs: o.timeoutMs }) }
+        } catch (e) {
+          r[x.ref] = { fehler: e instanceof AnalyseFehler ? e : new AnalyseFehler(KEINE_ANTWORT, 502) }
+        }
+      }))
+      return r
+    })
+
+  interface Stand {
+    ziel: Ziel
+    ref: string
+    korrektur?: string
+    letzte: { ausgabe: unknown; text: string } | null
+    aufrufe: number
+    fehler: AnalyseFehler | null
+    fertig: boolean
+  }
+  const staende: Stand[] = ziele.map((ziel, i) => ({ ziel, ref: String(i + 1), letzte: null, aufrufe: 0, fehler: null, fertig: false }))
+  let offen = staende.filter((s) => !s.fertig)
+
+  for (let runde = 0; offen.length > 0 && runde < MAX_AUFRUFE; runde++) {
+    const uebrig = ZEITBUDGET_MS - (jetzt() - start)
+    if (runde > 0 && uebrig < MIN_RUNDE_MS) break
+    const timeoutMs = Math.max(10_000, Math.min(MAX_KI_ZEIT_MS, uebrig - 5_000))
+
+    const auftraege: Auftrag[] = offen.map((s) => ({
+      ref: s.ref, system: s.ziel.system, nachricht: baueNachricht(s.ziel.eingabe, s.korrektur), eingabe: s.ziel.eingabe,
+    }))
+    const antworten = await kiBatch(config, aufgabe, promptVersion, auftraege, { timeoutMs })
+
+    const fehlgeschlagen = offen.map((s) => antworten[s.ref]).filter((a): a is { fehler: AnalyseFehler } => !a || 'fehler' in a)
+    if (fehlgeschlagen.length === offen.length) {
+      // Der Anbieter hat in dieser Runde für niemanden geliefert. Gibt es überall schon eine lesbare Fassung, zählt sie.
+      if (offen.every((s) => s.letzte)) break
+      throw fehlgeschlagen[0]?.fehler ?? new AnalyseFehler(KEINE_ANTWORT, 502)
+    }
+
+    const weiter: Stand[] = []
+    for (const s of offen) {
+      s.aufrufe++
+      const a = antworten[s.ref]
+      if (!a || 'fehler' in a) {
+        s.fehler = a?.fehler ?? new AnalyseFehler(KEINE_ANTWORT, 502)
+        weiter.push(s)
+        continue
+      }
+      let gelesen: { ausgabe: unknown; text: string }
+      try {
+        gelesen = s.ziel.parse(a.roh)
+      } catch {
+        s.korrektur = KEIN_JSON
+        weiter.push(s)
+        continue
+      }
+      s.letzte = gelesen
+      s.fehler = null
+      let pruefung: { geprueft: boolean; abweichungen?: string[] }
+      try {
+        pruefung = await s.ziel.pruefen(gelesen.text, gelesen.ausgabe)
+      } catch (e) {
+        s.fehler = e instanceof AnalyseFehler ? e : new AnalyseFehler('Die Analyse konnte nicht erstellt werden.', 500)
+        s.fertig = true
+        s.letzte = null
+        continue
+      }
+      if (pruefung.geprueft) {
+        s.fertig = true
+        continue
+      }
+      s.korrektur = `Deine letzte Antwort enthielt Zahlen, die nicht in den Daten stehen: ${(pruefung.abweichungen ?? []).join(', ')}. Formuliere neu und verwende nur Zahlen aus den Daten.`
+      weiter.push(s)
+    }
+    offen = weiter
+  }
+
+  const ergebnis = new Map<string, ZielErgebnis>()
+  for (const s of staende) {
+    if (s.letzte) ergebnis.set(s.ziel.schluessel, { ok: true, text: s.letzte.text, ausgabe: s.letzte.ausgabe, versuche: s.aufrufe })
+    else {
+      ergebnis.set(s.ziel.schluessel, {
+        ok: false,
+        fehler: s.fehler ?? new AnalyseFehler('Die KI hat keine verwertbare Antwort geliefert. Bitte später erneut versuchen.', 502),
+      })
+    }
+  }
+  return ergebnis
+}
+
+// ---- Einzelanalyse (eine Person) --------------------------------------------------------------------------------
+
+function personZiel(d: Abhaengigkeiten, basis: Record<string, unknown>, schluessel: string, eingabe: unknown): Ziel {
+  return {
+    schluessel,
+    system: SYSTEM_PROMPT,
+    eingabe,
+    parse: (roh) => {
+      const a = parseAusgabe(roh)
+      return { ausgabe: a, text: textAusAusgabe(a) }
+    },
+    pruefen: async (text, ausgabe) =>
+      (await rpcOderFehler(d, 'analyse_pruefen', { ...basis, p_text: text, p_ausgabe: ausgabe })) as { geprueft: boolean; abweichungen?: string[] },
+  }
+}
+
+function speichereAnalyse(d: Abhaengigkeiten, basis: Record<string, unknown>, config: AnbieterConfig, r: { text: string; ausgabe: unknown; versuche: number }) {
+  return rpcOderFehler(d, 'analyse_speichern', {
+    ...basis,
+    p_text: r.text,
+    p_ausgabe: r.ausgabe,
+    p_prompt_version: PROMPT_VERSION,
+    p_anbieter: config.name,
+    p_modell: config.modell,
+    p_versuche: r.versuche,
+  })
+}
+
 /**
  * Eingabe holen → gleiche Eingabe und Prompt-Version wie gespeichert = kein neuer KI-Aufruf → Anbieter formuliert →
  * Faktencheck über analyse_pruefen → bei Abweichung bis zu zwei Wiederholungen (höchstens MAX_AUFRUFE) → Entwurf speichern.
@@ -263,44 +572,118 @@ export async function erstelleAnalyse(
   }
 
   const config = d.anbieter()
+  const ziel = personZiel(d, basis, 'person', eingabeAntwort.eingabe)
+  const r = (await arbeiteZiele(d, config, AUFGABE_EINZEL, PROMPT_VERSION, [ziel])).get('person')!
+  if (!r.ok) throw r.fehler
 
-  let korrektur: string | undefined
-  let letzte: { ausgabe: Ausgabe; text: string } | null = null
-  let aufrufe = 0
-  while (aufrufe < MAX_AUFRUFE) {
-    aufrufe++
-    const roh = await d.ki(config, baueNachricht(eingabeAntwort.eingabe, korrektur), eingabeAntwort.eingabe)
-    let ausgabe: Ausgabe
+  const analyse = await speichereAnalyse(d, basis, config, r)
+  return { uebersprungen: false, versuche: r.versuche, analyse }
+}
+
+// ---- Sammellauf (alle Personen eines Monats) --------------------------------------------------------------------
+
+export interface SammellaufErgebnis {
+  erstellt: { person_id: string; versuche: number; geprueft: boolean }[]
+  fehlgeschlagen: { person_id: string; fehler: string }[]
+  /** Personen ohne Analyse, die in diesem Aufruf nicht mehr drankamen. Größer als 0: die Oberfläche ruft erneut auf. */
+  verbleibend: number
+}
+
+/**
+ * Erstellt die Einzelanalysen für die nächsten PAKET_GROESSE Personen des Monats, die noch keine haben (ohne die
+ * ausgenommenen). Die Personenliste kommt aus abschluss_uebersicht: nur Admins bekommen sie mit Analyse-Zuständen.
+ */
+export async function erstelleAlle(
+  d: Abhaengigkeiten,
+  p: { monat: string; ausgenommen: string[] },
+): Promise<SammellaufErgebnis> {
+  const monat = `${p.monat}-01`
+  const ue = (await rpcOderFehler(d, 'abschluss_uebersicht', { p_monat: monat })) as {
+    ki?: boolean
+    abschluss: unknown
+    personen: { id: string; name: string; analyse: unknown }[]
+  }
+  if (ue.ki !== true) throw new AnalyseFehler('Nur für Admins.', 403)
+  if (!ue.abschluss) throw new AnalyseFehler('Der Monat ist noch nicht abgeschlossen.', 422)
+
+  const offen = ue.personen.filter((x) => !x.analyse && !p.ausgenommen.includes(x.id))
+  const paket = offen.slice(0, PAKET_GROESSE)
+  const ergebnis: SammellaufErgebnis = { erstellt: [], fehlgeschlagen: [], verbleibend: offen.length - paket.length }
+  if (paket.length === 0) return ergebnis
+
+  const ziele: Ziel[] = []
+  const basisVon = new Map<string, Record<string, unknown>>()
+  for (const person of paket) {
+    const basis = { p_person: person.id, p_monat: monat }
     try {
-      ausgabe = parseAusgabe(roh)
-    } catch {
-      korrektur = 'Deine letzte Antwort war kein gültiges JSON im vorgegebenen Format. Antworte nur mit dem JSON-Objekt und allen sechs Schlüsseln.'
+      const e = (await rpcOderFehler(d, 'analyse_eingabe', basis)) as { eingabe: unknown }
+      ziele.push(personZiel(d, basis, person.id, e.eingabe))
+      basisVon.set(person.id, basis)
+    } catch (e) {
+      ergebnis.fehlgeschlagen.push({ person_id: person.id, fehler: e instanceof AnalyseFehler ? e.message : 'Die Analyse konnte nicht erstellt werden.' })
+    }
+  }
+  if (ziele.length === 0) return ergebnis
+
+  const config = d.anbieter()
+  const ergebnisse = await arbeiteZiele(d, config, AUFGABE_EINZEL, PROMPT_VERSION, ziele)
+  for (const ziel of ziele) {
+    const r = ergebnisse.get(ziel.schluessel)!
+    if (!r.ok) {
+      ergebnis.fehlgeschlagen.push({ person_id: ziel.schluessel, fehler: r.fehler.message })
       continue
     }
-    const text = textAusAusgabe(ausgabe)
-    letzte = { ausgabe, text }
-    const pruefung = (await rpcOderFehler(d, 'analyse_pruefen', { ...basis, p_text: text, p_ausgabe: ausgabe })) as {
-      geprueft: boolean
-      abweichungen?: string[]
+    try {
+      const gespeichert = (await speichereAnalyse(d, basisVon.get(ziel.schluessel)!, config, r)) as { geprueft?: boolean }
+      ergebnis.erstellt.push({ person_id: ziel.schluessel, versuche: r.versuche, geprueft: gespeichert?.geprueft === true })
+    } catch (e) {
+      ergebnis.fehlgeschlagen.push({ person_id: ziel.schluessel, fehler: e instanceof AnalyseFehler ? e.message : 'Die Analyse konnte nicht erstellt werden.' })
     }
-    if (pruefung.geprueft) break
-    korrektur = `Deine letzte Antwort enthielt Zahlen, die nicht in den Daten stehen: ${(pruefung.abweichungen ?? []).join(', ')}. Formuliere neu und verwende nur Zahlen aus den Daten.`
+  }
+  return ergebnis
+}
+
+// ---- Gesamtauswertung (das Team) --------------------------------------------------------------------------------
+
+/** Wie erstelleAnalyse, für die Gesamtauswertung des Teams (nur Teamwerte). */
+export async function erstelleGesamt(
+  d: Abhaengigkeiten,
+  p: { monat: string; neu: boolean },
+): Promise<Ergebnis> {
+  const basis = { p_monat: `${p.monat}-01` }
+
+  const eingabeAntwort = (await rpcOderFehler(d, 'gesamt_eingabe', basis)) as { eingabe: unknown; hash: string }
+  const vorhanden = (await rpcOderFehler(d, 'gesamt_lesen', basis)) as { eingabe_hash?: string; prompt_version?: string } | null
+
+  if (vorhanden && !p.neu && vorhanden.eingabe_hash === eingabeAntwort.hash && vorhanden.prompt_version === PROMPT_VERSION_GESAMT) {
+    return { uebersprungen: true, versuche: 0, analyse: vorhanden }
   }
 
-  if (!letzte) {
-    throw new AnalyseFehler('Die KI hat keine verwertbare Antwort geliefert. Bitte später erneut versuchen.', 502)
+  const config = d.anbieter()
+  const ziel: Ziel = {
+    schluessel: 'gesamt',
+    system: SYSTEM_PROMPT_GESAMT,
+    eingabe: eingabeAntwort.eingabe,
+    parse: (roh) => {
+      const a = parseGesamtAusgabe(roh)
+      return { ausgabe: a, text: textAusGesamt(a) }
+    },
+    pruefen: async (text, ausgabe) =>
+      (await rpcOderFehler(d, 'gesamt_pruefen', { ...basis, p_text: text, p_ausgabe: ausgabe })) as { geprueft: boolean; abweichungen?: string[] },
   }
+  const r = (await arbeiteZiele(d, config, AUFGABE_GESAMT, PROMPT_VERSION_GESAMT, [ziel])).get('gesamt')!
+  if (!r.ok) throw r.fehler
 
-  const analyse = await rpcOderFehler(d, 'analyse_speichern', {
+  const analyse = await rpcOderFehler(d, 'gesamt_speichern', {
     ...basis,
-    p_text: letzte.text,
-    p_ausgabe: letzte.ausgabe,
-    p_prompt_version: PROMPT_VERSION,
+    p_text: r.text,
+    p_ausgabe: r.ausgabe,
+    p_prompt_version: PROMPT_VERSION_GESAMT,
     p_anbieter: config.name,
     p_modell: config.modell,
-    p_versuche: aufrufe,
+    p_versuche: r.versuche,
   })
-  return { uebersprungen: false, versuche: aufrufe, analyse }
+  return { uebersprungen: false, versuche: r.versuche, analyse }
 }
 
 // ---- HTTP -----------------------------------------------------------------------------------------------------
@@ -326,15 +709,31 @@ export async function behandleAnfrage(req: Request, env: Record<string, string |
   const token = req.headers.get('authorization') ?? ''
   if (!/^Bearer\s+\S+/i.test(token)) return antwort(401, { ok: false, fehler: 'Bitte melde dich an.' })
 
-  let body: { person_id?: unknown; monat?: unknown; neu?: unknown } = {}
+  let body: { aufgabe?: unknown; person_id?: unknown; monat?: unknown; neu?: unknown; ausgenommen?: unknown } = {}
   try {
     body = await req.json()
   } catch {
     return antwort(400, { ok: false, fehler: 'Die Anfrage ist ungültig.' })
   }
-  if (typeof body.person_id !== 'string' || !UUID.test(body.person_id) || typeof body.monat !== 'string' || !MONAT.test(body.monat)) {
+
+  const aufgabe = body.aufgabe ?? 'person'
+  if (aufgabe !== 'person' && aufgabe !== 'alle' && aufgabe !== 'gesamt') {
+    return antwort(400, { ok: false, fehler: 'Die Aufgabe ist unbekannt.' })
+  }
+  if (typeof body.monat !== 'string' || !MONAT.test(body.monat)) {
+    return antwort(400, { ok: false, fehler: aufgabe === 'person' ? 'Person oder Monat fehlt oder ist ungültig.' : 'Der Monat fehlt oder ist ungültig.' })
+  }
+  if (aufgabe === 'person' && (typeof body.person_id !== 'string' || !UUID.test(body.person_id))) {
     return antwort(400, { ok: false, fehler: 'Person oder Monat fehlt oder ist ungültig.' })
   }
+  let ausgenommen: string[] = []
+  if (aufgabe === 'alle' && body.ausgenommen !== undefined) {
+    if (!Array.isArray(body.ausgenommen) || body.ausgenommen.length > 200 || !body.ausgenommen.every((x) => typeof x === 'string' && UUID.test(x))) {
+      return antwort(400, { ok: false, fehler: 'Die Liste der ausgenommenen Personen ist ungültig.' })
+    }
+    ausgenommen = body.ausgenommen as string[]
+  }
+  const monat = body.monat
 
   const url = (env.SUPABASE_URL ?? '').replace(/\/$/, '')
   const anon = env.SUPABASE_ANON_KEY ?? ''
@@ -355,11 +754,22 @@ export async function behandleAnfrage(req: Request, env: Record<string, string |
     }
   }
 
+  const d: Abhaengigkeiten = {
+    rpc,
+    anbieter: () => anbieterAusUmgebung(env),
+    ki: (c, n, e, o) => rufeAnbieter(c, n, e, fetchFn, o),
+    kiBatch: (c, a, v, auftraege, o) => rufeAnbieterBatch(c, a, v, auftraege, fetchFn, o),
+  }
+
   try {
-    const ergebnis = await erstelleAnalyse(
-      { rpc, anbieter: () => anbieterAusUmgebung(env), ki: (c, n, e) => rufeAnbieter(c, n, e, fetchFn) },
-      { personId: body.person_id, monat: body.monat, neu: body.neu === true },
-    )
+    if (aufgabe === 'alle') {
+      const ergebnis = await erstelleAlle(d, { monat, ausgenommen })
+      return antwort(200, { ok: true, aufgabe: 'alle', ...ergebnis })
+    }
+    const ergebnis =
+      aufgabe === 'gesamt'
+        ? await erstelleGesamt(d, { monat, neu: body.neu === true })
+        : await erstelleAnalyse(d, { personId: body.person_id as string, monat, neu: body.neu === true })
     return antwort(200, { ok: true, ...ergebnis })
   } catch (e) {
     if (e instanceof AnalyseFehler) return antwort(e.status, { ok: false, fehler: e.message })

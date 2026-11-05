@@ -26,14 +26,19 @@ export interface AbschlussUebersicht {
   monat: string
   monate: string[]
   eigene_analyse_nur_admin: boolean
+  /** Darf die aufrufende Person die KI nutzen? Zurzeit nur der Admin (salons.ki_nur_admin). Fehlt das Feld, gilt: ja. */
+  ki?: boolean
   abschluss: AbschlussInfo | null
   aktuell: { abgaben: number; erwartet: number }
   nicht_abgegeben: { id: string; name: string }[]
   personen: { id: string; name: string; analyse: AnalyseKurz | null }[]
+  /** Gesamtauswertung des Teams (nur mit KI-Recht) */
+  gesamt?: AnalyseKurz | null
 }
 
 export interface Analyse {
-  person_id: string
+  /** leer bei der Gesamtauswertung */
+  person_id: string | null
   monat: string
   status: 'entwurf' | 'freigegeben'
   text: string
@@ -58,6 +63,17 @@ export interface AnalyseErgebnis {
   versuche: number
   analyse: Analyse
 }
+
+/** Ergebnis eines Aufrufs des Sammellaufs (höchstens ein Paket Personen) */
+export interface SammellaufErgebnis {
+  erstellt: { person_id: string; versuche: number; geprueft: boolean }[]
+  fehlgeschlagen: { person_id: string; fehler: string }[]
+  /** Personen ohne Analyse, die noch nicht drankamen: dann erneut aufrufen */
+  verbleibend: number
+}
+
+/** Darf die aufrufende Person die KI-Analysen nutzen? */
+export const kiErlaubt = (u: Pick<AbschlussUebersicht, 'ki'>): boolean => u.ki !== false
 
 const zeitFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Berlin' })
 const datumFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeZone: 'Europe/Berlin' })

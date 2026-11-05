@@ -3,9 +3,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  AnalyseFehler, MAX_AUFRUFE, NICHT_EINGERICHTET, PROMPT_VERSION, SYSTEM_PROMPT, anbieterAusUmgebung, baueNachricht,
-  behandleAnfrage, erstelleAnalyse, parseAusgabe, rufeAnbieter, textAusAusgabe,
-  type Abhaengigkeiten, type AnbieterConfig, type RpcAntwort,
+  AUFGABE_EINZEL, AUFGABE_GESAMT, AnalyseFehler, MAX_AUFRUFE, NICHT_EINGERICHTET, PAKET_GROESSE, PROMPT_VERSION, PROMPT_VERSION_GESAMT,
+  SYSTEM_PROMPT, SYSTEM_PROMPT_GESAMT, ZEITBUDGET_MS, anbieterAusUmgebung, arbeiteZiele, baueNachricht, behandleAnfrage,
+  erstelleAlle, erstelleAnalyse, erstelleGesamt, parseAusgabe, parseGesamtAusgabe, rufeAnbieter, rufeAnbieterBatch, textAusAusgabe, textAusGesamt,
+  type Abhaengigkeiten, type AnbieterConfig, type Auftrag, type KiAntwort, type RpcAntwort, type Ziel,
 } from './analyse.ts'
 
 const PERSON = '11111111-0000-0000-0000-00000000000a'
@@ -19,6 +20,29 @@ const GUT = {
 }
 const EINGABE = { bewertete_person: 'die bewertete Person', monat: '2026-09', kennzahlen: { fremdbild: 3.0 } }
 const CLAUDE: AnbieterConfig = { name: 'claude', modell: 'modell-x', schluessel: 'geheim' }
+const WEBHOOK: AnbieterConfig = { name: 'webhook', modell: null, url: 'https://n8n.example/webhook/dawiid', geheimnis: 's3' }
+const GESAMT_EINGABE = { bewertet: 'das Team', monat: '2026-09', kennzahlen: { fremdbild: 3.8, selbstbild: 3.3 } }
+const GESAMT_GUT = {
+  zusammenfassung: 'Das Team liegt beim Fremdbild bei 3,8.',
+  staerken: ['Verhalten 1 ist stark'],
+  entwicklungsfelder: ['Verhalten 2 braucht Aufmerksamkeit'],
+  gespraechsfragen: ['Was läuft gut?', 'Was fehlt?', 'Wo hilft das Team?'],
+  vereinbarungen_vorschlaege: ['Eine Sache festlegen'],
+  datenlage_hinweis: null,
+}
+const ID = (n: number) => `11111111-0000-0000-0000-0000000000${String(n).padStart(2, '0')}`
+
+/** Antwort von abschluss_uebersicht: Admin, Monat abgeschlossen, Personen mit oder ohne Analyse. */
+function uebersicht(over: { ki?: boolean; abschluss?: unknown; personen?: { id: string; name: string; analyse: unknown }[] } = {}) {
+  return {
+    ki: over.ki ?? true,
+    abschluss: 'abschluss' in over ? over.abschluss : { monat: '2026-09' },
+    personen: over.personen ?? [
+      { id: ID(1), name: 'Person 1', analyse: null },
+      { id: ID(2), name: 'Person 2', analyse: null },
+    ],
+  }
+}
 
 /** Nachgebaute Datenbank: protokolliert alle Aufrufe; die Antworten lassen sich je Funktion überschreiben. */
 function db(overrides: Record<string, (args: Record<string, unknown>, n: number) => RpcAntwort> = {}) {
@@ -28,7 +52,12 @@ function db(overrides: Record<string, (args: Record<string, unknown>, n: number)
     analyse_eingabe: () => ({ data: { eingabe: EINGABE, hash: 'h1' }, error: null }),
     analyse_lesen: () => ({ data: null, error: null }),
     analyse_pruefen: () => ({ data: { geprueft: true, abweichungen: [] }, error: null }),
-    analyse_speichern: (a) => ({ data: { status: 'entwurf', text: a.p_text, versuche: a.p_versuche }, error: null }),
+    analyse_speichern: (a) => ({ data: { status: 'entwurf', text: a.p_text, versuche: a.p_versuche, geprueft: true }, error: null }),
+    gesamt_eingabe: () => ({ data: { eingabe: GESAMT_EINGABE, hash: 'g1' }, error: null }),
+    gesamt_lesen: () => ({ data: null, error: null }),
+    gesamt_pruefen: () => ({ data: { geprueft: true, abweichungen: [] }, error: null }),
+    gesamt_speichern: (a) => ({ data: { status: 'entwurf', text: a.p_text, versuche: a.p_versuche, geprueft: true }, error: null }),
+    abschluss_uebersicht: () => ({ data: uebersicht(), error: null }),
   }
   const rpc: Abhaengigkeiten['rpc'] = async (name, args) => {
     aufrufe.push({ name, args })
@@ -153,25 +182,34 @@ test('rufeAnbieter: Fehlerabbildung ohne Details nach außen', async () => {
   await assert.rejects(rufeAnbieter(CLAUDE, 'n', EINGABE, async () => new Response(JSON.stringify({ content: [] }), { status: 200 })), (e: unknown) => e instanceof AnalyseFehler && e.status === 502)
 })
 
-test('rufeAnbieter webhook: Geheimnis im Header, Antwort direkt oder verpackt', async () => {
+test('rufeAnbieter webhook: Auftrag mit Aufgabe, Geheimnis im Header, Antwort direkt oder verpackt', async () => {
   const w: AnbieterConfig = { name: 'webhook', modell: null, url: 'https://n8n.example/hook', geheimnis: 's3' }
   let gesehen: RequestInit = {}
   const liefert = (daten: unknown) => async (_u: string, init?: RequestInit) => {
     gesehen = init ?? {}
     return new Response(JSON.stringify(daten), { status: 200 })
   }
-  assert.deepEqual(await rufeAnbieter(w, 'n', EINGABE, liefert({ ausgabe: GUT })), GUT)
+  assert.deepEqual(await rufeAnbieter(w, 'n', EINGABE, liefert({ ergebnisse: [{ ref: '1', code: 200, ausgabe: GUT }] })), GUT)
   const h = gesehen.headers as Record<string, string>
   assert.equal(h.authorization, 'Bearer s3')
   assert.equal(h['x-webhook-secret'], 's3')
   const body = JSON.parse(String(gesehen.body))
-  assert.deepEqual([body.prompt_version, body.nachricht, body.system === SYSTEM_PROMPT], [PROMPT_VERSION, 'n', true])
-  assert.deepEqual(body.eingabe, EINGABE)
+  assert.deepEqual(Object.keys(body).sort(), ['aufgabe', 'auftraege', 'prompt_version'])
+  assert.deepEqual([body.aufgabe, body.prompt_version], [AUFGABE_EINZEL, PROMPT_VERSION])
+  assert.deepEqual(body.auftraege, [{ ref: '1', system: SYSTEM_PROMPT, nachricht: 'n', eingabe: EINGABE }])
+  // ältere Webhooks antworten direkt oder verpackt (nur bei einem Auftrag)
+  assert.deepEqual(await rufeAnbieter(w, 'n', EINGABE, liefert({ ausgabe: GUT })), GUT)
   assert.equal(await rufeAnbieter(w, 'n', EINGABE, liefert({ text: '{"x":1}' })), '{"x":1}')
   assert.deepEqual(await rufeAnbieter(w, 'n', EINGABE, liefert(GUT)), GUT)
   const ohne = { ...w, geheimnis: undefined }
-  await rufeAnbieter(ohne, 'n', EINGABE, liefert({ ausgabe: GUT }))
+  await rufeAnbieter(ohne, 'n', EINGABE, liefert({ ergebnisse: [{ ref: '1', ausgabe: GUT }] }))
   assert.equal((gesehen.headers as Record<string, string>).authorization, undefined)
+  // andere Aufgabe und anderer Prompt für die Gesamtauswertung
+  await rufeAnbieter(w, 'n', EINGABE, liefert({ ergebnisse: [{ ref: '1', ausgabe: GESAMT_GUT }] }), {
+    system: SYSTEM_PROMPT_GESAMT, promptVersion: PROMPT_VERSION_GESAMT, aufgabe: AUFGABE_GESAMT,
+  })
+  const gesamt = JSON.parse(String(gesehen.body))
+  assert.deepEqual([gesamt.aufgabe, gesamt.prompt_version, gesamt.auftraege[0].system], [AUFGABE_GESAMT, PROMPT_VERSION_GESAMT, SYSTEM_PROMPT_GESAMT])
 })
 
 // ---- Ablauf ---------------------------------------------------------------------------------------------------
@@ -278,6 +316,357 @@ test('Ablauf: Fehler der Datenbank → verständliche Meldung und passender Stat
   assert.deepEqual([sonst.status, sonst.message], [500, 'Die Analyse konnte nicht erstellt werden.'])
 })
 
+// ---- Gesamtauswertung: Ausgabe lesen --------------------------------------------------------------------------
+
+test('Gesamtauswertung: Prompt, Version und Regeln', () => {
+  assert.match(PROMPT_VERSION_GESAMT, /^gesamt-v\d+$/)
+  assert.match(SYSTEM_PROMPT_GESAMT, /Teamgesprächs/)
+  assert.match(SYSTEM_PROMPT_GESAMT, /ausschließlich Zahlen, die in den Daten stehen/)
+  assert.match(SYSTEM_PROMPT_GESAMT, /datenlage_hinweis/)
+  assert.match(SYSTEM_PROMPT_GESAMT, /keine Namen, keine Einzelpersonen und keine Kommentartexte/)
+  assert.notEqual(PROMPT_VERSION_GESAMT, PROMPT_VERSION)
+})
+
+test('parseGesamtAusgabe: eigener Hinweis-Schlüssel, sonst wie parseAusgabe', () => {
+  assert.equal(parseGesamtAusgabe(GESAMT_GUT).zusammenfassung, 'Das Team liegt beim Fremdbild bei 3,8.')
+  assert.equal(parseGesamtAusgabe('```json\n' + JSON.stringify(GESAMT_GUT) + '\n```').gespraechsfragen.length, 3)
+  assert.equal(parseGesamtAusgabe({ ...GESAMT_GUT, datenlage_hinweis: 'null' }).datenlage_hinweis, null)
+  assert.equal(parseGesamtAusgabe({ ...GESAMT_GUT, datenlage_hinweis: 'Nur 3 von 4 haben abgegeben.' }).datenlage_hinweis, 'Nur 3 von 4 haben abgegeben.')
+  assert.equal(parseGesamtAusgabe({ ...GESAMT_GUT, kommentar_qualitaet_hinweis: 'gehört nicht hierher' }).datenlage_hinweis, null, 'der Schlüssel der Einzelanalyse wird nicht gelesen')
+  for (const kaputt of ['kein json', [], { ...GESAMT_GUT, zusammenfassung: '' }, { ...GESAMT_GUT, staerken: [] }, { ...GESAMT_GUT, vereinbarungen_vorschlaege: 'x' }]) {
+    assert.throws(() => parseGesamtAusgabe(kaputt), undefined, `soll ablehnen: ${JSON.stringify(kaputt)}`)
+  }
+})
+
+test('textAusGesamt: Überschriften für das Team, Hinweis nur wenn vorhanden, keine nummerierten Listen', () => {
+  const text = textAusGesamt(parseGesamtAusgabe(GESAMT_GUT))
+  assert.match(text, /^## Zusammenfassung\nDas Team liegt beim Fremdbild bei 3,8\.\n\n## Stärken des Teams\n- Verhalten 1 ist stark\n\n## Entwicklungsfelder des Teams/)
+  assert.match(text, /## Fragen für das Teamgespräch\n- Was läuft gut\?/)
+  assert.doesNotMatch(text, /Hinweis zur Datenlage/)
+  assert.doesNotMatch(text, /^\d+\./m)
+  assert.match(textAusGesamt(parseGesamtAusgabe({ ...GESAMT_GUT, datenlage_hinweis: 'Dünn.' })), /## Hinweis zur Datenlage\nDünn\.$/)
+})
+
+// ---- Webhook-Protokoll mit mehreren Aufträgen -----------------------------------------------------------------
+
+const auftrag = (ref: string): Auftrag => ({ ref, system: `System ${ref}`, nachricht: `Nachricht ${ref}`, eingabe: { n: ref } })
+
+test('Webhook mit mehreren Aufträgen: EIN Aufruf, Antworten werden über ref zugeordnet', async () => {
+  let aufrufe = 0
+  let gesehen: { url: string; init: RequestInit } | null = null
+  const fetchFn = async (url: string, init?: RequestInit) => {
+    aufrufe++
+    gesehen = { url, init: init ?? {} }
+    return new Response(JSON.stringify({ ergebnisse: [
+      { ref: '3', code: 200, ausgabe: { n: 3 } },
+      { ref: '1', code: 200, output: '{"n":1}' },
+      { ref: '2', code: 502, fehler: 'Anthropic nicht erreichbar' },
+    ] }), { status: 200 })
+  }
+  const r = await rufeAnbieterBatch(WEBHOOK, AUFGABE_EINZEL, PROMPT_VERSION, [auftrag('1'), auftrag('2'), auftrag('3')], fetchFn)
+  assert.equal(aufrufe, 1)
+  assert.equal(gesehen!.url, WEBHOOK.url)
+  const body = JSON.parse(String(gesehen!.init.body))
+  assert.deepEqual(body.auftraege.map((a: Auftrag) => a.ref), ['1', '2', '3'])
+  assert.deepEqual(body.auftraege[1], { ref: '2', system: 'System 2', nachricht: 'Nachricht 2', eingabe: { n: '2' } })
+  assert.deepEqual(r['1'], { roh: '{"n":1}' })
+  assert.deepEqual(r['3'], { roh: { n: 3 } })
+  assert.ok('fehler' in r['2'] && r['2'].fehler instanceof AnalyseFehler && r['2'].fehler.status === 502)
+})
+
+test('Webhook mit mehreren Aufträgen: fehlende, leere und ausgelastete Ergebnisse sind Fehler einzelner Aufträge', async () => {
+  const fetchFn = async () => new Response(JSON.stringify({ ergebnisse: [
+    { ref: '1', code: 200, ausgabe: { n: 1 } },
+    { ref: '2', code: 429, fehler: 'x' },
+    { ref: '3', code: 200 },
+    { ref: 42, ausgabe: { n: 9 } },
+    null,
+  ] }), { status: 200 })
+  const r = await rufeAnbieterBatch(WEBHOOK, AUFGABE_EINZEL, PROMPT_VERSION, [auftrag('1'), auftrag('2'), auftrag('3'), auftrag('4')], fetchFn)
+  assert.ok('roh' in r['1'])
+  const status = (k: KiAntwort) => ('fehler' in k ? k.fehler.status : null)
+  assert.deepEqual([status(r['2']), status(r['3']), status(r['4'])], [503, 502, 502])
+  // ohne ergebnisse-Liste und mit mehreren Aufträgen wird nichts erraten
+  const direkt = await rufeAnbieterBatch(WEBHOOK, AUFGABE_EINZEL, PROMPT_VERSION, [auftrag('1'), auftrag('2')], async () => new Response(JSON.stringify({ ausgabe: GUT }), { status: 200 }))
+  assert.ok('fehler' in direkt['1'] && 'fehler' in direkt['2'])
+})
+
+test('Webhook: Fehler für die ganze Anfrage werden geworfen (Zugang, Auslastung, Zeit, keine Antwort)', async () => {
+  const mit = (status: number) => async () => new Response('x', { status })
+  await assert.rejects(rufeAnbieterBatch(WEBHOOK, AUFGABE_EINZEL, PROMPT_VERSION, [auftrag('1')], mit(403)), (e: unknown) => e instanceof AnalyseFehler && e.status === 502 && /Schlüssel/.test(e.message))
+  await assert.rejects(rufeAnbieterBatch(WEBHOOK, AUFGABE_EINZEL, PROMPT_VERSION, [auftrag('1')], mit(429)), (e: unknown) => e instanceof AnalyseFehler && e.status === 503)
+  await assert.rejects(rufeAnbieterBatch(WEBHOOK, AUFGABE_EINZEL, PROMPT_VERSION, [auftrag('1')], async () => { throw new Error('Zeit') }), (e: unknown) => e instanceof AnalyseFehler && e.status === 502)
+  await assert.rejects(rufeAnbieterBatch(WEBHOOK, AUFGABE_EINZEL, PROMPT_VERSION, [auftrag('1')], async () => new Response('kein json', { status: 200 })), (e: unknown) => e instanceof AnalyseFehler && e.status === 502)
+})
+
+test('Claude mit mehreren Aufträgen: ein Aufruf je Auftrag mit dessen Prompt, ein Fehler stört die anderen nicht', async () => {
+  const gesehen: { system: string; nachricht: string }[] = []
+  const fetchFn = async (_u: string, init?: RequestInit) => {
+    const b = JSON.parse(String(init?.body))
+    gesehen.push({ system: b.system, nachricht: b.messages[0].content })
+    if (b.system === 'System 2') return new Response('x', { status: 500 })
+    return new Response(JSON.stringify({ content: [{ type: 'text', text: `Antwort auf ${b.messages[0].content}` }] }), { status: 200 })
+  }
+  const r = await rufeAnbieterBatch(CLAUDE, AUFGABE_EINZEL, PROMPT_VERSION, [auftrag('1'), auftrag('2'), auftrag('3')], fetchFn)
+  assert.equal(gesehen.length, 3)
+  assert.deepEqual(r['1'], { roh: 'Antwort auf Nachricht 1' })
+  assert.deepEqual(r['3'], { roh: 'Antwort auf Nachricht 3' })
+  assert.ok('fehler' in r['2'])
+})
+
+// ---- Runden mit mehreren Zielen -------------------------------------------------------------------------------
+
+/** Ziele mit eigener Antwort-Reihenfolge; `pruefungen[schluessel]` liefert je Runde, ob der Faktencheck besteht. */
+function ziele(namen: string[], pruefungen: Record<string, boolean[]> = {}): Ziel[] {
+  const zaehler: Record<string, number> = {}
+  return namen.map((n) => ({
+    schluessel: n,
+    system: `System ${n}`,
+    eingabe: { name: n },
+    parse: (roh) => {
+      if (roh === 'kaputt') throw new Error('kein JSON')
+      return { ausgabe: { text: String(roh) }, text: `Text ${roh}` }
+    },
+    pruefen: async () => {
+      const i = (zaehler[n] = (zaehler[n] ?? 0) + 1) - 1
+      const liste = pruefungen[n] ?? [true]
+      return liste[Math.min(i, liste.length - 1)] ? { geprueft: true } : { geprueft: false, abweichungen: ['9,9'] }
+    },
+  }))
+}
+
+function stapel(antwort: (a: Auftrag, runde: number) => KiAntwort, extra: Partial<Abhaengigkeiten> = {}) {
+  const runden: { aufgabe: string; version: string; auftraege: Auftrag[]; timeoutMs: number }[] = []
+  const d: Abhaengigkeiten = {
+    rpc: async () => ({ data: null, error: null }),
+    anbieter: () => CLAUDE,
+    ki: async () => { throw new Error('ki darf hier nicht gerufen werden') },
+    kiBatch: async (_c, aufgabe, version, auftraege, o) => {
+      runden.push({ aufgabe, version, auftraege, timeoutMs: o.timeoutMs })
+      return Object.fromEntries(auftraege.map((a) => [a.ref, antwort(a, runden.length)]))
+    },
+    ...extra,
+  }
+  return { d, runden }
+}
+
+test('Runden: alle Ziele gehen in EINEM Aufruf an die KI, nur die offenen kommen in die nächste Runde', async () => {
+  const { d, runden } = stapel((a, runde) => ({ roh: `${a.ref}-${runde}` }))
+  const r = await arbeiteZiele(d, CLAUDE, AUFGABE_EINZEL, PROMPT_VERSION, ziele(['a', 'b', 'c'], { b: [false, true] }))
+  assert.equal(runden.length, 2)
+  assert.deepEqual(runden[0].auftraege.map((x) => x.ref), ['1', '2', '3'])
+  assert.deepEqual(runden[1].auftraege.map((x) => x.ref), ['2'], 'nur der Auftrag mit nicht bestandenem Faktencheck')
+  assert.match(runden[1].auftraege[0].nachricht, /^Deine letzte Antwort enthielt Zahlen, die nicht in den Daten stehen: 9,9\./)
+  assert.equal(runden[0].auftraege[1].system, 'System b', 'jedes Ziel bringt seinen Prompt mit')
+  assert.deepEqual([runden[0].aufgabe, runden[0].version], [AUFGABE_EINZEL, PROMPT_VERSION])
+  const v = (k: string) => { const x = r.get(k)!; return x.ok ? x.versuche : -1 }
+  assert.deepEqual([v('a'), v('b'), v('c')], [1, 2, 1])
+  assert.equal((r.get('b') as { text: string }).text, 'Text 2-2', 'die zweite, geprüfte Fassung')
+})
+
+test('Runden: höchstens drei, die letzte lesbare Fassung zählt; ungültige Antworten ergeben einen Fehler nur für dieses Ziel', async () => {
+  const { d, runden } = stapel((a) => ({ roh: a.ref === '2' ? 'kaputt' : 'ok' }))
+  const r = await arbeiteZiele(d, CLAUDE, AUFGABE_EINZEL, PROMPT_VERSION, ziele(['a', 'b', 'c'], { c: [false] }))
+  assert.equal(runden.length, MAX_AUFRUFE)
+  assert.deepEqual(runden.map((x) => x.auftraege.map((y) => y.ref)), [['1', '2', '3'], ['2', '3'], ['2', '3']])
+  assert.ok(r.get('a')!.ok)
+  assert.deepEqual([r.get('c')!.ok, (r.get('c') as { versuche: number }).versuche], [true, 3])
+  const b = r.get('b')!
+  assert.ok(!b.ok && b.fehler.status === 502 && /keine verwertbare Antwort/.test(b.fehler.message))
+  assert.match(runden[1].auftraege[0].nachricht, /kein gültiges JSON/)
+})
+
+test('Runden: ein Fehler des Anbieters bei einem Auftrag wird in der nächsten Runde wiederholt', async () => {
+  const { d, runden } = stapel((a, runde) => (a.ref === '2' && runde === 1 ? { fehler: new AnalyseFehler('x', 502) } : { roh: 'ok' }))
+  const r = await arbeiteZiele(d, CLAUDE, AUFGABE_EINZEL, PROMPT_VERSION, ziele(['a', 'b']))
+  assert.deepEqual(runden.map((x) => x.auftraege.length), [2, 1])
+  assert.ok(r.get('a')!.ok && r.get('b')!.ok)
+})
+
+test('Runden: scheitert der Anbieter für alle, wird sein Fehler geworfen; mit lesbaren Fassungen zählen diese', async () => {
+  const aus = stapel(() => ({ fehler: new AnalyseFehler('Die KI ist gerade ausgelastet. Bitte in ein paar Minuten erneut versuchen.', 503) }))
+  await assert.rejects(arbeiteZiele(aus.d, CLAUDE, AUFGABE_EINZEL, PROMPT_VERSION, ziele(['a', 'b'])), (e: unknown) => e instanceof AnalyseFehler && e.status === 503)
+  assert.equal(aus.runden.length, 1)
+
+  const spaeter = stapel((_a, runde) => (runde === 1 ? { roh: 'ok' } : { fehler: new AnalyseFehler('x', 502) }))
+  const r = await arbeiteZiele(spaeter.d, CLAUDE, AUFGABE_EINZEL, PROMPT_VERSION, ziele(['a'], { a: [false] }))
+  assert.deepEqual([r.get('a')!.ok, (r.get('a') as { versuche: number }).versuche], [true, 1], 'die erste Fassung bleibt erhalten')
+})
+
+test('Runden: das Zeitbudget begrenzt die Runden und die Zeit je Aufruf', async () => {
+  let uhr = 1_000
+  const { d, runden } = stapel(() => ({ roh: 'ok' }), { jetzt: () => uhr })
+  const mitUhr = { ...d, kiBatch: async (...a: Parameters<NonNullable<Abhaengigkeiten['kiBatch']>>) => { const r = await d.kiBatch!(...a); uhr += 100_000; return r } }
+  const r = await arbeiteZiele(mitUhr, CLAUDE, AUFGABE_EINZEL, PROMPT_VERSION, ziele(['a'], { a: [false] }))
+  assert.equal(runden.length, 2, 'nach 100 s sind nur noch 35 s übrig: eine zweite Runde ist erlaubt, eine dritte nicht')
+  assert.ok(runden[0].timeoutMs <= 120_000 && runden[0].timeoutMs >= 10_000)
+  assert.ok(runden[1].timeoutMs <= ZEITBUDGET_MS - 100_000 && runden[1].timeoutMs >= 10_000, `zweite Runde: ${runden[1].timeoutMs}`)
+  assert.ok(r.get('a')!.ok, 'die letzte lesbare Fassung zählt')
+})
+
+test('Runden: ein Fehler der Datenbank beim Faktencheck beendet nur dieses Ziel', async () => {
+  const z = ziele(['a', 'b'])
+  z[0].pruefen = async () => { throw new AnalyseFehler('Person nicht gefunden.', 403) }
+  const { d, runden } = stapel(() => ({ roh: 'ok' }))
+  const r = await arbeiteZiele(d, CLAUDE, AUFGABE_EINZEL, PROMPT_VERSION, z)
+  assert.equal(runden.length, 1)
+  const a = r.get('a')!
+  assert.ok(!a.ok && a.fehler.status === 403 && a.fehler.message === 'Person nicht gefunden.')
+  assert.ok(r.get('b')!.ok)
+})
+
+// ---- Sammellauf -----------------------------------------------------------------------------------------------
+
+/** Nachgebaute KI für den Sammellauf: eine Antwort je Auftrag, gemeinsam in einem Aufruf. */
+function sammelabh(rpc: Abhaengigkeiten['rpc'], antwort: (a: Auftrag, runde: number) => KiAntwort = () => ({ roh: JSON.stringify(GUT) }), extra: Partial<Abhaengigkeiten> = {}) {
+  return stapel(antwort, { rpc, ...extra })
+}
+
+const mitPersonen = (anzahl: number, ohneAnalyse = anzahl) =>
+  uebersicht({ personen: Array.from({ length: anzahl }, (_, i) => ({ id: ID(i + 1), name: `Person ${i + 1}`, analyse: i < anzahl - ohneAnalyse ? { status: 'entwurf' } : null })) })
+
+test('Sammellauf: alle Personen ohne Analyse in EINEM KI-Aufruf, je Person gespeichert, keine Kennung geht an die KI', async () => {
+  const x = db({
+    abschluss_uebersicht: () => ({ data: mitPersonen(3), error: null }),
+    analyse_eingabe: (a) => ({ data: { eingabe: { ...EINGABE, fuer: a.p_person === ID(2) ? 'zwei' : 'andere' }, hash: 'h' }, error: null }),
+  })
+  const { d, runden } = sammelabh(x.rpc)
+  const r = await erstelleAlle(d, { monat: '2026-09', ausgenommen: [] })
+  assert.equal(runden.length, 1, 'ein Aufruf für alle drei')
+  assert.deepEqual(runden[0].auftraege.map((a) => a.ref), ['1', '2', '3'])
+  assert.deepEqual([runden[0].aufgabe, runden[0].version], [AUFGABE_EINZEL, PROMPT_VERSION])
+  assert.ok(!JSON.stringify(runden[0].auftraege).includes('11111111'), 'keine Personen-Kennung in den Aufträgen')
+  assert.ok(runden[0].auftraege.every((a) => a.system === SYSTEM_PROMPT))
+  assert.deepEqual(r.erstellt.map((e) => e.person_id), [ID(1), ID(2), ID(3)])
+  assert.deepEqual([r.fehlgeschlagen.length, r.verbleibend], [0, 0])
+  assert.ok(r.erstellt.every((e) => e.versuche === 1 && e.geprueft))
+  const speichern = x.aufrufe.filter((a) => a.name === 'analyse_speichern').map((a) => a.args.p_person)
+  assert.deepEqual(speichern, [ID(1), ID(2), ID(3)])
+  assert.equal(x.anzahl('analyse_pruefen'), 3)
+  assert.equal(x.aufrufe.find((a) => a.name === 'abschluss_uebersicht')!.args.p_monat, '2026-09-01')
+})
+
+test('Sammellauf: höchstens ein Paket je Aufruf, Personen mit Analyse und ausgenommene werden übersprungen', async () => {
+  assert.equal(PAKET_GROESSE, 3)
+  const x = db({ abschluss_uebersicht: () => ({ data: mitPersonen(7, 6), error: null }) })   // Person 1 hat schon eine Analyse
+  const { d, runden } = sammelabh(x.rpc)
+  const erster = await erstelleAlle(d, { monat: '2026-09', ausgenommen: [ID(3)] })
+  assert.deepEqual(erster.erstellt.map((e) => e.person_id), [ID(2), ID(4), ID(5)], 'nicht Person 1 (hat Analyse), nicht Person 3 (ausgenommen)')
+  assert.equal(erster.verbleibend, 2)
+  assert.equal(runden[0].auftraege.length, 3)
+  const x2 = db({ abschluss_uebersicht: () => ({ data: mitPersonen(2), error: null }) })
+  const leer = await erstelleAlle(sammelabh(x2.rpc).d, { monat: '2026-09', ausgenommen: [ID(1), ID(2)] })
+  assert.deepEqual(leer, { erstellt: [], fehlgeschlagen: [], verbleibend: 0 })
+})
+
+test('Sammellauf: nichts zu tun → keine KI, auch wenn sie nicht eingerichtet ist', async () => {
+  const x = db({ abschluss_uebersicht: () => ({ data: mitPersonen(2, 0), error: null }) })
+  let gerufen = false
+  const { d, runden } = sammelabh(x.rpc, undefined, { anbieter: () => { gerufen = true; throw new AnalyseFehler(NICHT_EINGERICHTET, 503) } })
+  const r = await erstelleAlle(d, { monat: '2026-09', ausgenommen: [] })
+  assert.deepEqual([r.erstellt.length, r.verbleibend, gerufen, runden.length], [0, 0, false, 0])
+})
+
+test('Sammellauf: nur für Admins und nur für abgeschlossene Monate, ohne KI-Aufruf', async () => {
+  const kein = db({ abschluss_uebersicht: () => ({ data: uebersicht({ ki: false }), error: null }) })
+  const a = sammelabh(kein.rpc)
+  await assert.rejects(erstelleAlle(a.d, { monat: '2026-09', ausgenommen: [] }), (e: unknown) => e instanceof AnalyseFehler && e.status === 403 && e.message === 'Nur für Admins.')
+  assert.deepEqual([a.runden.length, kein.anzahl('analyse_eingabe')], [0, 0])
+
+  const offen = db({ abschluss_uebersicht: () => ({ data: uebersicht({ abschluss: null }), error: null }) })
+  await assert.rejects(erstelleAlle(sammelabh(offen.rpc).d, { monat: '2026-09', ausgenommen: [] }), (e: unknown) => e instanceof AnalyseFehler && e.status === 422 && /nicht abgeschlossen/.test(e.message))
+
+  const verboten = db({ abschluss_uebersicht: () => ({ data: null, error: { code: '42501', message: 'Nur für Verantwortliche und Admins.' } }) })
+  await assert.rejects(erstelleAlle(sammelabh(verboten.rpc).d, { monat: '2026-09', ausgenommen: [] }), (e: unknown) => e instanceof AnalyseFehler && e.status === 403)
+
+  const ohneKi = db({ abschluss_uebersicht: () => ({ data: mitPersonen(2), error: null }) })
+  await assert.rejects(
+    erstelleAlle(sammelabh(ohneKi.rpc, undefined, { anbieter: () => { throw new AnalyseFehler(NICHT_EINGERICHTET, 503) } }).d, { monat: '2026-09', ausgenommen: [] }),
+    (e: unknown) => e instanceof AnalyseFehler && e.status === 503 && e.message === NICHT_EINGERICHTET,
+  )
+})
+
+test('Sammellauf: Fehler bei einer Person (Antwort, Speichern) betreffen nur diese Person', async () => {
+  const x = db({
+    abschluss_uebersicht: () => ({ data: mitPersonen(3), error: null }),
+    analyse_speichern: (a) => (a.p_person === ID(3) ? { data: null, error: { code: 'XX000', message: 'interne Details' } } : { data: { geprueft: false }, error: null }),
+  })
+  // Person 2 (Auftrag 2): immer eine ungültige Antwort
+  const { d, runden } = sammelabh(x.rpc, (a) => ({ roh: a.ref === '2' ? 'kein json' : JSON.stringify(GUT) }))
+  const r = await erstelleAlle(d, { monat: '2026-09', ausgenommen: [] })
+  assert.deepEqual(r.erstellt.map((e) => [e.person_id, e.geprueft]), [[ID(1), false]])
+  assert.deepEqual(r.fehlgeschlagen.map((f) => f.person_id).sort(), [ID(2), ID(3)].sort())
+  const grund = (id: string) => r.fehlgeschlagen.find((f) => f.person_id === id)!.fehler
+  assert.match(grund(ID(2)), /keine verwertbare Antwort/)
+  assert.equal(grund(ID(3)), 'Die Analyse konnte nicht erstellt werden.', 'keine internen Details nach außen')
+  assert.deepEqual(runden.map((x) => x.auftraege.length), [3, 1, 1], 'die ungültige Antwort wird zweimal wiederholt, nur für diesen Auftrag')
+  assert.equal(r.verbleibend, 0)
+})
+
+test('Sammellauf: kann die Eingabe einer Person nicht gebaut werden, kommen die anderen trotzdem dran', async () => {
+  const x = db({
+    abschluss_uebersicht: () => ({ data: mitPersonen(4), error: null }),
+    analyse_eingabe: (a) => (a.p_person === ID(1) ? { data: null, error: { code: '22023', message: 'Für diese Person gibt es in diesem Monat keine Auswertung.' } } : { data: { eingabe: EINGABE, hash: 'h' }, error: null }),
+  })
+  const { d, runden } = sammelabh(x.rpc)
+  const r = await erstelleAlle(d, { monat: '2026-09', ausgenommen: [] })
+  assert.deepEqual(r.erstellt.map((e) => e.person_id), [ID(2), ID(3)])
+  assert.deepEqual(r.fehlgeschlagen.map((f) => f.person_id), [ID(1)])
+  assert.match(r.fehlgeschlagen[0].fehler, /keine Auswertung/)
+  assert.equal(r.verbleibend, 1, 'Person 4 kommt im nächsten Aufruf dran')
+  assert.deepEqual(runden[0].auftraege.map((a) => a.ref), ['1', '2'])
+})
+
+// ---- Gesamtauswertung: Ablauf ---------------------------------------------------------------------------------
+
+test('Gesamtauswertung: eigene Funktionen, eigener Prompt, eigene Aufgabe', async () => {
+  const x = db()
+  const { d, runden } = stapel(() => ({ roh: JSON.stringify(GESAMT_GUT) }), { rpc: x.rpc })
+  const r = await erstelleGesamt(d, { monat: '2026-09', neu: false })
+  assert.deepEqual([r.uebersprungen, r.versuche], [false, 1])
+  assert.deepEqual(x.aufrufe.map((a) => a.name), ['gesamt_eingabe', 'gesamt_lesen', 'gesamt_pruefen', 'gesamt_speichern'])
+  assert.deepEqual([runden[0].aufgabe, runden[0].version, runden[0].auftraege[0].system], [AUFGABE_GESAMT, PROMPT_VERSION_GESAMT, SYSTEM_PROMPT_GESAMT])
+  assert.equal(runden[0].auftraege[0].nachricht, baueNachricht(GESAMT_EINGABE))
+  const speichern = x.aufrufe.find((a) => a.name === 'gesamt_speichern')!.args
+  assert.deepEqual(Object.keys(speichern).sort(), ['p_anbieter', 'p_ausgabe', 'p_modell', 'p_monat', 'p_prompt_version', 'p_text', 'p_versuche'])
+  assert.equal(speichern.p_text, textAusGesamt(parseGesamtAusgabe(GESAMT_GUT)))
+  assert.deepEqual([speichern.p_monat, speichern.p_prompt_version, speichern.p_anbieter, speichern.p_versuche], ['2026-09-01', PROMPT_VERSION_GESAMT, 'claude', 1])
+  assert.ok(!('p_person' in speichern))
+})
+
+test('Gesamtauswertung: gleiche Eingabe und Version = kein neuer Aufruf; neue Daten, neue Version oder „neu“ fragen erneut', async () => {
+  const gleich = db({ gesamt_lesen: () => ({ data: { eingabe_hash: 'g1', prompt_version: PROMPT_VERSION_GESAMT, status: 'freigegeben' }, error: null }) })
+  let gerufen = false
+  const a = stapel(() => ({ roh: JSON.stringify(GESAMT_GUT) }), { rpc: gleich.rpc, anbieter: () => { gerufen = true; throw new AnalyseFehler(NICHT_EINGERICHTET, 503) } })
+  const r = await erstelleGesamt(a.d, { monat: '2026-09', neu: false })
+  assert.deepEqual([r.uebersprungen, r.versuche, gerufen, a.runden.length], [true, 0, false, 0])
+  for (const [vorhanden, neu] of [
+    [{ eingabe_hash: 'anderer', prompt_version: PROMPT_VERSION_GESAMT }, false],
+    [{ eingabe_hash: 'g1', prompt_version: 'gesamt-v0' }, false],
+    [{ eingabe_hash: 'g1', prompt_version: PROMPT_VERSION_GESAMT }, true],
+    [{ eingabe_hash: 'g1', prompt_version: PROMPT_VERSION }, false],
+  ] as const) {
+    const x = db({ gesamt_lesen: () => ({ data: vorhanden, error: null }) })
+    const s = stapel(() => ({ roh: JSON.stringify(GESAMT_GUT) }), { rpc: x.rpc })
+    const e = await erstelleGesamt(s.d, { monat: '2026-09', neu })
+    assert.deepEqual([e.uebersprungen, s.runden.length, x.anzahl('gesamt_speichern')], [false, 1, 1], JSON.stringify([vorhanden, neu]))
+  }
+})
+
+test('Gesamtauswertung: Faktencheck nicht bestanden → Wiederholung; Rechte und Fehler der Datenbank kommen durch', async () => {
+  const x = db({ gesamt_pruefen: (_a, n) => (n === 1 ? { data: { geprueft: false, abweichungen: ['4,71'] }, error: null } : { data: { geprueft: true, abweichungen: [] }, error: null }) })
+  const s = stapel((_a, runde) => ({ roh: JSON.stringify({ ...GESAMT_GUT, zusammenfassung: runde === 1 ? 'Wert 4,71' : 'Wert 3,8' }) }), { rpc: x.rpc })
+  const r = await erstelleGesamt(s.d, { monat: '2026-09', neu: false })
+  assert.equal(r.versuche, 2)
+  assert.match(s.runden[1].auftraege[0].nachricht, /4,71/)
+  assert.match(String(x.aufrufe.find((a) => a.name === 'gesamt_speichern')!.args.p_text), /Wert 3,8/)
+
+  const verboten = db({ gesamt_eingabe: () => ({ data: null, error: { code: '42501', message: 'Nur für Admins.' } }) })
+  await assert.rejects(erstelleGesamt(stapel(() => ({ roh: '' }), { rpc: verboten.rpc }).d, { monat: '2026-09', neu: false }), (e: unknown) => e instanceof AnalyseFehler && e.status === 403 && e.message === 'Nur für Admins.')
+  const offen = db({ gesamt_eingabe: () => ({ data: null, error: { code: '22023', message: 'Der Monat ist noch nicht abgeschlossen.' } }) })
+  await assert.rejects(erstelleGesamt(stapel(() => ({ roh: '' }), { rpc: offen.rpc }).d, { monat: '2026-09', neu: false }), (e: unknown) => e instanceof AnalyseFehler && e.status === 422)
+})
+
 // ---- HTTP -----------------------------------------------------------------------------------------------------
 
 const ENV = { SUPABASE_URL: 'https://p.supabase.co', SUPABASE_ANON_KEY: 'anon', AI_PROVIDER: 'claude', ANTHROPIC_API_KEY: 'k', ANTHROPIC_MODEL: 'm' }
@@ -345,4 +734,91 @@ test('HTTP: Fehler der Datenbank und der KI kommen als deutsche Meldung mit Stat
   const netz = await behandleAnfrage(anfrage({ person_id: PERSON, monat: '2026-09' }), ENV, async () => { throw new Error('Netz weg') })
   assert.equal(netz.status, 500)
   assert.deepEqual(await netz.json(), { ok: false, fehler: 'Die Analyse konnte nicht erstellt werden.' })
+})
+
+// ---- HTTP: Aufgaben -------------------------------------------------------------------------------------------
+
+test('HTTP: Aufgabe und Eingaben werden geprüft', async () => {
+  const nie = async () => { throw new Error('darf nicht aufgerufen werden') }
+  const code = async (body: unknown) => (await behandleAnfrage(anfrage(body), ENV, nie)).status
+  assert.equal(await code({ aufgabe: 'etwas', monat: '2026-09' }), 400)
+  assert.equal(await code({ aufgabe: 'gesamt' }), 400)
+  assert.equal(await code({ aufgabe: 'gesamt', monat: '2026-13' }), 400)
+  assert.equal(await code({ aufgabe: 'alle', monat: 'September' }), 400)
+  assert.equal(await code({ aufgabe: 'alle', monat: '2026-09', ausgenommen: 'x' }), 400)
+  assert.equal(await code({ aufgabe: 'alle', monat: '2026-09', ausgenommen: ['kein-uuid'] }), 400)
+  assert.equal(await code({ aufgabe: 'alle', monat: '2026-09', ausgenommen: Array.from({ length: 201 }, () => PERSON) }), 400)
+  assert.equal(await code({ aufgabe: 'person', monat: '2026-09' }), 400, 'Einzelanalyse braucht eine Person')
+  assert.equal(await code({ aufgabe: 'gesamt', monat: '2026-09' }), 500, 'gültig: weiter bis zur (hier fehlenden) Datenbank')
+})
+
+/** Datenbank und Anbieter für den kompletten Durchlauf über HTTP. */
+function umgebung(zusatz: Record<string, unknown> = {}, ki: (url: string, init?: RequestInit) => Response | null = () => null) {
+  const gesehen: { url: string; body: any; kopf: Record<string, string> }[] = []
+  const fetchFn = async (url: string, init?: RequestInit) => {
+    const kopf = Object.fromEntries(Object.entries((init?.headers ?? {}) as Record<string, string>))
+    const body = init?.body ? JSON.parse(String(init.body)) : null
+    gesehen.push({ url, body, kopf })
+    if (!url.includes('/rest/v1/rpc/')) return ki(url, init) ?? new Response('{}', { status: 500 })
+    const name = url.split('/rpc/')[1]
+    const antworten: Record<string, unknown> = {
+      gesamt_eingabe: { eingabe: GESAMT_EINGABE, hash: 'g1' },
+      gesamt_lesen: null,
+      gesamt_pruefen: { geprueft: true, abweichungen: [] },
+      gesamt_speichern: { status: 'entwurf', geprueft: true },
+      abschluss_uebersicht: uebersicht(),
+      analyse_eingabe: { eingabe: EINGABE, hash: 'h1' },
+      analyse_pruefen: { geprueft: true, abweichungen: [] },
+      analyse_speichern: { status: 'entwurf', geprueft: true },
+      ...zusatz,
+    }
+    return new Response(JSON.stringify(antworten[name]), { status: 200 })
+  }
+  return { fetchFn, gesehen }
+}
+
+test('HTTP: Gesamtauswertung über Claude', async () => {
+  const u = umgebung({}, (url) => (url === 'https://api.anthropic.com/v1/messages' ? new Response(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(GESAMT_GUT) }] }), { status: 200 }) : null))
+  const r = await behandleAnfrage(anfrage({ aufgabe: 'gesamt', monat: '2026-09' }), ENV, u.fetchFn)
+  assert.equal(r.status, 200)
+  const body = (await r.json()) as { ok: boolean; uebersprungen: boolean; versuche: number; analyse: { status: string } }
+  assert.deepEqual([body.ok, body.uebersprungen, body.versuche, body.analyse.status], [true, false, 1, 'entwurf'])
+  assert.deepEqual(u.gesehen.filter((g) => g.url.includes('/rpc/')).map((g) => g.url.split('/rpc/')[1]), ['gesamt_eingabe', 'gesamt_lesen', 'gesamt_pruefen', 'gesamt_speichern'])
+  const ki = u.gesehen.find((g) => g.url.startsWith('https://api.anthropic.com'))!
+  assert.equal(ki.body.system, SYSTEM_PROMPT_GESAMT)
+  assert.ok(u.gesehen.filter((g) => g.url.includes('/rpc/')).every((g) => g.kopf.authorization === 'Bearer jwt' && g.kopf.apikey === 'anon'))
+  assert.ok(!JSON.stringify(u.gesehen).includes('service_role'))
+})
+
+test('HTTP: Sammellauf über den Webhook — ein Aufruf mit allen Aufträgen, Ergebnisse je Person gespeichert', async () => {
+  const ENV_W = { SUPABASE_URL: 'https://p.supabase.co', SUPABASE_ANON_KEY: 'anon', AI_PROVIDER: 'webhook', AI_WEBHOOK_URL: 'https://n8n.example/webhook/dawiid', AI_WEBHOOK_SECRET: 'geheim' }
+  const u = umgebung(
+    { abschluss_uebersicht: mitPersonen(2) },
+    (url) => (url === ENV_W.AI_WEBHOOK_URL ? new Response(JSON.stringify({ ergebnisse: [{ ref: '2', code: 200, ausgabe: GUT }, { ref: '1', code: 200, ausgabe: GUT }] }), { status: 200 }) : null),
+  )
+  const r = await behandleAnfrage(anfrage({ aufgabe: 'alle', monat: '2026-09', ausgenommen: [] }), ENV_W, u.fetchFn)
+  assert.equal(r.status, 200)
+  const body = (await r.json()) as { ok: boolean; aufgabe: string; erstellt: { person_id: string }[]; fehlgeschlagen: unknown[]; verbleibend: number }
+  assert.deepEqual([body.ok, body.aufgabe, body.erstellt.map((e) => e.person_id), body.fehlgeschlagen.length, body.verbleibend], [true, 'alle', [ID(1), ID(2)], 0, 0])
+  const webhooks = u.gesehen.filter((g) => g.url === ENV_W.AI_WEBHOOK_URL)
+  assert.equal(webhooks.length, 1)
+  assert.equal(webhooks[0].kopf['x-webhook-secret'], 'geheim')
+  assert.deepEqual([webhooks[0].body.aufgabe, webhooks[0].body.prompt_version, webhooks[0].body.auftraege.map((a: Auftrag) => a.ref)], [AUFGABE_EINZEL, PROMPT_VERSION, ['1', '2']])
+  assert.ok(!JSON.stringify(webhooks[0].body).includes(ID(1)), 'keine Personen-Kennung im Webhook')
+  assert.deepEqual(u.gesehen.filter((g) => g.url.endsWith('/analyse_speichern')).map((g) => g.body.p_person), [ID(1), ID(2)])
+})
+
+test('HTTP: Sammellauf — Verantwortliche ohne KI-Recht bekommen 403 und die KI wird nicht gefragt', async () => {
+  const u = umgebung({ abschluss_uebersicht: uebersicht({ ki: false }) })
+  const r = await behandleAnfrage(anfrage({ aufgabe: 'alle', monat: '2026-09' }), ENV, u.fetchFn)
+  assert.equal(r.status, 403)
+  assert.deepEqual(await r.json(), { ok: false, fehler: 'Nur für Admins.' })
+  assert.ok(!u.gesehen.some((g) => g.url.startsWith('https://api.anthropic.com')))
+})
+
+test('HTTP: Einzelanalyse ohne Aufgabe wie bisher (aufgabe = person)', async () => {
+  const u = umgebung({}, (url) => (url === 'https://api.anthropic.com/v1/messages' ? new Response(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(GUT) }] }), { status: 200 }) : null))
+  const r = await behandleAnfrage(anfrage({ aufgabe: 'person', person_id: PERSON, monat: '2026-09' }), ENV, u.fetchFn)
+  assert.equal(r.status, 200)
+  assert.equal(u.gesehen.find((g) => g.url.startsWith('https://api.anthropic.com'))!.body.system, SYSTEM_PROMPT)
 })
