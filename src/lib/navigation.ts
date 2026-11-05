@@ -105,6 +105,17 @@ export const BEREICHE: readonly Bereich[] = [
     ],
   },
   {
+    schluessel: 'leitung',
+    pfad: '/app/leitung',
+    menue: 'Leitung',
+    titel: 'Leitung',
+    kurz: 'Kommentare, Monatsabschluss, Fokus und Agenda für das Teammeeting.',
+    icon: 'leitung',
+    rollen: LEITUNG,
+    live: true,
+    geplant: ['Kommentar-Auswertung', 'Monatsabschluss und Einzelanalyse', 'Fokus-Verhalten, Agenda und Termine'],
+  },
+  {
     schluessel: 'chefumfrage-mitarbeiter',
     pfad: '/app/chefumfrage',
     menue: 'Chefumfrage',

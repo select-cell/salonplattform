@@ -239,3 +239,31 @@ export const KENNZEICHEN_LABEL: Record<string, string> = {
   neu_begonnen: 'neu begonnen',
   ohne_sitzung: 'ohne Zeitmessung',
 }
+
+// ---- Kommentar-Auswertung (Erweiterung D) ---------------------------------------------
+
+export interface KommentarKennzahlen {
+  bewertungen: number
+  kommentare: number
+  quote: number | null
+  pflicht: number
+  pflicht_erfuellt: number
+  freiwillig_bewertungen: number
+  freiwillig_kommentare: number
+  freiwillige_quote: number | null
+  woerter_schnitt: number | null
+  kurz: number
+  doppelt: number
+  verhalten_ohne_kommentar: number
+}
+
+export interface KommentarAuswertung {
+  monat: string
+  monate: string[]
+  schwelle_pflicht: number
+  kurz_unter_woerter: number
+  eigene_analyse_nur_admin: boolean
+  team: KommentarKennzahlen & { erwartet: number; abgegeben: number; nicht_abgegeben: number; kurz_anteil: number | null }
+  personen: (KommentarKennzahlen & { id: string; name: string })[]
+  nicht_abgegeben: { id: string; name: string }[]
+}

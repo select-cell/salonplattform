@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthProvider'
 import { RequireAuth, RequireRolle, RequireTeilnahme } from './auth/Guards'
 import { AppLayout } from './components/AppLayout'
@@ -21,6 +21,8 @@ const ErgebnissePage = lazy(() => import('./pages/app/ErgebnissePage'))
 const TeamSeite = lazy(() => import('./pages/app/TeamSeite'))
 const MitgliederSeite = lazy(() => import('./pages/app/MitgliederSeite'))
 const MitgliedSeite = lazy(() => import('./pages/app/MitgliedSeite'))
+const Leitung = lazy(() => import('./pages/app/leitung/Leitung'))
+const Kommentare = lazy(() => import('./pages/app/leitung/Kommentare'))
 
 export default function App() {
   return (
@@ -56,6 +58,10 @@ export default function App() {
             <Route element={<RequireRolle rollen={['verantwortlicher', 'admin']} />}>
               <Route path="mitglieder" element={<MitgliederSeite />} />
               <Route path="mitglieder/:id" element={<MitgliedSeite />} />
+              <Route path="leitung" element={<Leitung />}>
+                <Route index element={<Navigate to="kommentare" replace />} />
+                <Route path="kommentare" element={<Kommentare />} />
+              </Route>
               <Route path="gaeste" element={<Platzhalter />} />
               <Route path="meine-umfrage" element={<Platzhalter />} />
             </Route>

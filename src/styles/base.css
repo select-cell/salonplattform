@@ -501,7 +501,7 @@ h3 {
   border-top: 1px solid var(--line);
 }
 
-@media (min-width: 960px) {
+@media (min-width: 1040px) {
   .nav {
     display: flex;
     flex: 1;
@@ -945,7 +945,7 @@ h3 {
   display: none;
 }
 
-@media (min-width: 960px) and (max-width: 1179px) {
+@media (min-width: 1040px) and (max-width: 1179px) {
   .passwort-btn {
     display: inline-grid;
   }
@@ -969,4 +969,32 @@ h3 {
   .kopf__rechts {
     gap: 0;
   }
+}
+
+/* Unter-Navigation im Bereich Leitung */
+.unternav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.unternav__link {
+  padding: 8px 14px;
+  border: 1.5px solid var(--cream-deep);
+  border-radius: 99px;
+  color: var(--text2);
+  font-size: 0.925rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.unternav__link:hover {
+  border-color: var(--muted);
+  color: var(--text);
+}
+
+.unternav__link.aktiv {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--cream);
 }

@@ -2,7 +2,7 @@
 // aus Plan §5.3 kommen hier mit den jeweiligen Phasen dazu.
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './konfiguration'
 import { supabase } from './supabase'
-import type { AbgabeStatus, Dashboard, PersonAuswertung, TeamAuswertung, Ueberfaellig, ZeitAuswertung } from './auswertung'
+import type { AbgabeStatus, Dashboard, PersonAuswertung, TeamAuswertung, Ueberfaellig, ZeitAuswertung, KommentarAuswertung } from './auswertung'
 import type { Person } from './types'
 import type { MonatStatus, UmfrageInhalt, UmfrageNutzdaten } from './umfrage'
 
@@ -138,4 +138,12 @@ export async function holeZeitAuswertung(monat?: string): Promise<ZeitAuswertung
   const { data, error } = await supabase.rpc('zeit_auswertung', monat ? { p_monat: `${monat}-01` } : {})
   if (error) throw new Error(error.message)
   return data as ZeitAuswertung
+}
+
+// ---- Kommentar-Auswertung (Erweiterung D) -------------------------------------------
+
+export async function holeKommentarAuswertung(monat?: string): Promise<KommentarAuswertung> {
+  const { data, error } = await supabase.rpc('kommentar_auswertung', monat ? { p_monat: `${monat}-01` } : {})
+  if (error) throw new Error(error.message)
+  return data as KommentarAuswertung
 }

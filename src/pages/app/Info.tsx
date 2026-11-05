@@ -49,6 +49,18 @@ export default function Info() {
         </ul>
       </Abschnitt>
 
+      <Abschnitt titel="Kommentare in der Umfrage">
+        <p>
+          Verantwortliche und Admin sehen, <strong>wie oft und wie ausführlich</strong> jede Person Kommentare schreibt: Quote, Anteil bei
+          Pflicht und freiwillig, durchschnittliche Länge, sehr kurze Kommentare, Wiederholungen und Verhalten ohne Kommentar.
+          Der <strong>Text</strong> eines Kommentars ist in dieser Auswertung nie zu sehen. Die Kennzahlen dienen dazu, das Feedback im Team
+          besser zu machen, nicht dazu, Personen zu bewerten.
+        </p>
+        <p className="klein muted">
+          Auf Wunsch lässt sich einstellen, dass Verantwortliche ihre eigenen Werte nicht sehen (nur der Admin).
+        </p>
+      </Abschnitt>
+
       <Abschnitt titel="Ausfüllzeit der Umfrage">
         <p>
           Wir messen, wie lange du <strong>aktiv</strong> an der Umfrage arbeitest. Aktiv heißt: Die Seite ist sichtbar und du hast in den
