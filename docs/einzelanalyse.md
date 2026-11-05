@@ -64,7 +64,7 @@ Die Adresse des Webhooks ist kein Geheimnis und steht im Code; ohne weitere Eins
 
 **Ein Webhook für alles:** Mit `AI_PROVIDER=webhook` geht jede KI-Anfrage an den **einen** Webhook. Anfrage: `{ aufgabe, prompt_version, auftraege: [{ ref, system, nachricht, eingabe }] }` mit `aufgabe` = `einzelanalyse` (auch für den Sammellauf mit mehreren Aufträgen), `gesamtauswertung` oder `agenda`. Antwort **direkt als Antwort des Webhooks**: `{ ergebnisse: [{ ref, code, ausgabe | fehler }] }`, die `ausgabe` ein JSON-Objekt mit den Schlüsseln des jeweiligen Prompts (Einzelanalyse: `zusammenfassung`, `staerken`, `entwicklungsfelder`, `gespraechsfragen`, `vereinbarungen_vorschlaege`, `kommentar_qualitaet_hinweis`; Gesamtauswertung: dieselben, statt des letzten `datenlage_hinweis`). `ref` ist eine laufende Nummer, nie eine Kennung aus der Datenbank. n8n schreibt nichts in die Datenbank: Die Edge Function lässt jede Antwort von der Datenbank prüfen und speichern.
 
-**Fertiger n8n-Workflow:** `n8n/dawiid-ki.workflow.json` mit einem Webhook, einem Strang je Aufgabe und je einem KI-Agenten (Anthropic) mit Kontext (Import, Einrichtung, Testanfragen und Anleitung zum Einzeltest in [n8n/README.md](../n8n/README.md)).
+**Fertiger n8n-Workflow:** `n8n/dawiid-ki.workflow.json` mit einem Webhook, einem Strang je Aufgabe und je einem Knoten „Claude …“, der die Anthropic-API mit Kontext direkt aufruft (Import, Einrichtung, Testanfragen und Anleitung zum Einzeltest in [n8n/README.md](../n8n/README.md)).
 
 **Zeit:** höchstens 135 Sekunden je Anfrage und 120 Sekunden je Aufruf des Anbieters (Supabase bricht nach 150 Sekunden ab). Deshalb höchstens 2 Personen je Sammellauf-Aufruf.
 
@@ -74,7 +74,7 @@ Feedbacktexte gehen **ohne Namen und ohne Absender** an den KI-Anbieter, bei der
 
 ## Tests
 
-pgTAP `07_monatsabschluss_analysen.test.sql` (151: Rechte, Abschluss, Eingabe ohne Namen über alle Namensteile, Faktencheck, Entwurf/Freigabe, Salon-Grenze, Schalter; mit `ki_nur_admin` aus), `09_ki_admin_gesamt.test.sql` (118: Standard nur Admin, Gesamtauswertung, Schalter, Salon-Grenze), `10_agenda_ki.test.sql` (75: Eingabe, Aufbau, Zeitbudget, Zahlen, Speichern, Bearbeiten), Logik der Edge Function `supabase/functions/analyse-erstellen/analyse.test.ts` (63, `npm run test:functions`), n8n-Workflow `n8n/workflow.test.mjs` (28, `npm run test:n8n`), Browser `phase-e.test.mjs` (85), `phase-f.test.mjs` (107) und `phase-g.test.mjs` (22, KI direkt aus der Oberfläche).
+pgTAP `07_monatsabschluss_analysen.test.sql` (151: Rechte, Abschluss, Eingabe ohne Namen über alle Namensteile, Faktencheck, Entwurf/Freigabe, Salon-Grenze, Schalter; mit `ki_nur_admin` aus), `09_ki_admin_gesamt.test.sql` (118: Standard nur Admin, Gesamtauswertung, Schalter, Salon-Grenze), `10_agenda_ki.test.sql` (75: Eingabe, Aufbau, Zeitbudget, Zahlen, Speichern, Bearbeiten), Logik der Edge Function `supabase/functions/analyse-erstellen/analyse.test.ts` (65, `npm run test:functions`), n8n-Workflow `n8n/workflow.test.mjs` (31, `npm run test:n8n`), Browser `phase-e.test.mjs` (85), `phase-f.test.mjs` (107) und `phase-g.test.mjs` (22, KI direkt aus der Oberfläche).
 
 ## Nicht live getestet
 

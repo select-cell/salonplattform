@@ -141,29 +141,62 @@ export class AnalyseFehler extends Error {
 
 // ---- Ausgabe der KI lesen und in Text umwandeln ---------------------------------------------------------------
 
+/**
+ * Entfernt Zeilenumbrüche, die mitten in einem Wort, einer Zahl oder einem Text stehen, und Tabs in Texten. Sie machen JSON ungültig.
+ * Manche Wege (Streaming in n8n) liefern Text in Stücken mit einem Umbruch dazwischen („Fe↵edback“, „nul↵l“); ohne die Umbrüche stimmt
+ * der Text wieder. Zwischen zwei JSON-Teilen ist ein Umbruch nie nötig, ihn zu entfernen kostet nichts.
+ */
+export function repariereJson(text: string): string {
+  let aus = ''
+  let inText = false
+  let escape = false
+  for (const c of text) {
+    if (c === '\n' || c === '\r') continue
+    if (!inText) {
+      if (c === '"') inText = true
+      aus += c
+    } else if (escape) {
+      escape = false
+      aus += c
+    } else if (c === '\\') {
+      escape = true
+      aus += c
+    } else if (c === '"') {
+      inText = false
+      aus += c
+    } else {
+      aus += c === '\t' ? ' ' : c
+    }
+  }
+  return aus
+}
+
+export const JSON_UNVOLLSTAENDIG = 'JSON unvollständig'
+
 function ersteJsonStelle(text: string): unknown {
   const ohneZaun = text.replace(/```(?:json)?/gi, '')
   try {
     return JSON.parse(ohneZaun.trim())
   } catch {
-    // weiter: das erste vollständige {...} suchen
+    // weiter: Umbrüche in Texten entfernen, dann das erste vollständige {...} suchen
   }
-  const start = ohneZaun.indexOf('{')
-  if (start < 0) throw new Error('kein JSON')
+  const von = ohneZaun.indexOf('{')
+  if (von < 0) throw new Error('kein JSON')
+  const t = repariereJson(ohneZaun.slice(von))
   let tiefe = 0
   let inText = false
   let escape = false
-  for (let i = start; i < ohneZaun.length; i++) {
-    const c = ohneZaun[i]
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i]
     if (inText) {
       if (escape) escape = false
       else if (c === '\\') escape = true
       else if (c === '"') inText = false
     } else if (c === '"') inText = true
     else if (c === '{') tiefe++
-    else if (c === '}' && --tiefe === 0) return JSON.parse(ohneZaun.slice(start, i + 1))
+    else if (c === '}' && --tiefe === 0) return JSON.parse(t.slice(0, i + 1))
   }
-  throw new Error('JSON unvollständig')
+  throw new Error(JSON_UNVOLLSTAENDIG)
 }
 
 const kurz = (t: string) => t.replace(/\s+/g, ' ').trim()
@@ -363,7 +396,7 @@ async function rufeClaude(config: AnbieterConfig, a: Auftrag, fetchFn: FetchFn, 
     headers: { 'content-type': 'application/json', 'x-api-key': config.schluessel ?? '', 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
       model: config.modell,
-      max_tokens: 2000,
+      max_tokens: 4096,
       system: a.system,
       messages: [{ role: 'user', content: a.nachricht }],
     }),
@@ -507,6 +540,7 @@ export interface Ziel {
 export type ZielErgebnis = { ok: true; text: string; ausgabe: unknown; versuche: number } | { ok: false; fehler: AnalyseFehler }
 
 const KEIN_JSON = 'Deine letzte Antwort war kein gültiges JSON im vorgegebenen Format. Antworte nur mit dem JSON-Objekt und allen Schlüsseln.'
+const KEIN_JSON_ABGESCHNITTEN = 'Deine letzte Antwort war abgeschnitten (das JSON war nicht zu Ende). Fasse dich kürzer: je Punkt ein kurzer Satz, höchstens drei Punkte je Block. Antworte nur mit dem vollständigen JSON-Objekt.'
 
 /**
  * Alle Ziele einer Aufgabe in Runden: Jede Runde schickt die noch offenen Ziele gemeinsam an die KI (bei einem Webhook in
@@ -574,8 +608,8 @@ export async function arbeiteZiele(
       let gelesen: { ausgabe: unknown; text: string }
       try {
         gelesen = s.ziel.parse(a.roh)
-      } catch {
-        s.korrektur = KEIN_JSON
+      } catch (e) {
+        s.korrektur = e instanceof Error && e.message === JSON_UNVOLLSTAENDIG ? KEIN_JSON_ABGESCHNITTEN : KEIN_JSON
         weiter.push(s)
         continue
       }

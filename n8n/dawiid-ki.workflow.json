@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## DAWIID KI: ein Webhook, drei Stränge\nDie Plattform schickt alles an diesen einen Webhook: direkt aus der Oberfläche (Browser des Admins), ersatzweise über die Edge Function **analyse-erstellen**. Das Feld `aufgabe` entscheidet, in welchen Strang die Anfrage läuft. Dort bearbeitet ein **KI-Agent** (Claude über die Anthropic-API) jeden Auftrag mit seinem Kontext und die Antwort geht direkt als Antwort des Webhooks zurück an die Plattform. Die Plattform prüft die Zahlen (Faktencheck) und speichert.\n\n### Einrichten\n1. Eine Zugangsdaten anlegen: **Anthropic** (API Key), dein Schlüssel. An **allen drei** Knoten **Claude …** auswählen. Mehr nicht: Der Webhook braucht kein Geheimnis.\n2. Workflow **aktivieren** (Schalter oben rechts). Die Production URL des Knotens Webhook ist `…/webhook/dawiid-ki`; sie steht schon in der Plattform.\n\n### Wer darf den Webhook aufrufen?\nNur wer in der Plattform angemeldet ist. Die Plattform schickt die Anmeldung (Authorization: Bearer …) mit, der Knoten **Anmeldung prüfen** lässt sie bei Supabase bestätigen. Ohne gültige Anmeldung antwortet der Webhook mit 401, bevor etwas an die KI geht. Im Editor-Test (Execute workflow) entfällt die Prüfung.\n\n### Einzeln testen\nDer Knoten **Webhook** enthält eine echte Beispielanfrage (angeheftet). **Execute workflow** läuft durch den Strang Einzelanalyse; jeden Knoten kannst du mit **Test step** wiederholen. Weitere Anfragen (Sammellauf, Gesamtauswertung, Agenda) liegen im Ordner `n8n/testanfragen`.",
+        "content": "## DAWIID KI: ein Webhook, drei Stränge\nDie Plattform schickt alles an diesen einen Webhook: direkt aus der Oberfläche (Browser des Admins), ersatzweise über die Edge Function **analyse-erstellen**. Das Feld `aufgabe` entscheidet, in welchen Strang die Anfrage läuft. Dort fragt ein Knoten **Claude …** die Anthropic-API mit dem Prompt und den Daten aus der Plattform (Kontext je Aufgabe), die Antwort geht direkt als Antwort des Webhooks zurück an die Plattform. Die Plattform prüft die Zahlen (Faktencheck) und speichert.\n\n### Einrichten\n1. Zugangsdaten **Anthropic** (API Key) anlegen und an **allen drei** Knoten **Claude …** auswählen (Authentication: Predefined Credential Type → Anthropic). Mehr nicht: Der Webhook braucht kein Geheimnis.\n2. Workflow **aktivieren** (Schalter oben rechts). Die Production URL des Knotens Webhook ist `…/webhook/dawiid-ki`; sie steht schon in der Plattform.\n\n### Wer darf den Webhook aufrufen?\nNur wer in der Plattform angemeldet ist. Die Plattform schickt die Anmeldung (Authorization: Bearer …) mit, der Knoten **Anmeldung prüfen** lässt sie bei Supabase bestätigen. Ohne gültige Anmeldung antwortet der Webhook mit 401, bevor etwas an die KI geht. Im Editor-Test (Execute workflow) entfällt die Prüfung.\n\n### Einzeln testen\nDer Knoten **Webhook** enthält eine echte Beispielanfrage (angeheftet). **Execute workflow** läuft durch den Strang Einzelanalyse; jeden Knoten kannst du mit **Test step** wiederholen. Weitere Anfragen (Sammellauf, Gesamtauswertung, Agenda) liegen im Ordner `n8n/testanfragen`.",
         "height": 760,
         "width": 560,
         "color": 4
@@ -19,7 +19,7 @@
     },
     {
       "parameters": {
-        "content": "### Die Stränge\n- **Einzelanalyse** (`aufgabe` = einzelanalyse): ein Auftrag je Person. Der **Sammellauf** der Plattform schickt mehrere Aufträge in einer Anfrage; jeder wird für sich bearbeitet.\n- **Gesamtauswertung** (`aufgabe` = gesamtauswertung): ein Auftrag für das ganze Team.\n- **Agenda** (`aufgabe` = agenda): ein Auftrag, die KI formuliert die Agenda fürs Teammeeting (fünf Blöcke, 15 bis 20 Minuten).\n\n### Neuer Strang\n1. Im Knoten **Anfrage prüfen** die Aufgabe in `AUFGABEN` eintragen.\n2. Im Knoten **Aufgabe wählen** eine Regel ergänzen.\n3. Einen Agenten samt Claude-Modell kopieren, an die neue Regel hängen und den Ausgang mit **Antwort lesen** verbinden.",
+        "content": "### Die Stränge\n- **Einzelanalyse** (`aufgabe` = einzelanalyse): ein Auftrag je Person. Der **Sammellauf** der Plattform schickt mehrere Aufträge in einer Anfrage; jeder wird für sich bearbeitet.\n- **Gesamtauswertung** (`aufgabe` = gesamtauswertung): ein Auftrag für das ganze Team.\n- **Agenda** (`aufgabe` = agenda): ein Auftrag, die KI formuliert die Agenda fürs Teammeeting (fünf Blöcke, 15 bis 20 Minuten).\n\n### Neuer Strang\n1. Im Knoten **Anfrage prüfen** die Aufgabe in `AUFGABEN` eintragen.\n2. Im Knoten **Aufgabe wählen** eine Regel ergänzen.\n3. Einen Knoten **Claude …** kopieren, an die neue Regel hängen und den Ausgang mit **Antwort lesen** verbinden.",
         "height": 420,
         "width": 560,
         "color": 6
@@ -35,7 +35,7 @@
     },
     {
       "parameters": {
-        "content": "### Was die Knoten tun\n- **Anmeldung prüfen** / **Angemeldet?**: fragt Supabase, ob die mitgeschickte Anmeldung gültig ist. Sonst Antwort 401.\n- **Anfrage prüfen**: Aufgabe bekannt? Aufträge vollständig? Hier steht auch der **Zusatzkontext** je Aufgabe, der dem Agenten mitgegeben wird.\n- **Agent …**: bekommt `system` (Prompt aus der Plattform plus Zusatzkontext) und `nachricht` (die Daten).\n- **Antwort lesen**: holt das JSON aus der Agent-Antwort, prüft Form und Anzahl der Punkte.\n- **Zahlencheck**: zeigt schon beim Testen Zahlen, die nicht in den Daten stehen. Maßgeblich bleibt der Faktencheck der Datenbank.\n- **Antwort bündeln**: eine Antwort für alle Aufträge. Unter `meta` stehen die Hinweise; die Plattform ignoriert sie.",
+        "content": "### Was die Knoten tun\n- **Anmeldung prüfen** / **Angemeldet?**: fragt Supabase, ob die mitgeschickte Anmeldung gültig ist. Sonst Antwort 401.\n- **Anfrage prüfen**: Aufgabe bekannt? Aufträge vollständig? Hier steht auch der **Zusatzkontext** je Aufgabe, der der KI mitgegeben wird.\n- **Claude …**: fragt die Anthropic-API (Modell und `max_tokens` stehen im Body). Es bekommt `system` (Prompt aus der Plattform plus Zusatzkontext) und `nachricht` (die Daten); mehrere Aufträge laufen gleichzeitig.\n- **Antwort lesen**: holt das JSON aus der Antwort der API, prüft Form und Anzahl der Punkte und meldet, wenn die Antwort wegen des Token-Limits abgeschnitten ist (`stop_reason`).\n- **Zahlencheck**: zeigt schon beim Testen Zahlen, die nicht in den Daten stehen. Maßgeblich bleibt der Faktencheck der Datenbank.\n- **Antwort bündeln**: eine Antwort für alle Aufträge. Unter `meta` stehen die Hinweise; die Plattform ignoriert sie.",
         "height": 380,
         "width": 560,
         "color": 7
@@ -207,122 +207,8 @@
     },
     {
       "parameters": {
-        "promptType": "define",
-        "text": "={{ $json.nachricht }}",
-        "options": {
-          "systemMessage": "={{ $json.system }}"
-        }
-      },
-      "id": "d4a11d00-0000-4000-8000-000000000011",
-      "name": "Agent Einzelanalyse",
-      "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 1.7,
-      "position": [
-        1500,
-        -260
-      ],
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "model": {
-          "__rl": true,
-          "mode": "id",
-          "value": "claude-sonnet-5-5"
-        },
-        "options": {
-          "maxTokensToSample": 2000
-        }
-      },
-      "id": "d4a11d00-0000-4000-8000-000000000012",
-      "name": "Claude Einzelanalyse",
-      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
-      "typeVersion": 1.3,
-      "position": [
-        1500,
-        -60
-      ]
-    },
-    {
-      "parameters": {
-        "promptType": "define",
-        "text": "={{ $json.nachricht }}",
-        "options": {
-          "systemMessage": "={{ $json.system }}"
-        }
-      },
-      "id": "d4a11d00-0000-4000-8000-000000000013",
-      "name": "Agent Gesamtauswertung",
-      "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 1.7,
-      "position": [
-        1500,
-        140
-      ],
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "model": {
-          "__rl": true,
-          "mode": "id",
-          "value": "claude-sonnet-5-5"
-        },
-        "options": {
-          "maxTokensToSample": 2000
-        }
-      },
-      "id": "d4a11d00-0000-4000-8000-000000000014",
-      "name": "Claude Gesamtauswertung",
-      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
-      "typeVersion": 1.3,
-      "position": [
-        1500,
-        340
-      ]
-    },
-    {
-      "parameters": {
-        "promptType": "define",
-        "text": "={{ $json.nachricht }}",
-        "options": {
-          "systemMessage": "={{ $json.system }}"
-        }
-      },
-      "id": "d4a11d00-0000-4000-8000-000000000021",
-      "name": "Agent Agenda",
-      "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 1.7,
-      "position": [
-        1500,
-        540
-      ],
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "model": {
-          "__rl": true,
-          "mode": "id",
-          "value": "claude-sonnet-5-5"
-        },
-        "options": {
-          "maxTokensToSample": 2000
-        }
-      },
-      "id": "d4a11d00-0000-4000-8000-000000000022",
-      "name": "Claude Agenda",
-      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
-      "typeVersion": 1.3,
-      "position": [
-        1500,
-        740
-      ]
-    },
-    {
-      "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "// Liest die Antwort des Agenten und macht daraus das Ergebnis für diesen Auftrag.\nlet k;\ntry {\n  k = $('Anfrage prüfen').item.json;\n} catch (e) {\n  k = $('Anfrage prüfen').all()[$itemIndex].json;\n}\nconst r = $input.item.json;\nconst fertig = (code, rest) => ({ json: { ref: k.ref, aufgabe: k.aufgabe, code, ...rest } });\n\n// Der Agent ist gescheitert (Zeitüberschreitung, Zugang, Auslastung)\nif (r.error || typeof r.output !== 'string') {\n  const meldung = typeof r.error === 'string' ? r.error : (r.error?.message ?? 'Der Agent hat keine Antwort geliefert.');\n  if (/429|rate.?limit|overloaded/i.test(meldung)) return fertig(429, { fehler: 'Die KI ist gerade ausgelastet.', detail: meldung });\n  return fertig(502, { fehler: 'Die KI ist nicht erreichbar oder hat nicht geantwortet.', detail: meldung });\n}\nconst text = r.output;\nif (!text.trim()) return fertig(502, { fehler: 'Der Agent hat keinen Text geliefert.' });\n\n// Wie die Edge Function: Code-Zaun entfernen, sonst das erste vollständige {...} suchen\nfunction ersteJsonStelle(t) {\n  const ohneZaun = t.replace(/```(?:json)?/gi, '');\n  try {\n    return JSON.parse(ohneZaun.trim());\n  } catch (e) {\n    // weiter\n  }\n  const start = ohneZaun.indexOf('{');\n  if (start < 0) throw new Error('kein JSON');\n  let tiefe = 0;\n  let inText = false;\n  let escape = false;\n  for (let i = start; i < ohneZaun.length; i++) {\n    const c = ohneZaun[i];\n    if (inText) {\n      if (escape) escape = false;\n      else if (c === '\\\\') escape = true;\n      else if (c === '\"') inText = false;\n    } else if (c === '\"') inText = true;\n    else if (c === '{') tiefe++;\n    else if (c === '}' && --tiefe === 0) return JSON.parse(ohneZaun.slice(start, i + 1));\n  }\n  throw new Error('JSON unvollständig');\n}\n\nconst hinweise = [];\nlet ausgabe;\ntry {\n  ausgabe = ersteJsonStelle(text);\n} catch (e) {\n  // Die Plattform fragt dann selbst noch einmal nach (höchstens dreimal)\n  hinweise.push('Die Antwort ist kein gültiges JSON: ' + e.message);\n  ausgabe = text;\n}\n\n// Form prüfen (nur zur Orientierung; die Plattform prüft die Form beim Lesen selbst)\nfunction pruefeAnalyse(a) {\n  if (typeof a.zusammenfassung !== 'string' || !a.zusammenfassung.trim()) hinweise.push('zusammenfassung fehlt');\n  for (const [name, [min, max]] of Object.entries(k.listen)) {\n    const liste = a[name];\n    if (!Array.isArray(liste) || liste.length === 0) hinweise.push(name + ' fehlt oder ist leer');\n    else if (liste.length < min || liste.length > max) hinweise.push(name + ': ' + liste.length + ' Punkte (erwartet ' + min + ' bis ' + max + ')');\n  }\n  if (!(k.hinweisSchluessel in a)) hinweise.push(k.hinweisSchluessel + ' fehlt (wird als leer gewertet)');\n  if (k.verbotenMuster && new RegExp(k.verbotenMuster).test(JSON.stringify(a))) hinweise.push(k.verbotenText);\n}\n\nfunction pruefeAgenda(a) {\n  const bloecke = a.bloecke;\n  if (!Array.isArray(bloecke) || bloecke.length !== k.bloecke.length) {\n    hinweise.push('bloecke: ' + k.bloecke.length + ' Blöcke erwartet');\n    return;\n  }\n  let summe = 0;\n  k.bloecke.forEach(([id, min, max], i) => {\n    const b = bloecke[i];\n    if (!b || typeof b !== 'object') return hinweise.push('Block ' + (i + 1) + ': id „' + id + '“ erwartet');\n    const ganz = typeof b.minuten === 'number' && Number.isInteger(b.minuten);\n    if (ganz) summe += b.minuten;\n    if (b.id !== id) return hinweise.push('Block ' + (i + 1) + ': id „' + id + '“ erwartet');\n    if (!ganz) hinweise.push(id + ': minuten ist keine ganze Zahl');\n    else if (b.minuten < min || b.minuten > max) hinweise.push(id + ': ' + b.minuten + ' Minuten (erlaubt ' + min + ' bis ' + max + ')');\n    const anzahl = Array.isArray(b.punkte) ? b.punkte.length : 0;\n    if (anzahl === 0) hinweise.push(id + ': punkte fehlt oder ist leer');\n    else if (anzahl < k.punkteProBlock[0] || anzahl > k.punkteProBlock[1]) hinweise.push(id + ': ' + anzahl + ' Punkte (erwartet ' + k.punkteProBlock[0] + ' bis ' + k.punkteProBlock[1] + ')');\n  });\n  if (summe < k.gesamt[0] || summe > k.gesamt[1]) hinweise.push('Summe ' + summe + ' Minuten (erlaubt ' + k.gesamt[0] + ' bis ' + k.gesamt[1] + ')');\n}\n\nif (typeof ausgabe === 'object' && ausgabe !== null && !Array.isArray(ausgabe)) {\n  if (k.form === 'agenda') pruefeAgenda(ausgabe);\n  else pruefeAnalyse(ausgabe);\n} else if (typeof ausgabe === 'object') {\n  hinweise.push('Die Antwort ist kein JSON-Objekt');\n}\n\nreturn fertig(200, { ausgabe, meta: { strang: k.strang, prompt_version: k.prompt_version, hinweise } });\n"
+        "jsCode": "// Liest die Antwort des Agenten und macht daraus das Ergebnis für diesen Auftrag.\nlet k;\ntry {\n  k = $('Anfrage prüfen').item.json;\n} catch (e) {\n  k = $('Anfrage prüfen').all()[$itemIndex].json;\n}\nconst r = $input.item.json;\nconst fertig = (code, rest) => ({ json: { ref: k.ref, aufgabe: k.aufgabe, code, ...rest } });\n\n// Die Antwort der Anthropic-API: { content: [{ type: 'text', text }], stop_reason, usage }. Ein Fehler kommt als { error: { type, message } }\n// (oder als Text bei einer Zeitüberschreitung). Auch die Form { output: '…' } wird gelesen.\nconst teile = Array.isArray(r.content) ? r.content.filter((x) => x && x.type === 'text' && typeof x.text === 'string').map((x) => x.text) : null;\nconst text = teile ? teile.join('') : (typeof r.output === 'string' ? r.output : undefined);\nconst api = teile\n  ? { stop_reason: r.stop_reason ?? null, ausgabe_token: r.usage?.output_tokens ?? null }\n  : {};\nif (r.error || typeof text !== 'string') {\n  const meldung = typeof r.error === 'string' ? r.error : ([r.error?.type, r.error?.message].filter(Boolean).join(': ') || 'Die KI hat keine Antwort geliefert.');\n  if (/429|rate.?limit|overloaded/i.test(meldung)) return fertig(429, { fehler: 'Die KI ist gerade ausgelastet.', detail: meldung });\n  return fertig(502, { fehler: 'Die KI ist nicht erreichbar oder hat nicht geantwortet.', detail: meldung });\n}\nif (!text.trim()) return fertig(502, { fehler: 'Die KI hat keinen Text geliefert.', detail: api.stop_reason ? 'stop_reason: ' + api.stop_reason : null });\n\n// Wie die Edge Function: Code-Zaun entfernen, Umbrüche mitten in Wörtern entfernen (Streaming liefert Text in Stücken mit einem\n// Umbruch dazwischen), sonst das erste vollständige {...} suchen\nfunction reparieren(t) {\n  let aus = '';\n  let inText = false;\n  let escape = false;\n  for (const c of t) {\n    if (c === '\\n' || c === '\\r') continue;\n    if (!inText) {\n      if (c === '\"') inText = true;\n      aus += c;\n    } else if (escape) {\n      escape = false;\n      aus += c;\n    } else if (c === '\\\\') {\n      escape = true;\n      aus += c;\n    } else if (c === '\"') {\n      inText = false;\n      aus += c;\n    } else {\n      aus += c === '\\t' ? ' ' : c;\n    }\n  }\n  return aus;\n}\nfunction ersteJsonStelle(t) {\n  const ohneZaun = t.replace(/```(?:json)?/gi, '');\n  try {\n    return JSON.parse(ohneZaun.trim());\n  } catch (e) {\n    // weiter\n  }\n  const von = ohneZaun.indexOf('{');\n  if (von < 0) throw new Error('kein JSON');\n  const r = reparieren(ohneZaun.slice(von));\n  let tiefe = 0;\n  let inText = false;\n  let escape = false;\n  for (let i = 0; i < r.length; i++) {\n    const c = r[i];\n    if (inText) {\n      if (escape) escape = false;\n      else if (c === '\\\\') escape = true;\n      else if (c === '\"') inText = false;\n    } else if (c === '\"') inText = true;\n    else if (c === '{') tiefe++;\n    else if (c === '}' && --tiefe === 0) return JSON.parse(r.slice(0, i + 1));\n  }\n  throw new Error('JSON unvollständig');\n}\n\nconst hinweise = [];\nif (api.stop_reason === 'max_tokens') hinweise.push('Die Antwort wurde wegen des Token-Limits abgeschnitten (stop_reason max_tokens). Im Knoten „Claude …“ max_tokens im Body erhöhen.');\nlet ausgabe;\ntry {\n  ausgabe = ersteJsonStelle(text);\n} catch (e) {\n  // Die Plattform fragt dann selbst noch einmal nach (höchstens dreimal)\n  hinweise.push('Die Antwort ist kein gültiges JSON: ' + e.message + (e.message === 'JSON unvollständig' ? ' (abgeschnitten? Dann am Knoten „Claude …“ die Option „Maximum Number of Tokens“ erhöhen)' : ''));\n  ausgabe = text;\n}\n\n// Form prüfen (nur zur Orientierung; die Plattform prüft die Form beim Lesen selbst)\nfunction pruefeAnalyse(a) {\n  if (typeof a.zusammenfassung !== 'string' || !a.zusammenfassung.trim()) hinweise.push('zusammenfassung fehlt');\n  for (const [name, [min, max]] of Object.entries(k.listen)) {\n    const liste = a[name];\n    if (!Array.isArray(liste) || liste.length === 0) hinweise.push(name + ' fehlt oder ist leer');\n    else if (liste.length < min || liste.length > max) hinweise.push(name + ': ' + liste.length + ' Punkte (erwartet ' + min + ' bis ' + max + ')');\n  }\n  if (!(k.hinweisSchluessel in a)) hinweise.push(k.hinweisSchluessel + ' fehlt (wird als leer gewertet)');\n  if (k.verbotenMuster && new RegExp(k.verbotenMuster).test(JSON.stringify(a))) hinweise.push(k.verbotenText);\n}\n\nfunction pruefeAgenda(a) {\n  const bloecke = a.bloecke;\n  if (!Array.isArray(bloecke) || bloecke.length !== k.bloecke.length) {\n    hinweise.push('bloecke: ' + k.bloecke.length + ' Blöcke erwartet');\n    return;\n  }\n  let summe = 0;\n  k.bloecke.forEach(([id, min, max], i) => {\n    const b = bloecke[i];\n    if (!b || typeof b !== 'object') return hinweise.push('Block ' + (i + 1) + ': id „' + id + '“ erwartet');\n    const ganz = typeof b.minuten === 'number' && Number.isInteger(b.minuten);\n    if (ganz) summe += b.minuten;\n    if (b.id !== id) return hinweise.push('Block ' + (i + 1) + ': id „' + id + '“ erwartet');\n    if (!ganz) hinweise.push(id + ': minuten ist keine ganze Zahl');\n    else if (b.minuten < min || b.minuten > max) hinweise.push(id + ': ' + b.minuten + ' Minuten (erlaubt ' + min + ' bis ' + max + ')');\n    const anzahl = Array.isArray(b.punkte) ? b.punkte.length : 0;\n    if (anzahl === 0) hinweise.push(id + ': punkte fehlt oder ist leer');\n    else if (anzahl < k.punkteProBlock[0] || anzahl > k.punkteProBlock[1]) hinweise.push(id + ': ' + anzahl + ' Punkte (erwartet ' + k.punkteProBlock[0] + ' bis ' + k.punkteProBlock[1] + ')');\n  });\n  if (summe < k.gesamt[0] || summe > k.gesamt[1]) hinweise.push('Summe ' + summe + ' Minuten (erlaubt ' + k.gesamt[0] + ' bis ' + k.gesamt[1] + ')');\n}\n\nif (typeof ausgabe === 'object' && ausgabe !== null && !Array.isArray(ausgabe)) {\n  if (k.form === 'agenda') pruefeAgenda(ausgabe);\n  else pruefeAnalyse(ausgabe);\n} else if (typeof ausgabe === 'object') {\n  hinweise.push('Die Antwort ist kein JSON-Objekt');\n}\n\nreturn fertig(200, { ausgabe, meta: { strang: k.strang, prompt_version: k.prompt_version, hinweise, ...api } });\n"
       },
       "id": "d4a11d00-0000-4000-8000-000000000015",
       "name": "Antwort lesen",
@@ -481,6 +367,135 @@
         720,
         300
       ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 4096, temperature: 0.3, system: $json.system, messages: [{ role: 'user', content: $json.nachricht }] }) }}",
+        "options": {
+          "timeout": 90000,
+          "batching": {
+            "batch": {
+              "batchSize": 10,
+              "batchInterval": 0
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "d4a11d00-0000-4000-8000-000000000011",
+      "name": "Claude Einzelanalyse",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1500,
+        -160
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 4096, temperature: 0.3, system: $json.system, messages: [{ role: 'user', content: $json.nachricht }] }) }}",
+        "options": {
+          "timeout": 90000,
+          "batching": {
+            "batch": {
+              "batchSize": 10,
+              "batchInterval": 0
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "d4a11d00-0000-4000-8000-000000000013",
+      "name": "Claude Gesamtauswertung",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1500,
+        240
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 4096, temperature: 0.3, system: $json.system, messages: [{ role: 'user', content: $json.nachricht }] }) }}",
+        "options": {
+          "timeout": 90000,
+          "batching": {
+            "batch": {
+              "batchSize": 10,
+              "batchInterval": 0
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "d4a11d00-0000-4000-8000-000000000021",
+      "name": "Claude Agenda",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1500,
+        640
+      ],
+      "onError": "continueRegularOutput"
     }
   ],
   "pinData": {
@@ -677,54 +692,21 @@
       "main": [
         [
           {
-            "node": "Agent Einzelanalyse",
+            "node": "Claude Einzelanalyse",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Agent Gesamtauswertung",
+            "node": "Claude Gesamtauswertung",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Agent Agenda",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Agent Einzelanalyse": {
-      "main": [
-        [
-          {
-            "node": "Antwort lesen",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Agent Gesamtauswertung": {
-      "main": [
-        [
-          {
-            "node": "Antwort lesen",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Agent Agenda": {
-      "main": [
-        [
-          {
-            "node": "Antwort lesen",
+            "node": "Claude Agenda",
             "type": "main",
             "index": 0
           }
@@ -764,39 +746,6 @@
         ]
       ]
     },
-    "Claude Einzelanalyse": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Agent Einzelanalyse",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Claude Gesamtauswertung": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Agent Gesamtauswertung",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Claude Agenda": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Agent Agenda",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Anmeldung prüfen": {
       "main": [
         [
@@ -820,6 +769,39 @@
         [
           {
             "node": "Nicht angemeldet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Einzelanalyse": {
+      "main": [
+        [
+          {
+            "node": "Antwort lesen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Gesamtauswertung": {
+      "main": [
+        [
+          {
+            "node": "Antwort lesen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Agenda": {
+      "main": [
+        [
+          {
+            "node": "Antwort lesen",
             "type": "main",
             "index": 0
           }

@@ -150,23 +150,26 @@ test('Anmeldung: ohne gültige Anmeldung bei Supabase geht nichts an die KI (401
   assert.equal(wert('test', { statusCode: 401 }), true, 'Execute workflow im Editor')
 })
 
-test('Aufbau: Stränge — der Schalter leitet jede Aufgabe an ihren Agenten, jeder Agent hat sein Claude-Modell', () => {
+test('Aufbau: Stränge — der Schalter leitet jede Aufgabe an ihren Claude-Knoten (direkter Aufruf der Anthropic-API)', () => {
   const regeln = knoten('Aufgabe wählen').parameters.rules.values
   assert.deepEqual(regeln.map((r) => r.conditions.conditions[0].rightValue), [AUFGABE_EINZEL, AUFGABE_GESAMT, AUFGABE_AGENDA], 'Namen wie in der Edge Function')
   assert.ok(regeln.every((r) => r.conditions.conditions[0].leftValue === '={{ $json.aufgabe }}'))
   const ausgaenge = workflow.connections['Aufgabe wählen'].main
-  assert.deepEqual(ausgaenge.map((a) => a.map((z) => z.node)), [['Agent Einzelanalyse'], ['Agent Gesamtauswertung'], ['Agent Agenda']])
-  for (const [agent, modell] of [['Agent Einzelanalyse', 'Claude Einzelanalyse'], ['Agent Gesamtauswertung', 'Claude Gesamtauswertung'], ['Agent Agenda', 'Claude Agenda']]) {
-    const a = knoten(agent)
-    assert.equal(a.type, '@n8n/n8n-nodes-langchain.agent')
-    assert.equal(a.parameters.text, '={{ $json.nachricht }}')
-    assert.equal(a.parameters.options.systemMessage, '={{ $json.system }}', 'der Prompt kommt aus der Plattform')
-    assert.equal(a.onError, 'continueRegularOutput', 'ein Fehler bei einem Auftrag stoppt die anderen nicht')
-    const m = knoten(modell)
-    assert.equal(m.type, '@n8n/n8n-nodes-langchain.lmChatAnthropic')
-    assert.equal(m.parameters.model.value, 'claude-sonnet-5-5')
-    assert.deepEqual(workflow.connections[modell].ai_languageModel[0].map((z) => z.node), [agent])
-    assert.deepEqual(workflow.connections[agent].main[0].map((z) => z.node), ['Antwort lesen'])
+  assert.deepEqual(ausgaenge.map((a) => a.map((z) => z.node)), [['Claude Einzelanalyse'], ['Claude Gesamtauswertung'], ['Claude Agenda']])
+  assert.ok(!workflow.nodes.some((n) => n.type.startsWith('@n8n/n8n-nodes-langchain')), 'keine KI-Agenten-Knoten: sie lieferten Text in Stücken und abgeschnitten')
+  for (const claude of ['Claude Einzelanalyse', 'Claude Gesamtauswertung', 'Claude Agenda']) {
+    const k = knoten(claude)
+    assert.equal(k.type, 'n8n-nodes-base.httpRequest')
+    const p = k.parameters
+    assert.deepEqual([p.method, p.url, p.authentication, p.nodeCredentialType], ['POST', 'https://api.anthropic.com/v1/messages', 'predefinedCredentialType', 'anthropicApi'])
+    assert.deepEqual(p.headerParameters.parameters, [{ name: 'anthropic-version', value: '2023-06-01' }])
+    assert.equal(k.onError, 'continueRegularOutput', 'ein Fehler bei einem Auftrag stoppt die anderen nicht')
+    assert.equal(p.options.response.response.neverError, true, 'Fehlermeldungen der API landen im Ergebnis')
+    // der Body: Modell, genug Ausgabe-Token, Prompt aus der Plattform als system, Daten als Nachricht
+    const ausdruck = p.jsonBody.replace(/^=\{\{\s*|\s*\}\}$/g, '')
+    const body = JSON.parse(new Function('$json', `return ${ausdruck}`)({ system: 'SYSTEM', nachricht: 'NACHRICHT' }))
+    assert.deepEqual(body, { model: 'claude-sonnet-5-5', max_tokens: 4096, temperature: 0.3, system: 'SYSTEM', messages: [{ role: 'user', content: 'NACHRICHT' }] }, claude)
+    assert.deepEqual(workflow.connections[claude].main[0].map((z) => z.node), ['Antwort lesen'])
   }
   const danach = (n) => workflow.connections[n].main[0].map((z) => z.node)
   assert.deepEqual([danach('Webhook'), danach('Anmeldung prüfen'), danach('Angemeldet?'), danach('Anfrage prüfen'), danach('Antwort lesen'), danach('Zahlencheck (Orientierung)'), danach('Antwort bündeln')], [
@@ -310,7 +313,65 @@ test('Antwort lesen: kein JSON → Text geht weiter, die Plattform fragt selbst 
   assert.match(r.meta.hinweise[0], /kein gültiges JSON/)
 })
 
-test('Antwort lesen: Fehler des Agenten', async () => {
+test('Antwort lesen: Text in Stücken mit Zeilenumbrüchen mitten in Wörtern (Streaming) wird als JSON gelesen', async () => {
+  const stuecke = (text, n) => text.replace(new RegExp(`(.{${n}})`, 'gs'), '$1\n')
+  const original = JSON.stringify(AGENDA_AUSGABE, null, 2)
+  for (const n of [5, 13, 31]) {
+    const r = await lesen({ output: stuecke(original, n) }, anfragen.agenda)
+    assert.equal(r.code, 200)
+    assert.deepEqual(r.ausgabe, AGENDA_AUSGABE, `Stücke zu ${n} Zeichen`)
+    assert.deepEqual(r.meta.hinweise, [])
+  }
+  // der Fall aus der Praxis: Umbrüche auch in Schlüsseln, Zahlen und zwischen den Teilen
+  const echt = '{\n\n  "bloecke": [\n\n    {\n      "id":\n "einstieg",\n      \n"minuten": 2,\n\n      "punkte": [\n\n        "Herzlich\nen Dank an das Team\n für die Te\nilnahme an der Fe\nedback-Umfrage im\n Oktober 2026."\n      ]\n    }, {"id": "kennzahlen", "minuten": 3\n, "punkte": ["Das Team sieht sich sel\nbst bei 3,2."]}, {"id": "fokus", "minuten": 7, "punkte": ["x"]}, {"id": "entwicklung", "minuten": 4, "punkte": ["y"]}, {"id": "vereinbarungen", "minuten": 2, "punkte": ["z"]}]}'
+  const g = await lesen({ output: echt }, anfragen.agenda)
+  assert.equal(g.ausgabe.bloecke[0].punkte[0], 'Herzlichen Dank an das Team für die Teilnahme an der Feedback-Umfrage im Oktober 2026.')
+  assert.equal(g.ausgabe.bloecke[1].punkte[0], 'Das Team sieht sich selbst bei 3,2.')
+  assert.equal(g.ausgabe.bloecke.length, 5)
+})
+
+test('Antwort lesen: abgeschnittene Antwort → Hinweis auf das Token-Limit, die Plattform fragt erneut', async () => {
+  const ganz = JSON.stringify(AGENDA_AUSGABE)
+  const r = await lesen({ output: ganz.slice(0, Math.floor(ganz.length * 0.6)) }, anfragen.agenda)
+  assert.equal(r.code, 200)
+  assert.equal(typeof r.ausgabe, 'string')
+  assert.match(r.meta.hinweise[0], /JSON unvollständig/)
+  assert.match(r.meta.hinweise[0], /Maximum Number of Tokens/)
+})
+
+test('Antwort lesen: Antwort der Anthropic-API (content, stop_reason, usage)', async () => {
+  const api = (text, extra = {}) => ({ id: 'msg_1', type: 'message', role: 'assistant', model: 'claude-sonnet-5-5', content: [{ type: 'text', text }], stop_reason: 'end_turn', usage: { input_tokens: 900, output_tokens: 410 }, ...extra })
+  const ok = await lesen(api(JSON.stringify(AGENDA_AUSGABE)), anfragen.agenda)
+  assert.equal(ok.code, 200)
+  assert.deepEqual(ok.ausgabe, AGENDA_AUSGABE)
+  assert.deepEqual(ok.meta, { strang: 'Agenda', prompt_version: PROMPT_VERSION_AGENDA, hinweise: [], stop_reason: 'end_turn', ausgabe_token: 410 })
+  // mehrere Textteile werden zusammengesetzt, andere Teile (z. B. thinking) bleiben außen vor
+  const geteilt = JSON.stringify(AGENDA_AUSGABE)
+  const zwei = await lesen(api('', { content: [{ type: 'thinking', thinking: '…' }, { type: 'text', text: geteilt.slice(0, 40) }, { type: 'text', text: geteilt.slice(40) }] }), anfragen.agenda)
+  assert.deepEqual(zwei.ausgabe, AGENDA_AUSGABE)
+  // abgeschnitten: genau die Ursache steht im Hinweis
+  const ganz = JSON.stringify(AGENDA_AUSGABE)
+  const ab = await lesen(api(ganz.slice(0, 200), { stop_reason: 'max_tokens', usage: { output_tokens: 4096 } }), anfragen.agenda)
+  assert.equal(ab.code, 200)
+  assert.match(ab.meta.hinweise[0], /Token-Limits abgeschnitten \(stop_reason max_tokens\)/)
+  assert.match(ab.meta.hinweise[1], /JSON unvollständig/)
+  assert.equal(ab.meta.ausgabe_token, 4096)
+  // leerer Text: Fehler für diesen Auftrag, mit dem Grund
+  const leer = await lesen(api('', { stop_reason: 'end_turn', content: [{ type: 'text', text: '' }] }))
+  assert.deepEqual([leer.code, leer.fehler, leer.detail], [502, 'Die KI hat keinen Text geliefert.', 'stop_reason: end_turn'])
+  // Fehler der API (neverError): { type: 'error', error: { type, message } }
+  const limit = await lesen({ type: 'error', error: { type: 'rate_limit_error', message: 'Number of requests has exceeded your rate limit' } })
+  assert.deepEqual([limit.code, limit.fehler], [429, 'Die KI ist gerade ausgelastet.'])
+  const ueber = await lesen({ type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } })
+  assert.equal(ueber.code, 429)
+  const falsch = await lesen({ type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } })
+  assert.deepEqual([falsch.code, falsch.detail], [502, 'authentication_error: invalid x-api-key'])
+  // und die Antwort in Stücken mit Umbrüchen mitten in Wörtern wird auch hier gelesen
+  const stuecke = ganz.replace(/(.{9})/gs, '$1\n')
+  assert.deepEqual((await lesen(api(stuecke), anfragen.agenda)).ausgabe, AGENDA_AUSGABE)
+})
+
+test('Antwort lesen: Fehler beim Aufruf (Zeitüberschreitung, Zugang, Auslastung)', async () => {
   const ausgelastet = await lesen({ error: 'Request failed with status code 429: rate_limit_error' })
   assert.deepEqual([ausgelastet.code, ausgelastet.fehler], [429, 'Die KI ist gerade ausgelastet.'])
   const ueberlastet = await lesen({ error: { message: 'Overloaded' } })
@@ -378,7 +439,7 @@ test('Durchlauf: Einzelanalyse läuft durch den Strang Einzelanalyse', async () 
   const gesehen = []
   const r = await simuliere(anfragen['einzelanalyse-anna'], (k, agent) => { gesehen.push([agent, k.system, k.nachricht]); return guterAgent(k) })
   assert.equal(r.status, 200)
-  assert.deepEqual(gesehen, [['Agent Einzelanalyse', SYSTEM_PROMPT, anfragen['einzelanalyse-anna'].auftraege[0].nachricht]])
+  assert.deepEqual(gesehen, [['Claude Einzelanalyse', SYSTEM_PROMPT, anfragen['einzelanalyse-anna'].auftraege[0].nachricht]])
   assert.deepEqual(r.body.aufgabe, AUFGABE_EINZEL)
   assert.equal(r.body.ergebnisse.length, 1)
   assert.deepEqual(r.body.ergebnisse[0].ausgabe, EINZEL_AUSGABE)
@@ -391,7 +452,7 @@ test('Durchlauf: Sammellauf — jeder Auftrag wird für sich bearbeitet, die Ant
     return { output: JSON.stringify({ ...EINZEL_AUSGABE, zusammenfassung: `Antwort für Auftrag ${k.ref}` }) }
   })
   assert.equal(r.status, 200)
-  assert.deepEqual(agenten, ['1:Agent Einzelanalyse', '2:Agent Einzelanalyse', '3:Agent Einzelanalyse'])
+  assert.deepEqual(agenten, ['1:Claude Einzelanalyse', '2:Claude Einzelanalyse', '3:Claude Einzelanalyse'])
   assert.deepEqual(r.body.ergebnisse.map((e) => [e.ref, e.code, e.ausgabe.zusammenfassung]), [
     ['1', 200, 'Antwort für Auftrag 1'], ['2', 200, 'Antwort für Auftrag 2'], ['3', 200, 'Antwort für Auftrag 3'],
   ])
@@ -400,7 +461,7 @@ test('Durchlauf: Sammellauf — jeder Auftrag wird für sich bearbeitet, die Ant
 test('Durchlauf: Gesamtauswertung läuft durch den Strang Gesamtauswertung', async () => {
   const gesehen = []
   const r = await simuliere(anfragen.gesamtauswertung, (k, agent) => { gesehen.push([agent, k.system === SYSTEM_PROMPT_GESAMT]); return guterAgent(k) })
-  assert.deepEqual(gesehen, [['Agent Gesamtauswertung', true]])
+  assert.deepEqual(gesehen, [['Claude Gesamtauswertung', true]])
   assert.equal(r.status, 200)
   assert.equal(r.body.aufgabe, AUFGABE_GESAMT)
   assert.deepEqual(r.body.ergebnisse[0].ausgabe, GESAMT_AUSGABE)
@@ -410,7 +471,7 @@ test('Durchlauf: Gesamtauswertung läuft durch den Strang Gesamtauswertung', asy
 test('Durchlauf: Agenda läuft durch den Strang Agenda', async () => {
   const gesehen = []
   const r = await simuliere(anfragen.agenda, (k, agent) => { gesehen.push([agent, k.system === SYSTEM_PROMPT_AGENDA]); return guterAgent(k) })
-  assert.deepEqual(gesehen, [['Agent Agenda', true]])
+  assert.deepEqual(gesehen, [['Claude Agenda', true]])
   assert.equal(r.status, 200)
   assert.equal(r.body.aufgabe, AUFGABE_AGENDA)
   assert.deepEqual(r.body.ergebnisse[0].ausgabe, AGENDA_AUSGABE)

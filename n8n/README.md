@@ -1,11 +1,11 @@
 # n8n: ein Webhook für alle KI-Aufgaben (Einzelanalyse, Gesamtauswertung, Agenda)
 
-Alle KI-Anfragen der Plattform laufen über **einen** Webhook. Die **Oberfläche** schickt sie aus dem Browser des Admins dorthin (ersatzweise die Edge Function `analyse-erstellen`, wenn der Browser den Webhook nicht erreicht), das Feld `aufgabe` entscheidet, in welchen **Strang** des Workflows die Anfrage läuft. In jedem Strang bearbeitet ein **KI-Agent** (Claude über die Anthropic-API, mit Kontext) die Aufträge, und die Antwort geht **direkt als Antwort des Webhooks** zurück an die Plattform.
+Alle KI-Anfragen der Plattform laufen über **einen** Webhook. Die **Oberfläche** schickt sie aus dem Browser des Admins dorthin (ersatzweise die Edge Function `analyse-erstellen`, wenn der Browser den Webhook nicht erreicht), das Feld `aufgabe` entscheidet, in welchen **Strang** des Workflows die Anfrage läuft. In jedem Strang fragt ein Knoten **Claude …** die **Anthropic-API** (Modell Claude, Prompt und Daten aus der Plattform, mit dem Kontext je Aufgabe) für jeden Auftrag, und die Antwort geht **direkt als Antwort des Webhooks** zurück an die Plattform.
 
 ```
-Plattform (Browser des Admins) ── POST ──▶ Webhook ──▶ Anmeldung prüfen ──▶ Angemeldet? ──▶ Anfrage prüfen ──▶ Aufgabe wählen ─┬─▶ Agent Einzelanalyse ───┐
-        ▲                                                       (bei Supabase)       └─ nein: 401                                  ├─▶ Agent Gesamtauswertung ┤
-        │                                                                                                                          └─▶ Agent Agenda           ┤
+Plattform (Browser des Admins) ── POST ──▶ Webhook ──▶ Anmeldung prüfen ──▶ Angemeldet? ──▶ Anfrage prüfen ──▶ Aufgabe wählen ─┬─▶ Claude Einzelanalyse ───┐
+        ▲                                                       (bei Supabase)       └─ nein: 401                                  ├─▶ Claude Gesamtauswertung ┤
+        │                                                                                                                          └─▶ Claude Agenda           ┤
         │                                                                                                                                                      ▼
         └────────── Antwort des Webhooks ◀── Antwort senden ◀── Antwort bündeln ◀── Zahlencheck ◀── Antwort lesen ◀───────────────────────────────────────────┘
 ```
@@ -24,11 +24,11 @@ Der Webhook erlaubt Aufrufe aus dem Browser (*Allowed Origins (CORS)* = `*`). Da
 
 | `aufgabe` | Strang | Was die Plattform damit macht |
 |---|---|---|
-| `einzelanalyse` | Agent Einzelanalyse | **Einzelanalyse** (ein Auftrag) und **Sammellauf** (bis zu 2 Aufträge in einer Anfrage, je Person einer) |
-| `gesamtauswertung` | Agent Gesamtauswertung | **Gesamtauswertung** des Teams (ein Auftrag, nur Teamwerte) |
-| `agenda` | Agent Agenda | **Agenda** fürs Teammeeting (ein Auftrag: fünf Blöcke, 15 bis 20 Minuten, nur Teamwerte). Die Vorlage ohne KI bleibt daneben bestehen. |
+| `einzelanalyse` | Claude Einzelanalyse | **Einzelanalyse** (ein Auftrag) und **Sammellauf** (bis zu 2 Aufträge in einer Anfrage, je Person einer) |
+| `gesamtauswertung` | Claude Gesamtauswertung | **Gesamtauswertung** des Teams (ein Auftrag, nur Teamwerte) |
+| `agenda` | Claude Agenda | **Agenda** fürs Teammeeting (ein Auftrag: fünf Blöcke, 15 bis 20 Minuten, nur Teamwerte). Die Vorlage ohne KI bleibt daneben bestehen. |
 
-Der Agenten-Prompt (`system`) und die Daten (`nachricht`) kommen aus der Plattform. Der Prompt steht versioniert im Repo (`supabase/functions/analyse-erstellen/analyse.ts`). Alles darf zurzeit **nur der Admin** auslösen (Schalter `salons.ki_nur_admin`).
+Der Prompt (`system`) und die Daten (`nachricht`) kommen aus der Plattform. Der Prompt steht versioniert im Repo (`supabase/functions/analyse-erstellen/analyse.ts`). Alles darf zurzeit **nur der Admin** auslösen (Schalter `salons.ki_nur_admin`).
 
 ### Anfrage an den Webhook
 
@@ -67,12 +67,12 @@ Ein Fehler bei einem Auftrag stoppt die anderen nicht. Ist **jeder** Auftrag ges
 | `testanfragen-erzeugen.mjs` | Schreibt `system`, `nachricht` und `prompt_version` der Testanfragen neu, wenn sich ein Prompt ändert |
 | `workflow.test.mjs` | Tests: `npm run test:n8n` |
 
-Die Einzelfälle: **anna** hat alle Daten, **berta** keinen Vormonat und keine eigenen Kommentare, **ludwig** ein Verhalten ohne Selbstbild (prüft, ob der Agent fehlende Daten offen nennt).
+Die Einzelfälle: **anna** hat alle Daten, **berta** keinen Vormonat und keine eigenen Kommentare, **ludwig** ein Verhalten ohne Selbstbild (prüft, ob die KI fehlende Daten offen nennt).
 
 ## Einrichten
 
 1. In n8n: **Workflows → Import from File** → `dawiid-ki.workflow.json`.
-2. **Zugangsdaten** anlegen und auswählen: **Anthropic** (API Key), dein Anthropic-Schlüssel, an **allen drei** Knoten „Claude …“. Mehr ist nicht nötig; die Zugangsdaten stehen bewusst nicht in der Datei.
+2. **Zugangsdaten** anlegen und auswählen: **Anthropic** (API Key), dein Anthropic-Schlüssel, an **allen drei** Knoten „Claude …“ (dort steht *Authentication: Predefined Credential Type* mit *Anthropic*; fehlt die Auswahl in deiner n8n-Version, nimm *Generic Credential Type → Header Auth* mit Name `x-api-key` und deinem Schlüssel). Mehr ist nicht nötig; die Zugangsdaten stehen bewusst nicht in der Datei.
 3. **Einzeln testen** (siehe unten), dann den Workflow **aktivieren** (Schalter oben rechts). Aufgerufen wird die **Production URL** `https://tobitest2008.app.n8n.cloud/webhook/dawiid-ki` (nicht `webhook-test`).
 4. **Die Adresse steht fest im Code** (`STANDARD_WEBHOOK_URL` in `supabase/functions/analyse-erstellen/analyse.ts`, die Oberfläche übernimmt sie von dort). Ändert sich die Adresse, ändert man diese eine Zeile. In Supabase ist **nichts** einzutragen. Optional überschreibt das Secret `AI_WEBHOOK_URL` die Adresse für den Weg über die Edge Function.
 
@@ -80,7 +80,7 @@ Die Einzelfälle: **anna** hat alle Daten, **berta** keinen Vormonat und keine e
 
 5. In der Plattform als **Admin**: Leitung → Monatsabschluss → Monat abschließen → „Alle fehlenden erstellen“ (Sammellauf), je Person „Erstellen“ oder bei der Gesamtauswertung „Erstellen“. Die Agenda: Leitung → Agenda → „Mit KI formulieren“.
 
-Falls n8n beim Import einen Knoten nicht kennt (die KI-Knoten ändern sich von Version zu Version): den Agenten und das Claude-Modell neu hinzufügen und eintragen: Agent → *Source for Prompt*: Define below, *Prompt (User Message)* `{{ $json.nachricht }}`, *Options → System Message* `{{ $json.system }}`; Modell `claude-sonnet-5-5`, *Maximum Number of Tokens* 2000.
+Die Knoten „Claude …“ sind gewöhnliche **HTTP Request**-Knoten, die die Anthropic-API (`POST https://api.anthropic.com/v1/messages`) direkt aufrufen. Das gibt die Antwort vollständig zurück und verrät in `meta.stop_reason`, ob sie zu Ende war. (Ein früherer Stand benutzte den KI-Agenten-Knoten von n8n; der lieferte den Text in Stücken mit Zeilenumbrüchen mitten in Wörtern, abgeschnitten oder leer.) Modell, `max_tokens` (4096) und `temperature` (0.3) stehen im Feld *JSON Body* der drei Knoten.
 
 ## Einzeln testen: Schritt für Schritt
 
@@ -116,12 +116,12 @@ curl -X POST "https://tobitest2008.app.n8n.cloud/webhook-test/dawiid-ki" \
 
 | Datei | Strang | Darauf achten |
 |---|---|---|
-| `einzelanalyse-anna` | Agent Einzelanalyse | Normalfall. `ausgabe` hat sechs Schlüssel, `meta.hinweise` ist leer, `meta.zahlen_nicht_in_daten` ist leer. |
-| `einzelanalyse-berta` | Agent Einzelanalyse | **Kein Vormonat.** Der Text soll das offen sagen und keine Veränderung erfinden. |
-| `einzelanalyse-ludwig` | Agent Einzelanalyse | **Ein Verhalten ohne Selbstbild.** Der Text soll das offen sagen. |
-| `sammellauf` | Agent Einzelanalyse, dreimal | Die Antwort hat drei `ergebnisse` mit `ref` 1, 2 und 3, jedes mit eigener Analyse. |
-| `gesamtauswertung` | Agent Gesamtauswertung | Der Text spricht vom „Team“, ohne Namen und ohne Einzelpersonen. |
-| `agenda` | Agent Agenda | Fünf Blöcke in der Reihenfolge einstieg, kennzahlen, fokus, entwicklung, vereinbarungen. `meta.hinweise` ist leer: Minuten innerhalb der Grenzen, Summe 15 bis 20, zwei bis vier Punkte je Block. |
+| `einzelanalyse-anna` | Claude Einzelanalyse | Normalfall. `ausgabe` hat sechs Schlüssel, `meta.hinweise` ist leer, `meta.zahlen_nicht_in_daten` ist leer. |
+| `einzelanalyse-berta` | Claude Einzelanalyse | **Kein Vormonat.** Der Text soll das offen sagen und keine Veränderung erfinden. |
+| `einzelanalyse-ludwig` | Claude Einzelanalyse | **Ein Verhalten ohne Selbstbild.** Der Text soll das offen sagen. |
+| `sammellauf` | Claude Einzelanalyse, dreimal | Die Antwort hat drei `ergebnisse` mit `ref` 1, 2 und 3, jedes mit eigener Analyse. |
+| `gesamtauswertung` | Claude Gesamtauswertung | Der Text spricht vom „Team“, ohne Namen und ohne Einzelpersonen. |
+| `agenda` | Claude Agenda | Fünf Blöcke in der Reihenfolge einstieg, kennzahlen, fokus, entwicklung, vereinbarungen. `meta.hinweise` ist leer: Minuten innerhalb der Grenzen, Summe 15 bis 20, zwei bis vier Punkte je Block. |
 
 ### Woran du merkst, dass etwas nicht stimmt
 
@@ -130,19 +130,21 @@ curl -X POST "https://tobitest2008.app.n8n.cloud/webhook-test/dawiid-ki" \
 | Antwort `401` „Bitte melde dich an.“ | Der Token fehlt oder ist abgelaufen (neu anmelden), oder der Knoten **Anmeldung prüfen** erreicht Supabase nicht. In der Plattform steht dann „Der KI-Zugang wurde abgelehnt.“ |
 | Im Browser „Failed to fetch“, in der Plattform läuft es über die Edge Function | n8n erlaubt den Aufruf aus dem Browser nicht (CORS). Im Knoten Webhook unter *Options* muss *Allowed Origins (CORS)* gesetzt sein (Standard im Import: `*`). Die Plattform nimmt dann selbstständig den Weg über die Edge Function. |
 | Ausführung bricht beim Webhook ab oder die Antwort ist `400` mit `details` | Die Anfrage ist unvollständig (zum Beispiel nur ein Teil der Datei eingefügt). Datei komplett einfügen. |
-| Agent-Knoten rot, Fehler zu Zugangsdaten | Anthropic-Zugangsdaten am Knoten „Claude …“ des **benutzten** Strangs auswählen (es sind zwei). |
-| `code: 502` mit `detail` im Ergebnis | Der Agent hat nicht geantwortet (Zeit, Schlüssel, Modellname). `detail` nennt den Grund. |
+| Knoten „Claude …“ rot, Fehler zu Zugangsdaten | Anthropic-Zugangsdaten am Knoten „Claude …“ des **benutzten** Strangs auswählen (es sind zwei). |
+| `meta.hinweise`: „abgeschnitten (stop_reason max_tokens)“ | Die Antwort war länger als erlaubt. Im Knoten „Claude …“ im *JSON Body* `max_tokens` erhöhen (Standard 4096; `meta.ausgabe_token` zeigt, wie viel verbraucht wurde). Die Plattform fragt bis zu dreimal neu und bittet dann um eine kürzere Fassung. |
+| Antwort enthält Zeilenumbrüche mitten in Wörtern („Fe↵edback“) | Der Text kam in Stücken an (so lieferte es der frühere KI-Agenten-Knoten). Die Plattform und der Knoten „Antwort lesen“ entfernen solche Umbrüche beim Lesen; es ist nichts einzustellen. |
+| `code: 502` mit `detail` im Ergebnis | Die KI hat nicht geantwortet (Zeit, Schlüssel, Modellname). `detail` nennt den Grund der Anthropic-API, zum Beispiel `authentication_error: invalid x-api-key`. |
 | `code: 429` | Anthropic ist ausgelastet, später erneut. |
-| `meta.hinweise` nennt „kein gültiges JSON“ | Der Agent hat kein JSON geliefert. Die Plattform fragt dann selbst noch bis zu zweimal nach. Tritt es dauernd auf, den Prompt prüfen. |
-| `meta.zahlen_nicht_in_daten` nicht leer | Der Agent hat eine Zahl genannt, die nicht in den Daten steht. In der Plattform verlangt die Datenbank dann eine neue Fassung. Kommt es oft vor, im Prompt nachschärfen. |
+| `meta.hinweise` nennt „kein gültiges JSON“ | Die KI hat kein JSON geliefert. Die Plattform fragt dann selbst noch bis zu zweimal nach. Tritt es dauernd auf, den Prompt prüfen. |
+| `meta.zahlen_nicht_in_daten` nicht leer | Die KI hat eine Zahl genannt, die nicht in den Daten steht. In der Plattform verlangt die Datenbank dann eine neue Fassung. Kommt es oft vor, im Prompt nachschärfen. |
 | `meta.hinweise` nennt „staerken: 5 Punkte (erwartet 2 bis 4)“ | Nur ein Hinweis zur Länge, kein Fehler. |
 
 ## Anpassen
 
-- **Kontext für den Agenten:** Im Knoten **Anfrage prüfen** steht je Aufgabe `zusatzkontext`. Der Text wird dem Prompt aus der Plattform angehängt (zum Beispiel Besonderheiten des Salons). Keine Zahlen hineinschreiben: Der Faktencheck lehnt Zahlen ab, die nicht in den Daten stehen.
+- **Kontext für die KI:** Im Knoten **Anfrage prüfen** steht je Aufgabe `zusatzkontext`. Der Text wird dem Prompt aus der Plattform angehängt (zum Beispiel Besonderheiten des Salons). Keine Zahlen hineinschreiben: Der Faktencheck lehnt Zahlen ab, die nicht in den Daten stehen.
 - **Modell und Länge:** am Knoten „Claude …“ je Strang. Das Modell ist dasselbe wie der Standard der Edge Function.
-- **Neuer Strang** (eine weitere Aufgabe): in **Anfrage prüfen** die Aufgabe in `AUFGABEN` eintragen, in **Aufgabe wählen** eine Regel ergänzen, Agent und Claude-Modell kopieren, den Ausgang mit **Antwort lesen** verbinden. Auf der Plattform-Seite kommt die Aufgabe in die Edge Function.
-- **Zeit:** Die Edge Function wartet je Anfrage höchstens 120 Sekunden auf n8n, insgesamt 135 Sekunden. Der Agent bearbeitet die Aufträge einer Anfrage nacheinander; deshalb schickt der Sammellauf höchstens 2 Personen je Anfrage (`PAKET_GROESSE` in `analyse.ts`; n8n Cloud beendet Anfragen nach etwa 100 Sekunden) und die Oberfläche ruft so lange erneut auf, bis alle fertig sind.
+- **Neuer Strang** (eine weitere Aufgabe): in **Anfrage prüfen** die Aufgabe in `AUFGABEN` eintragen, in **Aufgabe wählen** eine Regel ergänzen, einen Knoten „Claude …“ kopieren, den Ausgang mit **Antwort lesen** verbinden. Auf der Plattform-Seite kommt die Aufgabe in die Edge Function.
+- **Zeit:** Die Edge Function wartet je Anfrage höchstens 120 Sekunden auf n8n, insgesamt 135 Sekunden. Die Knoten „Claude …“ schicken die Aufträge einer Anfrage gleichzeitig los (*Batching*), bei langsamer KI kann es trotzdem knapp werden; deshalb schickt der Sammellauf höchstens 2 Personen je Anfrage (`PAKET_GROESSE` in `analyse.ts`; n8n Cloud beendet Anfragen nach etwa 100 Sekunden) und die Oberfläche ruft so lange erneut auf, bis alle fertig sind.
 
 ## Datenschutz
 

@@ -4,7 +4,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   AUFGABE_AGENDA, AUFGABE_EINZEL, AUFGABE_GESAMT, AnalyseFehler, MAX_AUFRUFE, NICHT_EINGERICHTET, PAKET_GROESSE, PROMPT_VERSION, PROMPT_VERSION_AGENDA, PROMPT_VERSION_GESAMT,
-  STANDARD_WEBHOOK_URL, SYSTEM_PROMPT, SYSTEM_PROMPT_AGENDA, SYSTEM_PROMPT_GESAMT, ZEITBUDGET_MS, anbieterAusUmgebung, arbeiteZiele, baueNachricht, behandleAnfrage,
+  STANDARD_WEBHOOK_URL, repariereJson, SYSTEM_PROMPT, SYSTEM_PROMPT_AGENDA, SYSTEM_PROMPT_GESAMT, ZEITBUDGET_MS, anbieterAusUmgebung, arbeiteZiele, baueNachricht, behandleAnfrage,
   erstelleAgenda, erstelleAlle, erstelleAnalyse, erstelleGesamt, parseAgendaAusgabe, parseAusgabe, parseGesamtAusgabe, rufeAnbieter, rufeAnbieterBatch,
   textAusAusgabe, textAusGesamt,
   type Abhaengigkeiten, type AnbieterConfig, type Auftrag, type KiAntwort, type RpcAntwort, type Ziel,
@@ -547,6 +547,42 @@ test('Runden: höchstens drei, die letzte lesbare Fassung zählt; ungültige Ant
   const b = r.get('b')!
   assert.ok(!b.ok && b.fehler.status === 502 && /keine verwertbare Antwort/.test(b.fehler.message))
   assert.match(runden[1].auftraege[0].nachricht, /kein gültiges JSON/)
+})
+
+/** Wie n8n-Streaming es liefert: Stücke von etwa 13 Zeichen, dazwischen ein Zeilenumbruch — auch mitten in Wörtern und Zahlen. */
+const zerstueckelt = (text: string, n = 13) => text.replace(new RegExp(`(.{${n}})`, 'gs'), '$1\n')
+
+test('Antwort in Stücken mit Zeilenumbrüchen mitten in Wörtern wird gelesen (n8n-Streaming)', () => {
+  const original = JSON.stringify(AGENDA_GUT, null, 2)
+  for (const n of [3, 7, 13, 29]) {
+    const kaputt = zerstueckelt(original, n)
+    assert.throws(() => JSON.parse(kaputt), 'so wäre es ungültiges JSON')
+    assert.deepEqual(parseAgendaAusgabe(kaputt), parseAgendaAusgabe(original), `Stücke zu ${n} Zeichen`)
+  }
+  // auch mit Code-Zaun und Text davor
+  assert.deepEqual(parseAgendaAusgabe('Hier die Agenda:\n```json\n' + zerstueckelt(JSON.stringify(AGENDA_GUT), 11) + '\n```'), parseAgendaAusgabe(JSON.stringify(AGENDA_GUT)))
+  // Umbrüche mitten in Wörtern, Zahlen und Schlüsselwörtern fallen weg, Tabs in Texten werden zu Leerzeichen
+  assert.equal(repariereJson('{"a":\n"x\ty\nz",\n"b": 1\n2, "c": nul\nl}'), '{"a":"x yz","b": 12, "c": null}')
+  assert.equal(repariereJson('{"a": "Zeile\\nzwei"}'), '{"a": "Zeile\\nzwei"}', 'ein maskierter Umbruch (\\n) bleibt')
+  // Einzelanalyse und Gesamtauswertung lesen ebenso
+  assert.deepEqual(parseGesamtAusgabe(zerstueckelt(JSON.stringify(GESAMT_GUT), 9)), parseGesamtAusgabe(JSON.stringify(GESAMT_GUT)))
+  assert.deepEqual(parseAusgabe(zerstueckelt(JSON.stringify(GUT), 9)), parseAusgabe(JSON.stringify(GUT)))
+})
+
+test('Abgeschnittene Antwort: „JSON unvollständig“ und bei der Wiederholung der Hinweis, sich kürzer zu fassen', async () => {
+  const ganz = JSON.stringify(AGENDA_GUT)
+  const abgeschnitten = zerstueckelt(ganz.slice(0, Math.floor(ganz.length * 0.55)), 13)
+  assert.throws(() => parseAgendaAusgabe(abgeschnitten), /JSON unvollständig/)
+  const { d, runden } = stapel((_a, runde) => ({ roh: runde === 1 ? abgeschnitten : ganz }))
+  const ziel: Ziel = {
+    schluessel: 'agenda', system: 's', eingabe: {},
+    parse: (roh) => ({ ausgabe: parseAgendaAusgabe(roh), text: 't' }),
+    pruefen: async () => ({ geprueft: true }),
+  }
+  const r = (await arbeiteZiele(d, CLAUDE, AUFGABE_AGENDA, PROMPT_VERSION_AGENDA, [ziel])).get('agenda')!
+  assert.ok(r.ok && r.versuche === 2)
+  assert.match(runden[1].auftraege[0].nachricht, /abgeschnitten/)
+  assert.match(runden[1].auftraege[0].nachricht, /Fasse dich kürzer/)
 })
 
 test('Runden: ein Fehler des Anbieters bei einem Auftrag wird in der nächsten Runde wiederholt', async () => {
