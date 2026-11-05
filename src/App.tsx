@@ -11,6 +11,7 @@ import Login from './pages/Login'
 import NotFound from './pages/NotFound'
 import Start from './pages/Start'
 import Dashboard from './pages/app/Dashboard'
+import Info from './pages/app/Info'
 import PasswortSeite from './pages/app/PasswortSeite'
 import Platzhalter from './pages/app/Platzhalter'
 import UmfrageSeite from './pages/app/UmfrageSeite'
@@ -40,6 +41,7 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="passwort" element={<PasswortSeite />} />
+            <Route path="info" element={<Info />} />
 
             <Route element={<RequireTeilnahme />}>
               <Route path="umfrage" element={<UmfrageSeite />} />

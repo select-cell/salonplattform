@@ -1,3 +1,5 @@
+import { SALON_SLUG } from '../config/brand'
+
 // Monatsumfrage: Typen, Ablauf, Prüfungen und Payload.
 // Die Oberfläche (components/umfrage) zeigt nur an; was erlaubt ist und was an die
 // Datenbank geht, steht hier. Der Server prüft alles noch einmal (umfrage_einreichen_v2).
@@ -75,11 +77,14 @@ export function neuerEntwurf(monat: string, jetzt: Date = new Date()): Entwurf {
   }
 }
 
-const schluesselEntwurf = (userId: string, monat: string) => `umfrage-entwurf:${userId}:${monat}`
+const schluesselEntwurf = (userId: string, monat: string) => `${SALON_SLUG}-umfrage:${userId}:${monat}`
+/** Früherer Schlüssel: bereits begonnene Entwürfe werden weiter gelesen */
+const alterSchluessel = (userId: string, monat: string) => `umfrage-entwurf:${userId}:${monat}`
 
 export function ladeEntwurf(userId: string, monat: string): Entwurf | null {
   try {
-    const roh = window.localStorage.getItem(schluesselEntwurf(userId, monat))
+    const roh =
+      window.localStorage.getItem(schluesselEntwurf(userId, monat)) ?? window.localStorage.getItem(alterSchluessel(userId, monat))
     if (!roh) return null
     const e = JSON.parse(roh) as Partial<Entwurf>
     if (e.version !== 1 || e.monat !== monat || typeof e.gestartetAm !== 'string') return null
@@ -100,6 +105,7 @@ export function speichereEntwurf(userId: string, entwurf: Entwurf): void {
 export function loescheEntwurf(userId: string, monat: string): void {
   try {
     window.localStorage.removeItem(schluesselEntwurf(userId, monat))
+    window.localStorage.removeItem(alterSchluessel(userId, monat))
   } catch {
     // ignorieren
   }
