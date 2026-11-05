@@ -198,7 +198,7 @@ export function TeamTabelle({
 }
 
 // ---------------------------------------------------------------------------------
-// Team-Sicht der Mitarbeiterin: nur Schnitte
+// Team-Sicht der Mitarbeiter: nur Schnitte
 // ---------------------------------------------------------------------------------
 export function SchnittTabelle({ zeilen, schwellen }: { zeilen: VerhaltenZeile[]; schwellen: Schwellen }) {
   const [modus, setModus] = useState<Sortierung>('standard')

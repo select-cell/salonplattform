@@ -7,7 +7,7 @@ import { holeTeamDashboard, holeTeamErgebnisse } from '../../lib/api'
 import { useDaten } from '../../lib/useDaten'
 import { istLeitung } from '../../lib/types'
 
-/** /app/team: Mitarbeiterinnen sehen Team-Schnitte, Verantwortliche und Admins das volle Dashboard. */
+/** /app/team: Mitarbeiter sehen Team-Schnitte, Verantwortliche und Admins das volle Dashboard. */
 export default function TeamSeite() {
   const person = usePerson()
   const leitung = istLeitung(person)
@@ -23,16 +23,16 @@ export default function TeamSeite() {
             : 'Durchschnittswerte des Teams, dazu Rangliste und Heatmap.'}
         </p>
       </header>
-      {leitung ? <LeitungsTeam /> : <TeamFuerMitarbeiterin />}
+      {leitung ? <LeitungsTeam /> : <TeamFuerMitarbeiter />}
     </div>
   )
 }
 
-function TeamFuerMitarbeiterin() {
+function TeamFuerMitarbeiter() {
   const { laedt, daten, fehler, neuLaden } = useDaten(holeTeamErgebnisse, [])
   const [gewaehlt, setGewaehlt] = useState<string | null>(null)
   const monat = daten && gewaehlt && daten.monate.includes(gewaehlt) ? gewaehlt : (daten?.monate[0] ?? '')
-  // Rangliste und Heatmap kommen aus dem Dashboard-Aufruf (für Mitarbeiterinnen ohne Dauer und Absender)
+  // Rangliste und Heatmap kommen aus dem Dashboard-Aufruf (für Mitarbeiter ohne Dauer und Absender)
   const uebersicht = useDaten(() => (monat ? holeTeamDashboard(monat) : Promise.resolve(null)), [monat])
   return (
     <DatenZustand laedt={laedt} fehler={fehler} onNeu={neuLaden}>

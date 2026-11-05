@@ -5,7 +5,7 @@ import { SbFbDiagramm, VerlaufDiagramm, type VerlaufDaten } from './Diagramme'
 import { Heatmap, Rangliste, TopFlop } from './Listen'
 import { SchnittTabelle } from './Tabellen'
 
-/** Team-Ergebnisse für Mitarbeiterinnen: Team-Schnitte, dazu Rangliste und Heatmap mit Namen (Wunsch des Auftraggebers) */
+/** Team-Ergebnisse für Mitarbeiter: Team-Schnitte, dazu Rangliste und Heatmap mit Namen (Wunsch des Auftraggebers) */
 export function TeamAnsicht({
   daten,
   monat,

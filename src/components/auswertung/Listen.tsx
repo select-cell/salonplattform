@@ -51,7 +51,7 @@ export function Rangliste({
   personen: DashboardPerson[]
   aktivId: string | null
   schwellen: Schwellen
-  /** Ohne onWahl sind die Namen nur Text (Mitarbeiterinnen haben keine Einzelansicht) */
+  /** Ohne onWahl sind die Namen nur Text (Mitarbeiter haben keine Einzelansicht) */
   onWahl?: (id: string) => void
 }) {
   return (

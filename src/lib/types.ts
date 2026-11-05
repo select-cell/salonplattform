@@ -14,7 +14,7 @@ export interface Person {
 }
 
 export const ROLLEN_LABEL: Record<Rolle, string> = {
-  mitarbeiter: 'Mitarbeiterin',
+  mitarbeiter: 'Mitarbeiter',
   verantwortlicher: 'Verantwortlicher',
   admin: 'Admin',
 }

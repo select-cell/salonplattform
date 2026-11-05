@@ -114,7 +114,7 @@ function ReminderPopup({ liste }: { liste: Ueberfaellig[] }) {
           Verstanden
         </button>
         <Link to="/app/mitglieder" className="btn btn--ghost" onClick={() => setOffen(false)}>
-          Zu den Mitarbeiterinnen
+          Zu den Mitarbeitern
         </Link>
       </div>
     </dialog>

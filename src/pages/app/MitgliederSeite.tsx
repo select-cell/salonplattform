@@ -7,7 +7,7 @@ import { einordnung, monatName, vorzeichen, zahl } from '../../lib/auswertung'
 import { aktuellerMonat, zeitpunktLabel } from '../../lib/monat'
 import { useDaten } from '../../lib/useDaten'
 
-/** /app/mitglieder: alle Mitarbeiterinnen mit Fremdbild, Differenz und Abgabe-Status (Plan §3). */
+/** /app/mitglieder: alle Mitarbeiter mit Fremdbild, Differenz und Abgabe-Status (Plan §3). */
 export default function MitgliederSeite() {
   const dash = useDaten(() => holeTeamDashboard(), [])
   const status = useDaten(holeAbgabeStatus, [])
@@ -17,7 +17,7 @@ export default function MitgliederSeite() {
   return (
     <div className="stack stack-l">
       <header className="seitenkopf">
-        <p className="overline">Mitarbeiterinnen</p>
+        <p className="overline">Mitarbeiter</p>
         <h1 style={{ marginTop: 8 }}>Jede Person im Detail</h1>
         <p>
           Werte aus {dash.daten?.monate.length ? monatName(dash.daten.monat) : 'dem neuesten Monat'}, Abgabe-Status für{' '}
@@ -47,7 +47,7 @@ function Liste({ dash, status }: { dash: Dashboard; status: AbgabeStatus[] }) {
     .sort((a, b) => a.name.localeCompare(b.name, 'de'))
 
   if (zeilen.length === 0) {
-    return <Leer titel="Noch keine Mitarbeiterinnen" text="Sobald Personen mit Teilnahme an der Teamumfrage angelegt sind, erscheinen sie hier." />
+    return <Leer titel="Noch keine Mitarbeiter" text="Sobald Personen mit Teilnahme an der Teamumfrage angelegt sind, erscheinen sie hier." />
   }
 
   return (

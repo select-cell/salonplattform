@@ -1,4 +1,4 @@
 export const MARKE = {
-  name: 'Dawiid',
+  name: 'DAWIID',
   zusatz: 'Team-Plattform',
 } as const

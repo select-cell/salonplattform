@@ -16,7 +16,7 @@ export default function MitgliedSeite() {
     <div className="stack stack-l">
       <header className="seitenkopf">
         <Link to="/app/mitglieder" className="textlink">
-          ← Alle Mitarbeiterinnen
+          ← Alle Mitarbeiter
         </Link>
         <h1 style={{ marginTop: 12 }}>{daten?.person.name ?? 'Individuelle Auswertung'}</h1>
         <p>Verlauf über alle Monate und jede Einzelbewertung mit Absender.</p>

@@ -9,7 +9,7 @@ interface Props {
   daten: PersonAuswertung
   monat: string
   onMonat: (monat: string) => void
-  /** Leitung sieht, wer wie bewertet hat; Mitarbeiterinnen nicht */
+  /** Leitung sieht, wer wie bewertet hat; Mitarbeiter nicht */
   mitAbsender: boolean
 }
 
@@ -127,7 +127,7 @@ function MonatsDetail({
   mitAbsender: boolean
 }) {
   const selbst = (daten.selbst_kommentare ?? []).filter((k) => k.monat === monat)
-  // Mitarbeiterinnen sehen nur ihr eigenes Selbstbild, die Fremdbild-Kommentare bleiben der Leitung vorbehalten
+  // Mitarbeiter sehen nur ihr eigenes Selbstbild, die Fremdbild-Kommentare bleiben der Leitung vorbehalten
   const mitText = zeilen.filter(
     (z) =>
       selbst.some((k) => k.nr === z.nr) ||

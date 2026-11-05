@@ -917,12 +917,14 @@ h3 {
   }
 }
 
-/* Logo rechts neben dem Salonnamen (dunkle Bildfläche, daher als Plakette) */
+/* Logo: Maske (nur die Form) in der Logo-Farbe des Designs, wechselt mit Hell und Nacht */
 .marke__logo {
   display: block;
-  height: 44px;
-  width: auto;
-  border-radius: 6px;
+  height: 40px;
+  aspect-ratio: 992 / 336;
+  background-color: var(--logo);
+  -webkit-mask: url('../assets/logo-dawiid-maske.png') center / contain no-repeat;
+  mask: url('../assets/logo-dawiid-maske.png') center / contain no-repeat;
 }
 
 .nutzer__link {
@@ -961,7 +963,7 @@ h3 {
   }
 
   .marke__logo {
-    height: 38px;
+    height: 34px;
   }
 
   .kopf__rechts {

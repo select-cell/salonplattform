@@ -92,14 +92,14 @@ export const BEREICHE: readonly Bereich[] = [
   {
     schluessel: 'mitglieder',
     pfad: '/app/mitglieder',
-    menue: 'Mitarbeiterinnen',
-    titel: 'Mitarbeiterinnen',
+    menue: 'Mitarbeiter',
+    titel: 'Mitarbeiter',
     kurz: 'Jede Person im Detail, mit Abgabe-Status.',
     icon: 'mitglieder',
     rollen: LEITUNG,
     live: true,
     geplant: [
-      'Liste aller Mitarbeiterinnen mit Fremdbild, Differenz und Abgabe-Status',
+      'Liste aller Mitarbeiter mit Fremdbild, Differenz und Abgabe-Status',
       'Individuelle Auswertung mit Verlauf über alle Monate',
       'Einzelbewertungen mit Absender und Kommentar',
     ],
