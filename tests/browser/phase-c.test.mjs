@@ -92,7 +92,7 @@ export default async function (browser) {
   {
     const { page, context, aufrufe, konsole } = await neueSeite(browser, { rolle: 'chef', antworten: antworten() })
     await page.goto(BASE + '/app/team')
-    await page.getByRole('button', { name: 'Verstanden' }).click().catch(() => undefined)
+    await page.getByRole('button', { name: 'Verstanden' }).click({ timeout: 1500 }).catch(() => undefined)
     await page.getByRole('button', { name: 'Monatsbericht als PDF' }).waitFor()
     t.check(true, 'Knopf „Monatsbericht als PDF“ ist im Team-Dashboard sichtbar')
     t.check(!aufrufe.some((a) => a.rpc === 'pdf_monatsbericht'), 'Vor dem Klick wird nichts abgerufen (und nichts protokolliert)')
@@ -125,7 +125,7 @@ export default async function (browser) {
   {
     const { page, context, aufrufe, konsole } = await neueSeite(browser, { rolle: 'chef', antworten: antworten({ person_ergebnisse: { person: { id: PERSON_ID, name: 'Anna Müller-Öztürk' }, schwellen: SCHWELLEN, monate: ['2026-10', '2026-09'], verhalten: PERSONENBERICHT.verhalten, kommentare: [], rituale: [], dauer: [], entwicklung: [], einzelwerte: [] } }) })
     await page.goto(BASE + '/app/team')
-    await page.getByRole('button', { name: 'Verstanden' }).click().catch(() => undefined)
+    await page.getByRole('button', { name: 'Verstanden' }).click({ timeout: 1500 }).catch(() => undefined)
     await page.getByRole('button', { name: 'Anna', exact: true }).click()
     await page.getByRole('heading', { name: 'Anna Müller-Öztürk' }).waitFor()
     const { dateiname, pfad } = await lade(page, 'Personenbericht als PDF', 'person.pdf')
@@ -157,7 +157,7 @@ export default async function (browser) {
       antworten: antworten({ pdf_monatsbericht: { status: 400, body: { code: '22023', message: 'Für diesen Monat gibt es keine Auswertung.' } } }),
     })
     await page.goto(BASE + '/app/team')
-    await page.getByRole('button', { name: 'Verstanden' }).click().catch(() => undefined)
+    await page.getByRole('button', { name: 'Verstanden' }).click({ timeout: 1500 }).catch(() => undefined)
     await page.getByRole('button', { name: 'Monatsbericht als PDF' }).click()
     await page.getByRole('alert').filter({ hasText: 'Für diesen Monat gibt es keine Auswertung.' }).waitFor()
     t.check(true, 'Fehlermeldung der Datenbank erscheint auf Deutsch')
@@ -176,7 +176,7 @@ export default async function (browser) {
   {
     const { page, context, aufrufe } = await neueSeite(browser, { rolle: 'admin', antworten: antworten() })
     await page.goto(BASE + '/app/info')
-    await page.getByRole('button', { name: 'Verstanden' }).click().catch(() => undefined)
+    await page.getByRole('button', { name: 'Verstanden' }).click({ timeout: 1500 }).catch(() => undefined)
     await page.locator('table[aria-label="Export-Protokoll"]').waitFor()
     const zeilen = await page.locator('table[aria-label="Export-Protokoll"] tbody tr').allInnerTexts()
     t.check(zeilen.length === 2, 'Admin sieht zwei Protokollzeilen')
@@ -189,7 +189,7 @@ export default async function (browser) {
   for (const rolle of ['chef', 'ma']) {
     const { page, context, aufrufe } = await neueSeite(browser, { rolle, antworten: antworten() })
     await page.goto(BASE + '/app/info')
-    await page.getByRole('button', { name: 'Verstanden' }).click().catch(() => undefined)
+    await page.getByRole('button', { name: 'Verstanden' }).click({ timeout: 1500 }).catch(() => undefined)
     await page.getByRole('heading', { name: 'PDF-Berichte' }).waitFor()
     t.check(!(await page.locator('main').innerText()).includes('Export-Protokoll') && !aufrufe.some((a) => a.rpc === 'pdf_export_protokoll'), `${rolle === 'chef' ? 'Verantwortliche' : 'Mitarbeiter'} sehen kein Export-Protokoll`)
     await context.close()

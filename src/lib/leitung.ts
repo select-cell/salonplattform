@@ -9,4 +9,7 @@ export interface LeitungSeite {
 export const LEITUNG_SEITEN: readonly LeitungSeite[] = [
   { pfad: 'kommentare', label: 'Kommentare' },
   { pfad: 'abschluss', label: 'Monatsabschluss' },
+  { pfad: 'fokus', label: 'Fokus' },
+  { pfad: 'agenda', label: 'Agenda' },
+  { pfad: 'termine', label: 'Termine', nurAdmin: true },
 ]

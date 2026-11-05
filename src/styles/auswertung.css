@@ -773,3 +773,21 @@
   line-height: 1.5;
   resize: vertical;
 }
+
+.analyse-liste__zusatz {
+  flex: 1 1 100%;
+  margin: 0;
+}
+
+.agenda-beispiel {
+  color: var(--text2);
+  font-style: italic;
+}
+.agenda-beispiel__hinweis {
+  margin-left: 8px;
+  font-style: normal;
+}
+
+.termin--entfernt {
+  opacity: 0.55;
+}

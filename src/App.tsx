@@ -24,6 +24,9 @@ const MitgliedSeite = lazy(() => import('./pages/app/MitgliedSeite'))
 const Leitung = lazy(() => import('./pages/app/leitung/Leitung'))
 const Kommentare = lazy(() => import('./pages/app/leitung/Kommentare'))
 const Abschluss = lazy(() => import('./pages/app/leitung/Abschluss'))
+const Fokus = lazy(() => import('./pages/app/leitung/Fokus'))
+const Agenda = lazy(() => import('./pages/app/leitung/Agenda'))
+const Termine = lazy(() => import('./pages/app/leitung/Termine'))
 
 export default function App() {
   return (
@@ -63,6 +66,13 @@ export default function App() {
                 <Route index element={<Navigate to="kommentare" replace />} />
                 <Route path="kommentare" element={<Kommentare />} />
                 <Route path="abschluss" element={<Abschluss />} />
+                <Route path="fokus" element={<Fokus />} />
+                <Route path="agenda" element={<Agenda />} />
+                <Route path="agenda/:monat" element={<Agenda />} />
+                {/* Termine pflegt nur der Admin: Verantwortliche werden nach /app umgeleitet */}
+                <Route element={<RequireRolle rollen={['admin']} />}>
+                  <Route path="termine" element={<Termine />} />
+                </Route>
               </Route>
               <Route path="gaeste" element={<Platzhalter />} />
               <Route path="meine-umfrage" element={<Platzhalter />} />

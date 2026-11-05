@@ -23,7 +23,7 @@ export default async function (browser) {
   {
     const { page, context } = await neueSeite(browser, { rolle: 'chef', antworten })
     await page.goto(BASE + '/app')
-    await page.getByRole('button', { name: 'Verstanden' }).click().catch(() => undefined)
+    await page.getByRole('button', { name: 'Verstanden' }).click({ timeout: 1500 }).catch(() => undefined)
     const menue = await page.locator('.nav').innerText()
     t.check(/Leitung/.test(menue), 'Verantwortlicher sieht den Menüpunkt „Leitung“')
     await page.getByRole('link', { name: 'Leitung', exact: true }).first().click()

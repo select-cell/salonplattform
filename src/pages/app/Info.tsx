@@ -159,6 +159,26 @@ export default function Info() {
         </ul>
       </Abschnitt>
 
+      <Abschnitt titel="Fokus, Agenda und Mails">
+        <p>
+          Verantwortliche und Admin markieren unter „Fokus“ Verhalten, die gerade besonders wichtig sind. Daraus entsteht für das Teammeeting eine <strong>Agenda</strong> (15 bis 20
+          Minuten). Sie wird <strong>ohne KI</strong> aus den Zahlen des Monats gebaut und zeigt nur das Team: keine Rangliste, keine Absender.
+        </p>
+        <ul className="platzhalter__liste">
+          <li>
+            <strong>Auf der Plattform</strong> stehen zu den Fokus-Verhalten bis zu zwei anonymisierte Kommentar-Beispiele (ohne Namen). Sie stehen <strong>nie in Mails und nie im PDF</strong>.
+          </li>
+          <li>
+            <strong>Per Mail</strong> bekommen nur die Verantwortlichen (und auf Wunsch der Admin) die Agenda einige Tage vor dem Termin und eine kurze Erinnerung kurz davor. Die Mail enthält
+            Zahlen auf Teamebene, <strong>keine Namen und keine Kommentare</strong>. Mitarbeiter bekommen nie eine Mail. Der Versand läuft über den Mail-Dienst Resend; dorthin gehen die Mail-Adressen der Empfänger
+            und der Inhalt der Mail.
+          </li>
+          <li>
+            Die Termine pflegt nur der Admin. Eine freigegebene Agenda steht am Ende des Monatsberichts (PDF).
+          </li>
+        </ul>
+      </Abschnitt>
+
       {person.rolle === 'admin' && <ExportProtokoll />}
     </div>
   )

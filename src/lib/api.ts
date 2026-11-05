@@ -3,6 +3,7 @@
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './konfiguration'
 import { supabase } from './supabase'
 import type { AbgabeStatus, Dashboard, PersonAuswertung, TeamAuswertung, Ueberfaellig, ZeitAuswertung, KommentarAuswertung } from './auswertung'
+import type { AgendaDaten, AgendaZeile, FokusListe, Rhythmus, TerminListe } from './agenda'
 import type { AbschlussInfo, AbschlussUebersicht, Analyse, AnalyseErgebnis } from './abschluss'
 import type { Person } from './types'
 import type { MonatStatus, UmfrageInhalt, UmfrageNutzdaten } from './umfrage'
@@ -233,4 +234,99 @@ export async function erstelleAnalyse(personId: string, monat: string, neu = fal
   const r = data as { ok?: boolean; fehler?: string } & Partial<AnalyseErgebnis>
   if (!r?.ok || !r.analyse) throw new Error(r?.fehler ?? 'Die Analyse konnte nicht erstellt werden.')
   return { uebersprungen: !!r.uebersprungen, versuche: r.versuche ?? 0, analyse: r.analyse }
+}
+
+// ---- Fokus, Agenda und Termine (Erweiterung F) --------------------------------------------------
+
+export async function holeFokus(): Promise<FokusListe> {
+  const { data, error } = await supabase.rpc('fokus_liste')
+  if (error) throw new Error(error.message)
+  return data as FokusListe
+}
+
+export async function schalteFokus(verhaltenId: string, an: boolean, begruendung?: string, bis?: string | null): Promise<FokusListe> {
+  const { data, error } = await supabase.rpc('fokus_umschalten', {
+    p_verhalten: verhaltenId,
+    p_an: an,
+    p_begruendung: begruendung ?? null,
+    p_bis: bis || null,
+  })
+  if (error) throw new Error(error.message)
+  return data as FokusListe
+}
+
+export async function holeAgenda(monat: string): Promise<AgendaZeile | null> {
+  const { data, error } = await supabase.rpc('agenda_lesen', { p_monat: `${monat}-01` })
+  if (error) throw new Error(error.message)
+  return (data as AgendaZeile | null) ?? null
+}
+
+export async function erzeugeAgenda(monat: string, neu = false): Promise<AgendaZeile> {
+  const { data, error } = await supabase.rpc('agenda_erzeugen', { p_monat: `${monat}-01`, p_neu: neu })
+  if (error) throw new Error(error.message)
+  return data as AgendaZeile
+}
+
+export async function bearbeiteAgenda(monat: string, agenda: AgendaDaten): Promise<AgendaZeile> {
+  const { data, error } = await supabase.rpc('agenda_bearbeiten', { p_monat: `${monat}-01`, p_agenda: agenda })
+  if (error) throw new Error(error.message)
+  return data as AgendaZeile
+}
+
+export async function gibAgendaFrei(monat: string, frei = true): Promise<AgendaZeile> {
+  const { data, error } = await supabase.rpc('agenda_freigeben', { p_monat: `${monat}-01`, p_freigeben: frei })
+  if (error) throw new Error(error.message)
+  return data as AgendaZeile
+}
+
+export async function holeTermine(): Promise<TerminListe> {
+  const { data, error } = await supabase.rpc('termine_liste')
+  if (error) throw new Error(error.message)
+  return data as TerminListe
+}
+
+export interface TerminEingabe {
+  id: string | null
+  startetLokal: string
+  titel: string
+  /** „2026-09“ oder leer = Monat vor dem Termin */
+  bezugsmonat: string
+  vorlaufTage: number[]
+  erinnerungStunden: number[]
+  adminInKopie: boolean
+  mailsPausiert: boolean
+}
+
+export async function speichereTermin(t: TerminEingabe): Promise<void> {
+  const { error } = await supabase.rpc('termin_speichern', {
+    p_id: t.id,
+    p_startet_lokal: t.startetLokal,
+    p_titel: t.titel,
+    p_bezugsmonat: t.bezugsmonat ? `${t.bezugsmonat}-01` : null,
+    p_vorlauf_tage: t.vorlaufTage,
+    p_erinnerung_stunden: t.erinnerungStunden,
+    p_admin_in_kopie: t.adminInKopie,
+    p_mails_pausiert: t.mailsPausiert,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function speichereSerie(
+  t: Omit<TerminEingabe, 'id' | 'bezugsmonat' | 'mailsPausiert'> & { rhythmus: Rhythmus; anzahl: number },
+): Promise<void> {
+  const { error } = await supabase.rpc('termine_serie', {
+    p_startet_lokal: t.startetLokal,
+    p_rhythmus: t.rhythmus,
+    p_anzahl: t.anzahl,
+    p_titel: t.titel,
+    p_vorlauf_tage: t.vorlaufTage,
+    p_erinnerung_stunden: t.erinnerungStunden,
+    p_admin_in_kopie: t.adminInKopie,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function entferneTermin(id: string): Promise<void> {
+  const { error } = await supabase.rpc('termin_entfernen', { p_id: id })
+  if (error) throw new Error(error.message)
 }

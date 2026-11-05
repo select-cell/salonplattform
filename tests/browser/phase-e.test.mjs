@@ -63,7 +63,7 @@ function welt({ abschluss = null, aktuell = { abgaben: 3, erwartet: 4 }, kiFehle
   return { z, antworten }
 }
 
-const kennt = (seite) => seite.getByRole('button', { name: 'Verstanden' }).click().catch(() => undefined)
+const kennt = (seite) => seite.getByRole('button', { name: 'Verstanden' }).click({ timeout: 1500 }).catch(() => undefined)
 const zeile = (seite, name) => seite.locator('[data-testid="analyse-tabelle"] > li', { hasText: name })
 
 export default async function (browser) {
@@ -171,6 +171,7 @@ export default async function (browser) {
   await zeile(page, 'Anna').getByRole('button', { name: 'Öffnen' }).click()
   await page.getByTestId('analyse-panel').getByRole('button', { name: 'Freigabe zurücknehmen' }).click()
   await page.getByText(/Freigabe zurückgenommen/).waitFor()
+  await zeile(page, 'Anna').getByText('Entwurf', { exact: true }).waitFor()
   t.check(/Entwurf/.test(await zeile(page, 'Anna').innerText()), 'Freigabe zurückgenommen: wieder Entwurf')
 
   t.abschnitt('Alle fehlenden erstellen und Fehler')
@@ -205,6 +206,7 @@ export default async function (browser) {
     await p.getByRole('button', { name: 'Stand aktualisieren' }).click()
     await p.getByText('Stand aktualisiert: 4 von 4 Abgaben.').waitFor()
     t.check(a.some((x) => x.rpc === 'monat_abschliessen'), 'Aktualisieren ruft monat_abschliessen erneut')
+    await p.getByTestId('abschluss-veraltet').waitFor({ state: 'detached' })
     t.check((await p.getByTestId('abschluss-veraltet').count()) === 0 && /vollständig/.test(await p.locator('main').innerText()), 'Danach vollständig, kein Hinweis mehr')
     await c.close()
   }

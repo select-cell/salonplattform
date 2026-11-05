@@ -3,6 +3,7 @@ import { pdfFarben as f } from '../config/brand'
 import type { Schwellen } from '../lib/auswertung'
 import { einordnung, monatName, topFlop } from '../lib/auswertung'
 import { formatDauer } from '../lib/zeitmesser'
+import { AgendaAbschnitt, type FreigegebeneAgenda } from './AgendaAbschnitt'
 import { Balken, Kennzahl, Legende, Seite, prozent, stile, vz, z1 } from './bausteine'
 
 export interface MonatsberichtDaten {
@@ -18,7 +19,8 @@ export interface MonatsberichtDaten {
     personen: { id: string; name: string; quote: number | null; pflicht: number; pflicht_erfuellt: number; freiwillige_quote: number | null; woerter_schnitt: number | null }[]
   }
   zeit: { abgegeben: number; zaehlt: number; median_sek: number | null } | null
-  agenda: unknown
+  /** nur eine freigegebene Agenda; sonst null */
+  agenda: FreigegebeneAgenda | null
 }
 
 export function Monatsbericht({ daten, logo }: { daten: MonatsberichtDaten; logo: string | null }) {
@@ -139,6 +141,8 @@ export function Monatsbericht({ daten, logo }: { daten: MonatsberichtDaten; logo
             ))}
           </View>
         )}
+
+        {d.agenda && <AgendaAbschnitt agenda={d.agenda} />}
       </Seite>
     </Document>
   )
