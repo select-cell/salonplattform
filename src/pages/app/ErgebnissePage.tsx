@@ -15,7 +15,7 @@ export default function ErgebnissePage() {
       <header className="seitenkopf">
         <p className="overline">Meine Ergebnisse</p>
         <h1 style={{ marginTop: 8 }}>So siehst du dich, so sehen dich andere</h1>
-        <p>Deine Selbsteinschätzung im Vergleich zu dem, was die Kolleginnen von dir wahrnehmen.</p>
+        <p>Deine Selbsteinschätzung im Vergleich zu dem, was die Kollegen von dir wahrnehmen.</p>
       </header>
       <DatenZustand laedt={laedt} fehler={fehler} onNeu={neuLaden}>
         {daten && <PersonenAnsicht daten={daten} monat={monat} onMonat={setGewaehlt} mitAbsender={false} />}

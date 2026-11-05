@@ -35,7 +35,7 @@ export default function MitgliederSeite() {
 }
 
 function Liste({ dash, status }: { dash: Dashboard; status: AbgabeStatus[] }) {
-  // Alle aktiven Teilnehmerinnen, auch wenn sie noch keine Auswertung haben
+  // Alle aktiven Teilnehmer, auch wenn sie noch keine Auswertung haben
   const ids = new Set([...status.map((s) => s.person_id), ...dash.personen.map((p) => p.id)])
   const zeilen = [...ids]
     .map((id) => ({

@@ -12,7 +12,7 @@ export async function holeIch(): Promise<Person | null> {
   return (data as Person | null) ?? null
 }
 
-/** Alle Umfrage-Monate der eingeloggten Teilnehmerin, neuester zuerst. Leer, wenn sie nicht teilnimmt. */
+/** Alle Umfrage-Monate des eingeloggten Teilnehmers, neuester zuerst. Leer, wenn er nicht teilnimmt. */
 export async function holeMeineMonate(): Promise<MonatStatus[]> {
   const { data, error } = await supabase.rpc('meine_monate')
   if (error) throw new Error(error.message)

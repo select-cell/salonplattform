@@ -16,7 +16,7 @@ export function EntwicklungSchritt({ inhalt, entwurf, onWahl, onBegruendung }: P
       <header className="stack-s">
         <span className="badge badge--gruen">Entwicklung des Monats</span>
         <h2 id="schritt-titel" className="umfrage__titel">
-          Bei welcher Kollegin hast du im letzten Monat eine besonders positive Entwicklung im Verhalten beobachtet?
+          Bei welchem Kollegen hast du im letzten Monat eine besonders positive Entwicklung im Verhalten beobachtet?
         </h2>
         <p className="muted">Du kannst dich selbst nicht auswählen.</p>
       </header>

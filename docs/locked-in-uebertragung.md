@@ -23,7 +23,7 @@ Die Änderung betrifft nur den **Bewertungsablauf im Browser**. Das Absenden der
 | **Stufe** | Ein Wert der Skala (1 bis 5) mit einer Beschreibung. |
 | **Bestätigt / gesperrt** | Das Bewertungsfeld wurde mit „Locked In“ abgeschlossen und ist nicht mehr änderbar. |
 
-Eine Seite zeigt **eine Frage** und darunter **alle Bewertungsfelder dieser Frage** (bei uns: du selbst, Kollegin 1, Kollegin 2).
+Eine Seite zeigt **eine Frage** und darunter **alle Bewertungsfelder dieser Frage** (bei uns: du selbst, Kollege 1, Kollege 2).
 
 ---
 

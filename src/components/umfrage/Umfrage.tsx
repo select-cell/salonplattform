@@ -206,7 +206,7 @@ function StartSchritt({
         {kolleginnen > 0 && (
           <>
             {' '}
-            und {kolleginnen === 1 ? 'deine Kollegin' : `deine ${kolleginnen} Kolleginnen`} (<strong>Fremdbild</strong>)
+            und {kolleginnen === 1 ? 'deinen Kollegen' : `deine ${kolleginnen} Kollegen`} (<strong>Fremdbild</strong>)
           </>
         )}
         . Nimm dir dafür etwas Ruhe, deine Antworten helfen dem ganzen Team.

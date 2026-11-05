@@ -155,7 +155,7 @@ from public.rituale r
 where r.nr = 1 and r.salon_id = (select id from public.salons where name = 'Dawiid');
 ```
 
-Ein Verhalten ausblenden: `update public.verhalten set aktiv = false where nr = …;`. Die Umfrage verlangt immer genau die aktiven Verhalten, für jede aktive Teilnehmerin.
+Ein Verhalten ausblenden: `update public.verhalten set aktiv = false where nr = …;`. Die Umfrage verlangt immer genau die aktiven Verhalten, für jede aktiven Teilnehmer.
 
 **Video-Pflicht:** Mit Video-Link wird die Bewertung erst frei, wenn das Video bis zum Ende gelaufen ist. Das erkennt die Umfrage bei Vimeo-Links und direkten Videodateien (`.mp4`, `.webm`). Bei anderen Links bestätigt die Person selbst. Läuft ein Video nicht, erscheint nach 20 Sekunden ein Ausweg, damit niemand feststeckt.
 
@@ -173,9 +173,9 @@ Danach ist nur noch `umfrage_einreichen_v2` (nur eingeloggt) erreichbar. Der Tes
 
 ### Wer sieht was in den Auswertungen?
 
-- **Mitarbeiterin:** eigenes Selbstbild und Fremdbild, Kommentare der Kolleginnen **ohne Absender**, das Team nur als Durchschnitt.
+- **Mitarbeiterin:** eigenes Selbstbild und Fremdbild, Kommentare der Kollegen **ohne Absender**, das Team nur als Durchschnitt.
 - **Verantwortlicher und Admin:** Rangliste, Heatmap, jede Person im Detail, Einzelbewertungen **mit Absender**, Abgabe-Status und das Reminder-Popup.
-- Alle Kennzahlen werden in der Datenbank gerechnet (Selbstbild = eigene Note, Fremdbild = Schnitt der Kolleginnen, Differenz = Selbstbild − Fremdbild). Die Schwellen (0,3 / 2,5 / 3,5) stehen in der Tabelle `salons`.
+- Alle Kennzahlen werden in der Datenbank gerechnet (Selbstbild = eigene Note, Fremdbild = Schnitt der Kollegen, Differenz = Selbstbild − Fremdbild). Die Schwellen (0,3 / 2,5 / 3,5) stehen in der Tabelle `salons`.
 
 ### Wer sieht was?
 

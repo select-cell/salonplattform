@@ -158,7 +158,7 @@ select ok((select tage_bis_frist from public.meine_monate() where monat_key = pg
 
 select is(jsonb_array_length(public.umfrage_inhalt()->'verhalten'), 2, 'Inhalt: nur aktive Verhalten');
 select is(jsonb_array_length(public.umfrage_inhalt()->'kolleginnen'), 2,
-          'Inhalt: Kolleginnen ohne mich, ohne Gesperrte, ohne anderen Salon');
+          'Inhalt: Kollegen ohne mich, ohne Gesperrte, ohne anderen Salon');
 select is(jsonb_array_length(public.umfrage_inhalt()->'verhalten'->0->'kriterien'), 2, 'Inhalt: Bewertungsstufen');
 select is(jsonb_array_length(public.umfrage_inhalt()->'rituale'->0->'fragen'), 3, 'Inhalt: Ritual-Fragen');
 select is(public.umfrage_inhalt()->'person'->>'name', 'Anna Test', 'Inhalt: eigene Person aus dem Login');
@@ -209,7 +209,7 @@ select throws_ok($$ select public.umfrage_einreichen_v2(
   '22023', 'Für die Entwicklung des Monats kannst du eine andere Person aus dem Team wählen.', 'Entwicklung: nicht aus fremdem Salon');
 select throws_ok($$ select public.umfrage_einreichen_v2(
     pg_temp.payload(pg_temp.mkey(-1)) #- '{entwicklung,person_id}') $$,
-  '22023', 'Bitte wähle bei der Entwicklung des Monats eine Kollegin aus.', 'Entwicklung des Monats ist Pflicht');
+  '22023', 'Bitte wähle bei der Entwicklung des Monats einen Kollegen aus.', 'Entwicklung des Monats ist Pflicht');
 select throws_ok($$ select public.umfrage_einreichen_v2(
     pg_temp.payload(pg_temp.mkey(-1)) #- '{entwicklung,begruendung}') $$,
   '22023', 'Bitte begründe deine Wahl bei der Entwicklung des Monats.', 'Begründung der Entwicklung ist Pflicht');
@@ -307,11 +307,11 @@ select throws_ok($$ select public.umfrage_einreichen_v2(pg_temp.payload(pg_temp.
 select is(jsonb_array_length(public.umfrage_inhalt()->'kolleginnen'), 0, 'Verantwortlicher bekommt keine Bewertungsliste');
 select is(jsonb_array_length(public.umfrage_inhalt()->'verhalten'), 2, 'Verantwortlicher sieht die Inhalte');
 
--- Eine Teilnehmerin eines anderen Salons sieht die Kolleginnen von Salon U nicht
+-- Ein Teilnehmer eines anderen Salons sieht die Kollegen von Salon U nicht
 reset role;
 select pg_temp.anmelden('22222222-0000-0000-0000-00000000000f');
 set local role authenticated;
-select is(jsonb_array_length(public.umfrage_inhalt()->'kolleginnen'), 0, 'Anderer Salon: keine Kolleginnen von Salon U');
+select is(jsonb_array_length(public.umfrage_inhalt()->'kolleginnen'), 0, 'Anderer Salon: keine Kollegen von Salon U');
 select is(jsonb_array_length(public.umfrage_inhalt()->'verhalten'), 0, 'Anderer Salon: keine Inhalte von Salon U');
 
 -- ---------------------------------------------------------------------------

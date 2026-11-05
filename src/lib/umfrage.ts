@@ -34,7 +34,7 @@ export interface Verhalten {
   kriterien: Kriterium[]
 }
 
-export interface Kollegin {
+export interface Kollege {
   id: string
   name: string
 }
@@ -43,7 +43,7 @@ export interface UmfrageInhalt {
   salon: { id: string; name: string }
   person: { id: string; name: string }
   verhalten: Verhalten[]
-  kolleginnen: Kollegin[]
+  kolleginnen: Kollege[]
 }
 
 // ---- Entwurf (Zwischenstand im Browser) ---------------------------------------
@@ -160,7 +160,7 @@ export function brauchtVideo(_url: string | null): boolean {
 /** Meldung, was an diesem Schritt noch fehlt, oder null, wenn man weiter darf. */
 export function schrittFehler(schritt: Schritt, entwurf: Entwurf, inhalt: UmfrageInhalt): string | null {
   if (schritt.art === 'entwicklung') {
-    if (!entwurf.entwicklung.personId) return 'Bitte wähle eine Kollegin für die Entwicklung des Monats aus.'
+    if (!entwurf.entwicklung.personId) return 'Bitte wähle einen Kollegen für die Entwicklung des Monats aus.'
     if (!entwurf.entwicklung.begruendung.trim()) return 'Bitte begründe deine Wahl bei der Entwicklung des Monats.'
     return null
   }

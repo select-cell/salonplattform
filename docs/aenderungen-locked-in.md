@@ -24,11 +24,11 @@ Ziel: Die Befragten setzen sich bei jeder Bewertung mit dem Kriterium auseinande
 ## 2. Ablauf im Detail
 
 ### Reihenfolge
-Eine Seite zeigt **ein Verhalten** mit drei Karten untereinander: du selbst (Selbstbild), Kollegin 1, Kollegin 2 (Fremdbild).
+Eine Seite zeigt **ein Verhalten** mit drei Karten untereinander: du selbst (Selbstbild), Kollege 1, Kollege 2 (Fremdbild).
 
 ```
-Verhalten 1 → Selbst → Kollegin 1 → Kollegin 2
-Verhalten 2 → Selbst → Kollegin 1 → Kollegin 2
+Verhalten 1 → Selbst → Kollege 1 → Kollege 2
+Verhalten 2 → Selbst → Kollege 1 → Kollege 2
 … bis Verhalten 20 → Zusammenfassung
 ```
 
@@ -218,14 +218,14 @@ Stand der Prüfungen: 82 Prüfungen in der Umfrage, insgesamt über 250 Browser-
 
 ### Umfrage
 - **Rituale entfernt:** Sie sind in der Plattform nicht mehr sichtbar (in der Datenbank deaktiviert, Daten bleiben erhalten).
-- **Entwicklung des Monats** steht als **erste Frage** und ist **Pflicht** (Kollegin wählen, Begründung). Auch serverseitig geprüft.
+- **Entwicklung des Monats** steht als **erste Frage** und ist **Pflicht** (Kollege wählen, Begründung). Auch serverseitig geprüft.
 - **Video-Sperre:** Jedes Verhalten hat ein Video. Ohne Video läuft ein Platzhalter von 8 Sekunden (`PLATZHALTER_VIDEO_SEKUNDEN`), danach werden die Bewertungen frei. Vorspulen ist gesperrt.
 - **Stufentexte:** 100 Bewertungsstufen (20 Verhalten × 5) aus der bisherigen Umfrage in der Datenbank. Einheitliche Stufennamen für alle Verhalten: Bewusstsein, Aufbau, Stabilität, Profi, High Performer.
 
 ### Auswertungen
 - **Heatmap:** nur noch der Durchschnitt je Säule pro Person, dazu „Ø Team“ und eine Gesamtzeile.
 - **Selbstbild-Kommentare** stehen bei jeder Person im Bereich der Rückmeldungen, für Admin, Verantwortliche und die Person selbst.
-- **Mitarbeiterinnen:** Auf der Team-Seite sehen sie Rangliste und Heatmap mit Namen. In ihren eigenen Ergebnissen sehen sie **nur ihre eigenen Selbstbild-Antworten**, keine Kommentare der Kolleginnen. Die Fremdbild-Zahlen bleiben sichtbar. Verantwortliche und Admin sehen weiter alles.
+- **Mitarbeiterinnen:** Auf der Team-Seite sehen sie Rangliste und Heatmap mit Namen. In ihren eigenen Ergebnissen sehen sie **nur ihre eigenen Selbstbild-Antworten**, keine Kommentare der Kollegen. Die Fremdbild-Zahlen bleiben sichtbar. Verantwortliche und Admin sehen weiter alles.
 
 ### Plattform
 - **Logo:** Im Kopf steht nur noch das Dawiid-Logo (ohne Schriftzug).
@@ -239,7 +239,7 @@ Stand der Prüfungen: 82 Prüfungen in der Umfrage, insgesamt über 250 Browser-
 | `rituale_deaktivieren` | Rituale ausblenden (umkehrbar) |
 | `umfrage_entwicklung_pflicht` | Entwicklung des Monats mit Begründung ist Pflicht |
 | `ergebnisse_selbstbild_team` | Selbstbild-Kommentare in den Auswertungen, Team-Übersicht auch für Mitarbeiterinnen |
-| `mitarbeiterin_ohne_fremdkommentare` | Mitarbeiterinnen sehen keine Kommentare der Kolleginnen |
+| `mitarbeiterin_ohne_fremdkommentare` | Mitarbeiterinnen sehen keine Kommentare der Kollegen |
 | `stufennamen_verhalten_1` | Einheitliche Stufennamen für Verhalten 1 |
 
 Das Locked-In selbst braucht **keine** Migration.

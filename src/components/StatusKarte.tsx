@@ -34,7 +34,7 @@ export function StatusKarte() {
         {status.laedt && !status.daten && <p className="muted" style={{ marginTop: 10 }}>Wird geladen …</p>}
         {status.fehler && <p className="hinweis hinweis--fehler" style={{ marginTop: 12 }}>{status.fehler}</p>}
         {status.daten && status.daten.length === 0 && (
-          <p className="muted" style={{ marginTop: 10 }}>Es gibt noch keine Teilnehmerinnen an der Teamumfrage.</p>
+          <p className="muted" style={{ marginTop: 10 }}>Es gibt noch keine Teilnehmer an der Teamumfrage.</p>
         )}
         {status.daten && status.daten.length > 0 && (
           <ul className="statuszeilen">

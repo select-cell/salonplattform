@@ -38,7 +38,7 @@ export const BEREICHE: readonly Bereich[] = [
     nurTeilnehmer: true,
     live: true,
     geplant: [
-      'Selbstbild und Fremdbild der Kolleginnen in einem Durchgang',
+      'Selbstbild und Fremdbild der Kollegen in einem Durchgang',
       'Videos und Bewertungsstufen pro Verhalten',
       'Entwicklung des Monats als erste Frage',
     ],

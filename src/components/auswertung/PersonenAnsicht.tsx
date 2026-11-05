@@ -19,7 +19,7 @@ export function PersonenAnsicht({ daten, monat, onMonat, mitAbsender }: Props) {
     return (
       <Leer
         titel="Noch keine Ergebnisse"
-        text="Sobald die erste Umfrage abgegeben ist und die Kolleginnen bewertet haben, erscheinen hier die Auswertungen."
+        text="Sobald die erste Umfrage abgegeben ist und die Kollegen bewertet haben, erscheinen hier die Auswertungen."
       />
     )
   }
