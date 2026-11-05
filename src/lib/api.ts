@@ -147,3 +147,33 @@ export async function holeKommentarAuswertung(monat?: string): Promise<Kommentar
   if (error) throw new Error(error.message)
   return data as KommentarAuswertung
 }
+
+// ---- PDF-Export (Erweiterung C) -------------------------------------------------------
+
+export async function holePdfMonatsbericht(monat: string): Promise<import('../pdf/Monatsbericht').MonatsberichtDaten> {
+  const { data, error } = await supabase.rpc('pdf_monatsbericht', { p_monat: `${monat}-01` })
+  if (error) throw new Error(error.message)
+  return data as import('../pdf/Monatsbericht').MonatsberichtDaten
+}
+
+export async function holePdfPersonenbericht(personId: string, monat: string): Promise<import('../pdf/Personenbericht').PersonenberichtDaten> {
+  const { data, error } = await supabase.rpc('pdf_personenbericht', { p_person: personId, p_monat: `${monat}-01` })
+  if (error) throw new Error(error.message)
+  return data as import('../pdf/Personenbericht').PersonenberichtDaten
+}
+
+export interface PdfProtokollZeile {
+  erstellt_am: string
+  von: string
+  art: 'monatsbericht' | 'personenbericht'
+  /** „2026-10“ */
+  monat: string
+  /** Name der Person beim Personenbericht, sonst null */
+  ziel: string | null
+}
+
+export async function holePdfProtokoll(limit = 50): Promise<PdfProtokollZeile[]> {
+  const { data, error } = await supabase.rpc('pdf_export_protokoll', { p_limit: limit })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as PdfProtokollZeile[]
+}

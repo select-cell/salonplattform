@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { DatenZustand } from '../../components/auswertung/Bausteine'
+import { PdfKnopf } from '../../components/auswertung/PdfKnopf'
 import { PersonenAnsicht } from '../../components/auswertung/PersonenAnsicht'
 import { holePersonErgebnisse } from '../../lib/api'
+import { ladePersonenberichtHerunter } from '../../lib/pdf'
 import { useDaten } from '../../lib/useDaten'
 
 /** /app/mitglieder/:id: Auswertung einer Person mit Verlauf und Einzelbewertungen inklusive Absender. */
@@ -22,7 +24,14 @@ export default function MitgliedSeite() {
         <p>Verlauf über alle Monate und jede Einzelbewertung mit Absender.</p>
       </header>
       <DatenZustand laedt={laedt} fehler={fehler} onNeu={neuLaden}>
-        {daten && <PersonenAnsicht daten={daten} monat={monat} onMonat={setGewaehlt} mitAbsender />}
+        {daten && (
+          <>
+            {monat && (
+              <PdfKnopf key={`${id}-${monat}`} label="Personenbericht als PDF" erzeuge={() => ladePersonenberichtHerunter(id, monat)} />
+            )}
+            <PersonenAnsicht daten={daten} monat={monat} onMonat={setGewaehlt} mitAbsender />
+          </>
+        )}
       </DatenZustand>
     </div>
   )

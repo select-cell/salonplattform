@@ -689,3 +689,15 @@
   font-variant-numeric: tabular-nums;
   background: color-mix(in srgb, var(--accent) var(--intensitaet, 0%), transparent);
 }
+
+/* PDF-Knopf (Erweiterung C) */
+.pdf-knopf {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+.pdf-knopf .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}

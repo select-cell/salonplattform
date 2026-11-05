@@ -109,6 +109,13 @@ const PFADE = {
       <path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" />
     </>
   ),
+  download: (
+    <>
+      <path d="M12 3v12" />
+      <path d="m7 10 5 5 5-5" />
+      <path d="M4 20h16" />
+    </>
+  ),
   schloss: (
     <>
       <rect x="3" y="11" width="18" height="11" rx="2" />

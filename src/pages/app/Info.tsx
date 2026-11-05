@@ -1,5 +1,10 @@
 import type { ReactNode } from 'react'
+import { usePerson } from '../../auth/kontext'
+import { DatenZustand } from '../../components/auswertung/Bausteine'
 import { MARKE } from '../../config/brand'
+import { holePdfProtokoll } from '../../lib/api'
+import { monatName } from '../../lib/auswertung'
+import { useDaten } from '../../lib/useDaten'
 
 function Abschnitt({ titel, children }: { titel: string; children: ReactNode }) {
   return (
@@ -10,10 +15,54 @@ function Abschnitt({ titel, children }: { titel: string; children: ReactNode }) 
   )
 }
 
+const ART_NAME = { monatsbericht: 'Monatsbericht', personenbericht: 'Personenbericht' } as const
+const zeitFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Berlin' })
+
+/** Nur für Admins: wer wann welchen PDF-Bericht abgerufen hat. */
+function ExportProtokoll() {
+  const { laedt, daten, fehler, neuLaden } = useDaten(() => holePdfProtokoll(50), [])
+  return (
+    <Abschnitt titel="Export-Protokoll (nur Admin)">
+      <p className="klein muted">Die letzten 50 PDF-Berichte: wer wann welchen Bericht abgerufen hat.</p>
+      <DatenZustand laedt={laedt && !daten} fehler={fehler} onNeu={neuLaden}>
+        {daten && daten.length === 0 && <p className="muted">Noch kein Bericht abgerufen.</p>}
+        {daten && daten.length > 0 && (
+          <div className="tabelle-scroll">
+            <table className="tabelle" aria-label="Export-Protokoll">
+              <thead>
+                <tr>
+                  <th scope="col">Wann</th>
+                  <th scope="col">Wer</th>
+                  <th scope="col">Bericht</th>
+                  <th scope="col">Monat</th>
+                </tr>
+              </thead>
+              <tbody>
+                {daten.map((z, i) => (
+                  <tr key={`${z.erstellt_am}-${i}`}>
+                    <td>{zeitFormat.format(new Date(z.erstellt_am))}</td>
+                    <td>{z.von}</td>
+                    <td>
+                      {ART_NAME[z.art]}
+                      {z.ziel ? `: ${z.ziel}` : ''}
+                    </td>
+                    <td>{monatName(z.monat)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </DatenZustand>
+    </Abschnitt>
+  )
+}
+
 /**
  * /app/info: „Info und Datenschutz“. Jede Erweiterung, die Daten anders nutzt, ergänzt hier einen Absatz.
  */
 export default function Info() {
+  const person = usePerson()
   return (
     <div className="stack stack-l" style={{ maxWidth: 760 }}>
       <header className="seitenkopf">
@@ -78,6 +127,19 @@ export default function Info() {
           </li>
         </ul>
       </Abschnitt>
+
+      <Abschnitt titel="PDF-Berichte">
+        <p>
+          Verantwortliche und Admin können den Monatsbericht des Teams und den Bericht einer Person als <strong>PDF</strong> herunterladen.
+          Das PDF entsteht in deinem Browser, die Plattform speichert keine Kopie. Jeder Abruf wird mit Name, Bericht und Monat
+          protokolliert; das Protokoll sehen nur Admins.
+        </p>
+        <p className="klein muted">
+          Die Berichte enthalten Kommentare und Namen und sind als „vertraulich“ gekennzeichnet. Bitte gib sie nur weiter, wenn es sein muss.
+        </p>
+      </Abschnitt>
+
+      {person.rolle === 'admin' && <ExportProtokoll />}
     </div>
   )
 }

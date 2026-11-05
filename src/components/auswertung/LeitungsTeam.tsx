@@ -5,7 +5,9 @@ import { einordnung, mittel, monatName, topFlop, vorzeichen, zahl } from '../../
 import { useDaten } from '../../lib/useDaten'
 import { Abschnitt, DatenZustand, EinordnungBadge, Kennzahl, Leer, Monatswahl } from './Bausteine'
 import { DifferenzDiagramm, SbFbDiagramm, VerlaufDiagramm, type VerlaufDaten } from './Diagramme'
+import { ladeMonatsberichtHerunter, ladePersonenberichtHerunter } from '../../lib/pdf'
 import { Heatmap, Rangliste, TopFlop } from './Listen'
+import { PdfKnopf } from './PdfKnopf'
 import { PersonenAnsicht } from './PersonenAnsicht'
 import { TeamTabelle } from './Tabellen'
 import { ZeitAbschnitt } from './ZeitAbschnitt'
@@ -49,7 +51,10 @@ export function LeitungsTeam() {
       </div>
 
       {ansicht === 'team' ? (
-        <TeamDashboard d={d} verlauf={verlauf.daten} onPerson={setAnsicht} />
+        <>
+          <PdfKnopf key={`monat-${monat}`} label="Monatsbericht als PDF" erzeuge={() => ladeMonatsberichtHerunter(monat)} />
+          <TeamDashboard d={d} verlauf={verlauf.daten} onPerson={setAnsicht} />
+        </>
       ) : (
         <PersonSicht key={ansicht} personId={ansicht} monat={monat} onMonat={wechsleMonat} />
       )}
@@ -64,6 +69,13 @@ function PersonSicht({ personId, monat, onMonat }: { personId: string; monat: st
       {person.daten && (
         <>
           <h2 className="ausw-person">{person.daten.person.name}</h2>
+          {person.daten.monate.includes(monat) && (
+            <PdfKnopf
+              key={`${personId}-${monat}`}
+              label="Personenbericht als PDF"
+              erzeuge={() => ladePersonenberichtHerunter(personId, monat)}
+            />
+          )}
           <PersonenAnsicht daten={person.daten} monat={monat} onMonat={onMonat} mitAbsender />
         </>
       )}
