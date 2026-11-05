@@ -66,7 +66,18 @@ export interface AgendaZeile {
   bearbeitet_von: string | null
   freigegeben_am: string | null
   freigegeben_von: string | null
+  /** 'vorlage' (ohne KI) oder der Anbieter der KI (zum Beispiel 'webhook'); ältere Antworten ohne Angabe sind Vorlagen */
+  anbieter?: string | null
+  modell?: string | null
+  prompt_version?: string | null
+  versuche?: number | null
+  /** Faktencheck der Datenbank (bei der Vorlage immer bestanden) */
+  geprueft?: boolean
+  pruef_hinweis?: string | null
 }
+
+/** Hat die KI diese Agenda formuliert (und nicht die Vorlage)? */
+export const vonKi = (z: Pick<AgendaZeile, 'anbieter'>): boolean => !!z.anbieter && z.anbieter !== 'vorlage'
 
 /** Das Zeitbudget je Block (Vorlage agenda-vorlage-v1). Die Datenbank prüft es verbindlich; hier nur für die Anzeige. */
 export const BLOCK_GRENZEN: Record<BlockId, { min: number; max: number; name: string }> = {

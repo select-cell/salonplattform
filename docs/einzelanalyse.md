@@ -33,9 +33,11 @@ Jede Zahl im Text und in der strukturierten Ausgabe muss in der Eingabe vorkomme
 
 ## Sammellauf und Gesamtauswertung (Version 1.3)
 
-**Sammellauf** („Alle fehlenden erstellen“): Die Oberfläche ruft die Edge Function mit `aufgabe: "alle"` auf. Sie bearbeitet je Aufruf die nächsten **3 Personen** ohne Analyse (`PAKET_GROESSE`), schickt sie **in einer Anfrage** an die KI und speichert jede Analyse einzeln (mit eigenem Faktencheck und eigenen Wiederholungen, nur für die betroffene Person). Die Antwort nennt `erstellt`, `fehlgeschlagen` (mit Grund) und `verbleibend`; die Oberfläche ruft erneut auf, bis nichts mehr fehlt, und nimmt gescheiterte Personen aus (`ausgenommen`).
+**Sammellauf** („Alle fehlenden erstellen“): Die Oberfläche ruft die Edge Function mit `aufgabe: "alle"` auf. Sie bearbeitet je Aufruf die nächsten **2 Personen** ohne Analyse (`PAKET_GROESSE`; n8n Cloud beendet Anfragen nach etwa 100 Sekunden), schickt sie **in einer Anfrage** an die KI und speichert jede Analyse einzeln (mit eigenem Faktencheck und eigenen Wiederholungen, nur für die betroffene Person). Die Antwort nennt `erstellt`, `fehlgeschlagen` (mit Grund) und `verbleibend`; die Oberfläche ruft erneut auf, bis nichts mehr fehlt, und nimmt gescheiterte Personen aus (`ausgenommen`).
 
 **Gesamtauswertung** (`aufgabe: "gesamt"`): ein KI-Text für das **ganze Team** mit `gesamt_eingabe`, `gesamt_pruefen`, `gesamt_speichern`, `gesamt_lesen`, `gesamt_bearbeiten`, `gesamt_freigeben` (gleicher Ablauf wie bei der Einzelanalyse, Typ `team_gesamt` in `analysen`). Die Eingabe enthält nur **Teamwerte**: Kennzahlen und Vormonat, je Verhalten Selbst-/Fremdbild, Stärken und Entwicklungsfelder, die größten Differenzen und Veränderungen, die Fokus-Verhalten des Monats (nur Nummer und Titel) und die **Zahl** der Kommentare (`kommentare.fremdbild_bewertungen`, `davon_mit_kommentar`). Keine Namen, keine Einzelpersonen, keine Kommentartexte, keine Begründungen. Prompt: `SYSTEM_PROMPT_GESAMT`, Version `gesamt-v1`. Die Gesamtauswertung erscheint noch in keinem PDF.
+
+**Agenda mit KI** (`aufgabe: "agenda"`): die KI formuliert die Agenda fürs Teammeeting aus denselben Teamwerten; Aufbau, Zeitbudget und Zahlen prüft die Datenbank (`agenda_ki_*`). Einzelheiten stehen in [agenda-termine.md](agenda-termine.md).
 
 ## Datenbank (`20261105104052_monatsabschluss_analysen.sql`, erweitert durch `…_ki_admin_gesamtauswertung.sql`)
 
@@ -55,11 +57,11 @@ Eingabe holen → gleiche Eingabe **und** Prompt-Version wie gespeichert = **kei
 
 Ohne Einrichtung meldet die Seite „Die KI ist noch nicht eingerichtet.“; alles andere läuft. Der Prompt liegt versioniert im Repo (`PROMPT_VERSION` in `analyse.ts`). Wer ihn ändert, erhöht die Version; dann gilt die Eingabe als neu. Die Branche („Friseursalon“) steht im ersten Satz von `SYSTEM_PROMPT`.
 
-**Ein Webhook für alles:** Mit `AI_PROVIDER=webhook` geht jede KI-Anfrage an den **einen** Webhook. Anfrage: `{ aufgabe, prompt_version, auftraege: [{ ref, system, nachricht, eingabe }] }` mit `aufgabe` = `einzelanalyse` (auch für den Sammellauf mit mehreren Aufträgen) oder `gesamtauswertung`. Antwort **direkt als Antwort des Webhooks**: `{ ergebnisse: [{ ref, code, ausgabe | fehler }] }`, die `ausgabe` ein JSON-Objekt mit den Schlüsseln des jeweiligen Prompts (Einzelanalyse: `zusammenfassung`, `staerken`, `entwicklungsfelder`, `gespraechsfragen`, `vereinbarungen_vorschlaege`, `kommentar_qualitaet_hinweis`; Gesamtauswertung: dieselben, statt des letzten `datenlage_hinweis`). `ref` ist eine laufende Nummer, nie eine Kennung aus der Datenbank. n8n schreibt nichts in die Datenbank: Die Edge Function lässt jede Antwort von der Datenbank prüfen und speichern.
+**Ein Webhook für alles:** Mit `AI_PROVIDER=webhook` geht jede KI-Anfrage an den **einen** Webhook. Anfrage: `{ aufgabe, prompt_version, auftraege: [{ ref, system, nachricht, eingabe }] }` mit `aufgabe` = `einzelanalyse` (auch für den Sammellauf mit mehreren Aufträgen), `gesamtauswertung` oder `agenda`. Antwort **direkt als Antwort des Webhooks**: `{ ergebnisse: [{ ref, code, ausgabe | fehler }] }`, die `ausgabe` ein JSON-Objekt mit den Schlüsseln des jeweiligen Prompts (Einzelanalyse: `zusammenfassung`, `staerken`, `entwicklungsfelder`, `gespraechsfragen`, `vereinbarungen_vorschlaege`, `kommentar_qualitaet_hinweis`; Gesamtauswertung: dieselben, statt des letzten `datenlage_hinweis`). `ref` ist eine laufende Nummer, nie eine Kennung aus der Datenbank. n8n schreibt nichts in die Datenbank: Die Edge Function lässt jede Antwort von der Datenbank prüfen und speichern.
 
 **Fertiger n8n-Workflow:** `n8n/dawiid-ki.workflow.json` mit einem Webhook, einem Strang je Aufgabe und je einem KI-Agenten (Anthropic) mit Kontext (Import, Einrichtung, Testanfragen und Anleitung zum Einzeltest in [n8n/README.md](../n8n/README.md)).
 
-**Zeit:** höchstens 135 Sekunden je Anfrage und 120 Sekunden je Aufruf des Anbieters (Supabase bricht nach 150 Sekunden ab). Deshalb höchstens 3 Personen je Sammellauf-Aufruf.
+**Zeit:** höchstens 135 Sekunden je Anfrage und 120 Sekunden je Aufruf des Anbieters (Supabase bricht nach 150 Sekunden ab). Deshalb höchstens 2 Personen je Sammellauf-Aufruf.
 
 ## Datenschutz
 
@@ -67,7 +69,7 @@ Feedbacktexte gehen **ohne Namen und ohne Absender** an den KI-Anbieter, bei der
 
 ## Tests
 
-pgTAP `07_monatsabschluss_analysen.test.sql` (151: Rechte, Abschluss, Eingabe ohne Namen über alle Namensteile, Faktencheck, Entwurf/Freigabe, Salon-Grenze, Schalter; mit `ki_nur_admin` aus), `09_ki_admin_gesamt.test.sql` (118: Standard nur Admin, Gesamtauswertung, Schalter, Salon-Grenze), Logik der Edge Function `supabase/functions/analyse-erstellen/analyse.test.ts` (50, `npm run test:functions`), n8n-Workflow `n8n/workflow.test.mjs` (22, `npm run test:n8n`), Browser `phase-e.test.mjs` (85).
+pgTAP `07_monatsabschluss_analysen.test.sql` (151: Rechte, Abschluss, Eingabe ohne Namen über alle Namensteile, Faktencheck, Entwurf/Freigabe, Salon-Grenze, Schalter; mit `ki_nur_admin` aus), `09_ki_admin_gesamt.test.sql` (118: Standard nur Admin, Gesamtauswertung, Schalter, Salon-Grenze), `10_agenda_ki.test.sql` (75: Eingabe, Aufbau, Zeitbudget, Zahlen, Speichern, Bearbeiten), Logik der Edge Function `supabase/functions/analyse-erstellen/analyse.test.ts` (59, `npm run test:functions`), n8n-Workflow `n8n/workflow.test.mjs` (27, `npm run test:n8n`), Browser `phase-e.test.mjs` (85) und `phase-f.test.mjs` (107).
 
 ## Nicht live getestet
 

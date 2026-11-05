@@ -168,7 +168,7 @@ export default function Info() {
       <Abschnitt titel="Fokus, Agenda und Mails">
         <p>
           Verantwortliche und Admin markieren unter „Fokus“ Verhalten, die gerade besonders wichtig sind. Daraus entsteht für das Teammeeting eine <strong>Agenda</strong> (15 bis 20
-          Minuten). Sie wird <strong>ohne KI</strong> aus den Zahlen des Monats gebaut und zeigt nur das Team: keine Rangliste, keine Absender.
+          Minuten). Die Vorlage wird <strong>ohne KI</strong> aus den Zahlen des Monats gebaut; der Admin kann die Agenda zusätzlich von der <strong>KI formulieren</strong> lassen (dann gehen nur Teamwerte und die Fokus-Verhalten an die KI, keine Namen und keine Kommentartexte). Die Agenda zeigt nur das Team: keine Rangliste, keine Absender.
         </p>
         <ul className="platzhalter__liste">
           <li>

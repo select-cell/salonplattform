@@ -5,6 +5,7 @@
 //   person   Einzelanalyse für eine Person (Standard, wie bisher)
 //   alle     Sammellauf: die Einzelanalysen aller Personen eines Monats, die noch keine haben (in Paketen)
 //   gesamt   Gesamtauswertung des Teams
+//   agenda   Agenda fürs Teammeeting, von der KI formuliert (die Vorlage ohne KI bleibt daneben bestehen)
 //
 // Alle Zahlen kommen aus SQL, die KI formuliert nur den Text. Die Datenbank baut die Eingabe (ohne Namen),
 // prüft jede Zahl im Text gegen die Eingabe (Faktencheck) und ermittelt „geprueft“ selbst. Diese Function
@@ -18,12 +19,16 @@
 /** Wer einen Prompt ändert, erhöht die Version: dann gilt die Eingabe als neu und die KI wird erneut gefragt. */
 export const PROMPT_VERSION = 'analyse-v1'
 export const PROMPT_VERSION_GESAMT = 'gesamt-v1'
+export const PROMPT_VERSION_AGENDA = 'agenda-ki-v1'
 
 /** Höchstens so viele KI-Aufrufe je Analyse (ein erster Versuch und bis zu zwei Wiederholungen). */
 export const MAX_AUFRUFE = 3
 
-/** Wie viele Personen ein Aufruf des Sammellaufs höchstens bearbeitet (die Oberfläche ruft so lange auf, bis alle fertig sind). */
-export const PAKET_GROESSE = 3
+/**
+ * Wie viele Personen ein Aufruf des Sammellaufs höchstens bearbeitet (die Oberfläche ruft so lange auf, bis alle fertig sind).
+ * n8n Cloud beendet Anfragen nach etwa 100 Sekunden und der Agent arbeitet die Aufträge nacheinander ab: zwei Personen passen sicher hinein.
+ */
+export const PAKET_GROESSE = 2
 
 /** Gesamtzeit für eine Anfrage. Die Edge Function antwortet spätestens nach 150 Sekunden, sonst bricht Supabase ab. */
 export const ZEITBUDGET_MS = 135_000
@@ -32,6 +37,7 @@ const MAX_KI_ZEIT_MS = 120_000
 
 export const AUFGABE_EINZEL = 'einzelanalyse'
 export const AUFGABE_GESAMT = 'gesamtauswertung'
+export const AUFGABE_AGENDA = 'agenda'
 
 // Branche: Friseursalon. Für einen anderen Salontyp den ersten Satz anpassen und PROMPT_VERSION erhöhen.
 export const SYSTEM_PROMPT = `Du unterstützt die Leitung eines Friseursalons bei Mitarbeitergesprächen. Du bekommst die Auswertung einer Feedback-Umfrage (Selbstbild und Fremdbild, Noten von 1 bis 5) für eine Person. Alle Namen sind entfernt: Die bewertete Person heißt „die bewertete Person“, andere heißen „Kollege A“, „Kollege B“ und so weiter.
@@ -76,6 +82,32 @@ Antworte ausschließlich mit einem JSON-Objekt, ohne weiteren Text und ohne Code
   "gespraechsfragen": ["3 bis 4 offene Fragen für das Teamgespräch"],
   "vereinbarungen_vorschlaege": ["2 bis 3 konkrete Vorschläge"],
   "datenlage_hinweis": "ein Satz, falls die Datenlage dünn ist (geringe Beteiligung, kein Vormonat, kaum Kommentare), sonst null"
+}`
+
+export const SYSTEM_PROMPT_AGENDA = `Du unterstützt die Leitung eines Friseursalons bei der Vorbereitung des nächsten Teammeetings (15 bis 20 Minuten). Du bekommst die Auswertung der Feedback-Umfrage des Monats für das gesamte Team (Selbstbild und Fremdbild, Noten von 1 bis 5), die aktuellen Fokus-Verhalten und das Zeitbudget je Block. Es gibt nur Teamwerte: keine Namen, keine Einzelpersonen und keine Kommentartexte.
+
+Erstelle daraus die Agenda für das Meeting auf Deutsch mit genau fünf Blöcken in dieser Reihenfolge: einstieg, kennzahlen, fokus, entwicklung, vereinbarungen. Je Block gibst du die Minuten an (eine ganze Zahl zwischen min und max aus dem Zeitbudget) und die Gesprächspunkte.
+
+Regeln:
+- Verwende ausschließlich Zahlen, die in den Daten stehen (Noten, Differenzen, Veränderungen, Anzahlen, Monat und Jahr). Rechne nichts selbst nach, runde nicht anders und erfinde keine Prozentwerte. Schreibe Zahlen im deutschen Format mit Komma, so wie in den Daten.
+- einstieg: Dank an das Team und die Beteiligung (abgegeben von erwartet).
+- kennzahlen: Selbstbild, Fremdbild und Differenz des Teams, die Einordnung und, wenn vorhanden, der Vergleich zum Vormonat.
+- fokus: zuerst die Fokus-Verhalten (fokus_aktuell), danach die größten Differenzen und Veränderungen. Höchstens drei Verhalten insgesamt. Nenne die Nummer und den Titel. Gibt es kein Fokus-Verhalten und keine Auffälligkeiten, sage das und schlage vor, gemeinsam eines festzulegen.
+- entwicklung: die Entwicklungsfelder (niedrigste Fremdbilder), ohne Wiederholung aus dem Fokus-Block.
+- vereinbarungen: offene Leitfragen: Was nehmen wir uns vor? Wer übernimmt welchen Schritt? Woran merken wir, dass es besser wird?
+- Jeder Punkt ist ein kurzer, in sich verständlicher Satz (höchstens 300 Zeichen), je Block zwei bis vier Punkte. Keine Nummerierung.
+- Sprich vom „Team“. Leite nichts über einzelne Personen ab, auch nicht aus der Beteiligung. Keine Namen, keine Aussagen zu Gehalt, Kündigung, Gesundheit oder Recht.
+- Fehlen Daten (zum Beispiel kein Vormonat oder eine geringe Beteiligung), sage das offen.
+
+Antworte ausschließlich mit einem JSON-Objekt, ohne weiteren Text und ohne Code-Block, in genau dieser Form (die Minuten sind Beispiele):
+{
+  "bloecke": [
+    { "id": "einstieg", "minuten": 2, "punkte": ["…"] },
+    { "id": "kennzahlen", "minuten": 3, "punkte": ["…"] },
+    { "id": "fokus", "minuten": 7, "punkte": ["…"] },
+    { "id": "entwicklung", "minuten": 4, "punkte": ["…"] },
+    { "id": "vereinbarungen", "minuten": 2, "punkte": ["…"] }
+  ]
 }`
 
 export interface Ausgabe {
@@ -195,6 +227,42 @@ export function textAusGesamt(a: GesamtAusgabe): string {
   ]
   if (a.datenlage_hinweis) teile.push(`## Hinweis zur Datenlage\n${a.datenlage_hinweis}`)
   return teile.join('\n\n')
+}
+
+export const BLOCK_IDS = ['einstieg', 'kennzahlen', 'fokus', 'entwicklung', 'vereinbarungen'] as const
+
+export interface AgendaAusgabe {
+  bloecke: { id: string; minuten: number; punkte: string[] }[]
+}
+
+/**
+ * Liest die Agenda der KI: fünf Blöcke in fester Reihenfolge mit Minuten und Punkten. Ob die Minuten ins Zeitbudget passen,
+ * prüft die Datenbank verbindlich (mit einer Meldung, die an die KI zurückgeht); hier nur die Form.
+ */
+export function parseAgendaAusgabe(roh: unknown): AgendaAusgabe {
+  const o = typeof roh === 'string' ? ersteJsonStelle(roh) : roh
+  if (!o || typeof o !== 'object' || Array.isArray(o)) throw new Error('keine Objekt-Antwort')
+  const b = (o as Record<string, unknown>).bloecke
+  if (!Array.isArray(b) || b.length !== BLOCK_IDS.length) throw new Error('bloecke: fünf Blöcke erwartet')
+  const bloecke = b.map((x, i) => {
+    if (!x || typeof x !== 'object' || Array.isArray(x)) throw new Error(`Block ${i + 1} ist kein Objekt`)
+    const r = x as Record<string, unknown>
+    if (r.id !== BLOCK_IDS[i]) throw new Error(`Block ${i + 1}: id „${BLOCK_IDS[i]}“ erwartet`)
+    const minuten = typeof r.minuten === 'string' && r.minuten.trim() !== '' ? Number(r.minuten.replace(',', '.')) : r.minuten
+    if (typeof minuten !== 'number' || !Number.isFinite(minuten)) throw new Error(`Block ${r.id}: minuten fehlt`)
+    const punkte = (Array.isArray(r.punkte) ? r.punkte : [])
+      .map((p) => (typeof p === 'string' ? p : p && typeof p === 'object' && typeof (p as { text?: unknown }).text === 'string' ? (p as { text: string }).text : ''))
+      .map(kurz)
+      .filter(Boolean)
+    if (punkte.length === 0) throw new Error(`Block ${r.id}: punkte ist leer`)
+    return { id: String(r.id), minuten, punkte }
+  })
+  return { bloecke }
+}
+
+/** Der Text der Agenda für die Anzeige im Protokoll: eine Zeile je Punkt */
+export function textAusAgenda(a: AgendaAusgabe): string {
+  return a.bloecke.flatMap((b) => b.punkte).join('\n')
 }
 
 /** Die Nachricht an die KI. Bei einer Wiederholung steht oben, was beim letzten Mal nicht stimmte. */
@@ -413,7 +481,8 @@ export interface Ziel {
   system: string
   eingabe: unknown
   parse: (roh: unknown) => { ausgabe: unknown; text: string }
-  pruefen: (text: string, ausgabe: unknown) => Promise<{ geprueft: boolean; abweichungen?: string[] }>
+  /** `korrektur`: der Hinweis an die KI bei der Wiederholung (sonst die Liste der Zahlen, die nicht in den Daten stehen) */
+  pruefen: (text: string, ausgabe: unknown) => Promise<{ geprueft: boolean; abweichungen?: string[]; korrektur?: string }>
 }
 
 export type ZielErgebnis = { ok: true; text: string; ausgabe: unknown; versuche: number } | { ok: false; fehler: AnalyseFehler }
@@ -493,7 +562,7 @@ export async function arbeiteZiele(
       }
       s.letzte = gelesen
       s.fehler = null
-      let pruefung: { geprueft: boolean; abweichungen?: string[] }
+      let pruefung: { geprueft: boolean; abweichungen?: string[]; korrektur?: string }
       try {
         pruefung = await s.ziel.pruefen(gelesen.text, gelesen.ausgabe)
       } catch (e) {
@@ -506,7 +575,9 @@ export async function arbeiteZiele(
         s.fertig = true
         continue
       }
-      s.korrektur = `Deine letzte Antwort enthielt Zahlen, die nicht in den Daten stehen: ${(pruefung.abweichungen ?? []).join(', ')}. Formuliere neu und verwende nur Zahlen aus den Daten.`
+      s.korrektur =
+        pruefung.korrektur ??
+        `Deine letzte Antwort enthielt Zahlen, die nicht in den Daten stehen: ${(pruefung.abweichungen ?? []).join(', ')}. Formuliere neu und verwende nur Zahlen aus den Daten.`
       weiter.push(s)
     }
     offen = weiter
@@ -686,6 +757,68 @@ export async function erstelleGesamt(
   return { uebersprungen: false, versuche: r.versuche, analyse }
 }
 
+// ---- Agenda fürs Teammeeting (von der KI formuliert) -----------------------------------------------------------
+
+/**
+ * Wie erstelleGesamt, für die Agenda. Die Datenbank setzt Überschriften und Hinweise „Stand unvollständig“, prüft Aufbau,
+ * Zeitbudget (15 bis 20 Minuten) und jede Zahl; ein Fehler im Aufbau geht als Hinweis zurück an die KI.
+ * Die Agenda aus der Vorlage (ohne KI) bleibt unberührt, bis dieser Aufruf erfolgreich speichert.
+ */
+export async function erstelleAgenda(
+  d: Abhaengigkeiten,
+  p: { monat: string; neu: boolean },
+): Promise<Ergebnis> {
+  const basis = { p_monat: `${p.monat}-01` }
+
+  const eingabeAntwort = (await rpcOderFehler(d, 'agenda_ki_eingabe', basis)) as { eingabe: unknown; hash: string }
+  const vorhanden = (await rpcOderFehler(d, 'agenda_lesen', basis)) as { eingabe_hash?: string; prompt_version?: string; anbieter?: string } | null
+
+  if (
+    vorhanden && !p.neu && vorhanden.anbieter !== 'vorlage' &&
+    vorhanden.eingabe_hash === eingabeAntwort.hash && vorhanden.prompt_version === PROMPT_VERSION_AGENDA
+  ) {
+    return { uebersprungen: true, versuche: 0, analyse: vorhanden }
+  }
+
+  const config = d.anbieter()
+  const ziel: Ziel = {
+    schluessel: 'agenda',
+    system: SYSTEM_PROMPT_AGENDA,
+    eingabe: eingabeAntwort.eingabe,
+    parse: (roh) => {
+      const a = parseAgendaAusgabe(roh)
+      return { ausgabe: a, text: textAusAgenda(a) }
+    },
+    pruefen: async (_text, ausgabe) => {
+      const r = (await rpcOderFehler(d, 'agenda_ki_pruefen', { ...basis, p_bloecke: (ausgabe as AgendaAusgabe).bloecke })) as {
+        geprueft: boolean
+        abweichungen?: string[]
+        struktur_fehler?: string | null
+      }
+      if (r.struktur_fehler) {
+        return {
+          geprueft: false,
+          korrektur: `Deine letzte Antwort passt nicht zur Vorgabe: ${r.struktur_fehler} Halte dich genau an die fünf Blöcke, ihre Reihenfolge und die Minuten aus dem Zeitbudget.`,
+        }
+      }
+      return { geprueft: r.geprueft, abweichungen: r.abweichungen }
+    },
+  }
+  const r = (await arbeiteZiele(d, config, AUFGABE_AGENDA, PROMPT_VERSION_AGENDA, [ziel])).get('agenda')!
+  if (!r.ok) throw r.fehler
+
+  // Passt der Aufbau auch nach der letzten Runde nicht, lehnt die Datenbank beim Speichern mit einer deutschen Meldung ab (422)
+  const analyse = await rpcOderFehler(d, 'agenda_ki_speichern', {
+    ...basis,
+    p_bloecke: (r.ausgabe as AgendaAusgabe).bloecke,
+    p_prompt_version: PROMPT_VERSION_AGENDA,
+    p_anbieter: config.name,
+    p_modell: config.modell,
+    p_versuche: r.versuche,
+  })
+  return { uebersprungen: false, versuche: r.versuche, analyse }
+}
+
 // ---- HTTP -----------------------------------------------------------------------------------------------------
 
 const CORS = {
@@ -717,7 +850,7 @@ export async function behandleAnfrage(req: Request, env: Record<string, string |
   }
 
   const aufgabe = body.aufgabe ?? 'person'
-  if (aufgabe !== 'person' && aufgabe !== 'alle' && aufgabe !== 'gesamt') {
+  if (aufgabe !== 'person' && aufgabe !== 'alle' && aufgabe !== 'gesamt' && aufgabe !== 'agenda') {
     return antwort(400, { ok: false, fehler: 'Die Aufgabe ist unbekannt.' })
   }
   if (typeof body.monat !== 'string' || !MONAT.test(body.monat)) {
@@ -766,10 +899,13 @@ export async function behandleAnfrage(req: Request, env: Record<string, string |
       const ergebnis = await erstelleAlle(d, { monat, ausgenommen })
       return antwort(200, { ok: true, aufgabe: 'alle', ...ergebnis })
     }
+    const neu = body.neu === true
     const ergebnis =
       aufgabe === 'gesamt'
-        ? await erstelleGesamt(d, { monat, neu: body.neu === true })
-        : await erstelleAnalyse(d, { personId: body.person_id as string, monat, neu: body.neu === true })
+        ? await erstelleGesamt(d, { monat, neu })
+        : aufgabe === 'agenda'
+          ? await erstelleAgenda(d, { monat, neu })
+          : await erstelleAnalyse(d, { personId: body.person_id as string, monat, neu })
     return antwort(200, { ok: true, ...ergebnis })
   } catch (e) {
     if (e instanceof AnalyseFehler) return antwort(e.status, { ok: false, fehler: e.message })

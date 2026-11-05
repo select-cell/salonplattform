@@ -3,9 +3,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  AUFGABE_EINZEL, AUFGABE_GESAMT, AnalyseFehler, MAX_AUFRUFE, NICHT_EINGERICHTET, PAKET_GROESSE, PROMPT_VERSION, PROMPT_VERSION_GESAMT,
-  SYSTEM_PROMPT, SYSTEM_PROMPT_GESAMT, ZEITBUDGET_MS, anbieterAusUmgebung, arbeiteZiele, baueNachricht, behandleAnfrage,
-  erstelleAlle, erstelleAnalyse, erstelleGesamt, parseAusgabe, parseGesamtAusgabe, rufeAnbieter, rufeAnbieterBatch, textAusAusgabe, textAusGesamt,
+  AUFGABE_AGENDA, AUFGABE_EINZEL, AUFGABE_GESAMT, AnalyseFehler, MAX_AUFRUFE, NICHT_EINGERICHTET, PAKET_GROESSE, PROMPT_VERSION, PROMPT_VERSION_AGENDA, PROMPT_VERSION_GESAMT,
+  SYSTEM_PROMPT, SYSTEM_PROMPT_AGENDA, SYSTEM_PROMPT_GESAMT, ZEITBUDGET_MS, anbieterAusUmgebung, arbeiteZiele, baueNachricht, behandleAnfrage,
+  erstelleAgenda, erstelleAlle, erstelleAnalyse, erstelleGesamt, parseAgendaAusgabe, parseAusgabe, parseGesamtAusgabe, rufeAnbieter, rufeAnbieterBatch,
+  textAusAusgabe, textAusGesamt,
   type Abhaengigkeiten, type AnbieterConfig, type Auftrag, type KiAntwort, type RpcAntwort, type Ziel,
 } from './analyse.ts'
 
@@ -29,6 +30,16 @@ const GESAMT_GUT = {
   gespraechsfragen: ['Was läuft gut?', 'Was fehlt?', 'Wo hilft das Team?'],
   vereinbarungen_vorschlaege: ['Eine Sache festlegen'],
   datenlage_hinweis: null,
+}
+const AGENDA_EINGABE = { aufgabe: 'Agenda für das nächste Teammeeting', monat: '2026-09', team: GESAMT_EINGABE, zeitbudget: { gesamt_min: 15, gesamt_max: 20 } }
+const AGENDA_GUT = {
+  bloecke: [
+    { id: 'einstieg', minuten: 2, punkte: ['Danke an alle. 3 von 4 haben abgegeben.'] },
+    { id: 'kennzahlen', minuten: 3, punkte: ['Das Team-Fremdbild liegt bei 3,8.'] },
+    { id: 'fokus', minuten: 7, punkte: ['Fokus: Verhalten 1.', 'Größte Differenz bei Verhalten 2.'] },
+    { id: 'entwicklung', minuten: 4, punkte: ['Verhalten 2 liegt bei 3,3.'] },
+    { id: 'vereinbarungen', minuten: 2, punkte: ['Was nehmen wir uns vor?'] },
+  ],
 }
 const ID = (n: number) => `11111111-0000-0000-0000-0000000000${String(n).padStart(2, '0')}`
 
@@ -58,6 +69,10 @@ function db(overrides: Record<string, (args: Record<string, unknown>, n: number)
     gesamt_pruefen: () => ({ data: { geprueft: true, abweichungen: [] }, error: null }),
     gesamt_speichern: (a) => ({ data: { status: 'entwurf', text: a.p_text, versuche: a.p_versuche, geprueft: true }, error: null }),
     abschluss_uebersicht: () => ({ data: uebersicht(), error: null }),
+    agenda_ki_eingabe: () => ({ data: { eingabe: AGENDA_EINGABE, hash: 'a1' }, error: null }),
+    agenda_lesen: () => ({ data: null, error: null }),
+    agenda_ki_pruefen: () => ({ data: { geprueft: true, abweichungen: [], struktur_fehler: null }, error: null }),
+    agenda_ki_speichern: (a) => ({ data: { status: 'entwurf', anbieter: 'claude', versuche: a.p_versuche, geprueft: true }, error: null }),
   }
   const rpc: Abhaengigkeiten['rpc'] = async (name, args) => {
     aufrufe.push({ name, args })
@@ -525,35 +540,35 @@ function sammelabh(rpc: Abhaengigkeiten['rpc'], antwort: (a: Auftrag, runde: num
 const mitPersonen = (anzahl: number, ohneAnalyse = anzahl) =>
   uebersicht({ personen: Array.from({ length: anzahl }, (_, i) => ({ id: ID(i + 1), name: `Person ${i + 1}`, analyse: i < anzahl - ohneAnalyse ? { status: 'entwurf' } : null })) })
 
-test('Sammellauf: alle Personen ohne Analyse in EINEM KI-Aufruf, je Person gespeichert, keine Kennung geht an die KI', async () => {
+test('Sammellauf: das Paket geht in EINEM KI-Aufruf an die KI, je Person gespeichert, keine Kennung geht an die KI', async () => {
   const x = db({
-    abschluss_uebersicht: () => ({ data: mitPersonen(3), error: null }),
+    abschluss_uebersicht: () => ({ data: mitPersonen(2), error: null }),
     analyse_eingabe: (a) => ({ data: { eingabe: { ...EINGABE, fuer: a.p_person === ID(2) ? 'zwei' : 'andere' }, hash: 'h' }, error: null }),
   })
   const { d, runden } = sammelabh(x.rpc)
   const r = await erstelleAlle(d, { monat: '2026-09', ausgenommen: [] })
-  assert.equal(runden.length, 1, 'ein Aufruf für alle drei')
-  assert.deepEqual(runden[0].auftraege.map((a) => a.ref), ['1', '2', '3'])
+  assert.equal(runden.length, 1, 'ein Aufruf für beide')
+  assert.deepEqual(runden[0].auftraege.map((a) => a.ref), ['1', '2'])
   assert.deepEqual([runden[0].aufgabe, runden[0].version], [AUFGABE_EINZEL, PROMPT_VERSION])
   assert.ok(!JSON.stringify(runden[0].auftraege).includes('11111111'), 'keine Personen-Kennung in den Aufträgen')
   assert.ok(runden[0].auftraege.every((a) => a.system === SYSTEM_PROMPT))
-  assert.deepEqual(r.erstellt.map((e) => e.person_id), [ID(1), ID(2), ID(3)])
+  assert.deepEqual(r.erstellt.map((e) => e.person_id), [ID(1), ID(2)])
   assert.deepEqual([r.fehlgeschlagen.length, r.verbleibend], [0, 0])
   assert.ok(r.erstellt.every((e) => e.versuche === 1 && e.geprueft))
   const speichern = x.aufrufe.filter((a) => a.name === 'analyse_speichern').map((a) => a.args.p_person)
-  assert.deepEqual(speichern, [ID(1), ID(2), ID(3)])
-  assert.equal(x.anzahl('analyse_pruefen'), 3)
+  assert.deepEqual(speichern, [ID(1), ID(2)])
+  assert.equal(x.anzahl('analyse_pruefen'), 2)
   assert.equal(x.aufrufe.find((a) => a.name === 'abschluss_uebersicht')!.args.p_monat, '2026-09-01')
 })
 
 test('Sammellauf: höchstens ein Paket je Aufruf, Personen mit Analyse und ausgenommene werden übersprungen', async () => {
-  assert.equal(PAKET_GROESSE, 3)
+  assert.equal(PAKET_GROESSE, 2)
   const x = db({ abschluss_uebersicht: () => ({ data: mitPersonen(7, 6), error: null }) })   // Person 1 hat schon eine Analyse
   const { d, runden } = sammelabh(x.rpc)
   const erster = await erstelleAlle(d, { monat: '2026-09', ausgenommen: [ID(3)] })
-  assert.deepEqual(erster.erstellt.map((e) => e.person_id), [ID(2), ID(4), ID(5)], 'nicht Person 1 (hat Analyse), nicht Person 3 (ausgenommen)')
-  assert.equal(erster.verbleibend, 2)
-  assert.equal(runden[0].auftraege.length, 3)
+  assert.deepEqual(erster.erstellt.map((e) => e.person_id), [ID(2), ID(4)], 'nicht Person 1 (hat Analyse), nicht Person 3 (ausgenommen)')
+  assert.equal(erster.verbleibend, 3)
+  assert.equal(runden[0].auftraege.length, 2)
   const x2 = db({ abschluss_uebersicht: () => ({ data: mitPersonen(2), error: null }) })
   const leer = await erstelleAlle(sammelabh(x2.rpc).d, { monat: '2026-09', ausgenommen: [ID(1), ID(2)] })
   assert.deepEqual(leer, { erstellt: [], fehlgeschlagen: [], verbleibend: 0 })
@@ -586,35 +601,43 @@ test('Sammellauf: nur für Admins und nur für abgeschlossene Monate, ohne KI-Au
   )
 })
 
-test('Sammellauf: Fehler bei einer Person (Antwort, Speichern) betreffen nur diese Person', async () => {
+test('Sammellauf: eine ungültige Antwort betrifft nur diese Person, die andere wird gespeichert', async () => {
   const x = db({
-    abschluss_uebersicht: () => ({ data: mitPersonen(3), error: null }),
-    analyse_speichern: (a) => (a.p_person === ID(3) ? { data: null, error: { code: 'XX000', message: 'interne Details' } } : { data: { geprueft: false }, error: null }),
+    abschluss_uebersicht: () => ({ data: mitPersonen(2), error: null }),
+    analyse_speichern: () => ({ data: { geprueft: false }, error: null }),
   })
   // Person 2 (Auftrag 2): immer eine ungültige Antwort
   const { d, runden } = sammelabh(x.rpc, (a) => ({ roh: a.ref === '2' ? 'kein json' : JSON.stringify(GUT) }))
   const r = await erstelleAlle(d, { monat: '2026-09', ausgenommen: [] })
   assert.deepEqual(r.erstellt.map((e) => [e.person_id, e.geprueft]), [[ID(1), false]])
-  assert.deepEqual(r.fehlgeschlagen.map((f) => f.person_id).sort(), [ID(2), ID(3)].sort())
-  const grund = (id: string) => r.fehlgeschlagen.find((f) => f.person_id === id)!.fehler
-  assert.match(grund(ID(2)), /keine verwertbare Antwort/)
-  assert.equal(grund(ID(3)), 'Die Analyse konnte nicht erstellt werden.', 'keine internen Details nach außen')
-  assert.deepEqual(runden.map((x) => x.auftraege.length), [3, 1, 1], 'die ungültige Antwort wird zweimal wiederholt, nur für diesen Auftrag')
+  assert.deepEqual(r.fehlgeschlagen.map((f) => f.person_id), [ID(2)])
+  assert.match(r.fehlgeschlagen[0].fehler, /keine verwertbare Antwort/)
+  assert.deepEqual(runden.map((x) => x.auftraege.length), [2, 1, 1], 'die ungültige Antwort wird zweimal wiederholt, nur für diesen Auftrag')
   assert.equal(r.verbleibend, 0)
+})
+
+test('Sammellauf: scheitert das Speichern bei einer Person, kommen keine internen Details nach außen', async () => {
+  const x = db({
+    abschluss_uebersicht: () => ({ data: mitPersonen(2), error: null }),
+    analyse_speichern: (a) => (a.p_person === ID(1) ? { data: null, error: { code: 'XX000', message: 'interne Details' } } : { data: { geprueft: true }, error: null }),
+  })
+  const r = await erstelleAlle(sammelabh(x.rpc).d, { monat: '2026-09', ausgenommen: [] })
+  assert.deepEqual(r.erstellt.map((e) => e.person_id), [ID(2)])
+  assert.deepEqual(r.fehlgeschlagen, [{ person_id: ID(1), fehler: 'Die Analyse konnte nicht erstellt werden.' }])
 })
 
 test('Sammellauf: kann die Eingabe einer Person nicht gebaut werden, kommen die anderen trotzdem dran', async () => {
   const x = db({
-    abschluss_uebersicht: () => ({ data: mitPersonen(4), error: null }),
+    abschluss_uebersicht: () => ({ data: mitPersonen(3), error: null }),
     analyse_eingabe: (a) => (a.p_person === ID(1) ? { data: null, error: { code: '22023', message: 'Für diese Person gibt es in diesem Monat keine Auswertung.' } } : { data: { eingabe: EINGABE, hash: 'h' }, error: null }),
   })
   const { d, runden } = sammelabh(x.rpc)
   const r = await erstelleAlle(d, { monat: '2026-09', ausgenommen: [] })
-  assert.deepEqual(r.erstellt.map((e) => e.person_id), [ID(2), ID(3)])
+  assert.deepEqual(r.erstellt.map((e) => e.person_id), [ID(2)])
   assert.deepEqual(r.fehlgeschlagen.map((f) => f.person_id), [ID(1)])
   assert.match(r.fehlgeschlagen[0].fehler, /keine Auswertung/)
-  assert.equal(r.verbleibend, 1, 'Person 4 kommt im nächsten Aufruf dran')
-  assert.deepEqual(runden[0].auftraege.map((a) => a.ref), ['1', '2'])
+  assert.equal(r.verbleibend, 1, 'Person 3 kommt im nächsten Aufruf dran')
+  assert.deepEqual(runden[0].auftraege.map((a) => a.ref), ['1'])
 })
 
 // ---- Gesamtauswertung: Ablauf ---------------------------------------------------------------------------------
@@ -762,6 +785,10 @@ function umgebung(zusatz: Record<string, unknown> = {}, ki: (url: string, init?:
     if (!url.includes('/rest/v1/rpc/')) return ki(url, init) ?? new Response('{}', { status: 500 })
     const name = url.split('/rpc/')[1]
     const antworten: Record<string, unknown> = {
+      agenda_ki_eingabe: { eingabe: AGENDA_EINGABE, hash: 'a1' },
+      agenda_lesen: null,
+      agenda_ki_pruefen: { geprueft: true, abweichungen: [], struktur_fehler: null },
+      agenda_ki_speichern: { status: 'entwurf', geprueft: true },
       gesamt_eingabe: { eingabe: GESAMT_EINGABE, hash: 'g1' },
       gesamt_lesen: null,
       gesamt_pruefen: { geprueft: true, abweichungen: [] },
@@ -821,4 +848,112 @@ test('HTTP: Einzelanalyse ohne Aufgabe wie bisher (aufgabe = person)', async () 
   const r = await behandleAnfrage(anfrage({ aufgabe: 'person', person_id: PERSON, monat: '2026-09' }), ENV, u.fetchFn)
   assert.equal(r.status, 200)
   assert.equal(u.gesehen.find((g) => g.url.startsWith('https://api.anthropic.com'))!.body.system, SYSTEM_PROMPT)
+})
+
+// ---- Agenda mit KI --------------------------------------------------------------------------------------------
+
+test('Agenda: Prompt, Version und Aufbau der Antwort', () => {
+  assert.match(PROMPT_VERSION_AGENDA, /^agenda-ki-v\d+$/)
+  assert.equal(AUFGABE_AGENDA, 'agenda')
+  assert.match(SYSTEM_PROMPT_AGENDA, /genau fünf Blöcken/)
+  assert.match(SYSTEM_PROMPT_AGENDA, /einstieg, kennzahlen, fokus, entwicklung, vereinbarungen/)
+  assert.match(SYSTEM_PROMPT_AGENDA, /ausschließlich Zahlen, die in den Daten stehen/)
+  assert.match(SYSTEM_PROMPT_AGENDA, /keine Namen, keine Einzelpersonen und keine Kommentartexte/)
+})
+
+test('parseAgendaAusgabe: Objekt, JSON-Text, Code-Zaun; Punkte als Text oder { text }; Zahlen als Text', () => {
+  assert.equal(parseAgendaAusgabe(AGENDA_GUT).bloecke.length, 5)
+  assert.deepEqual(parseAgendaAusgabe('```json\n' + JSON.stringify(AGENDA_GUT) + '\n```').bloecke[2].punkte, ['Fokus: Verhalten 1.', 'Größte Differenz bei Verhalten 2.'])
+  const gemischt = { bloecke: AGENDA_GUT.bloecke.map((b, i) => (i === 0 ? { ...b, minuten: '2', punkte: [{ text: '  Danke \n an alle  ' }, ''] } : b)) }
+  const a = parseAgendaAusgabe(gemischt)
+  assert.deepEqual([a.bloecke[0].minuten, a.bloecke[0].punkte], [2, ['Danke an alle']])
+})
+
+test('parseAgendaAusgabe: falsche Form wird abgelehnt (Anzahl, Reihenfolge, Minuten, Punkte)', () => {
+  const mit = (f: (b: typeof AGENDA_GUT.bloecke) => unknown) => ({ bloecke: f(structuredClone(AGENDA_GUT.bloecke)) })
+  for (const kaputt of [
+    'kein json', [], { bloecke: 'x' }, mit((b) => b.slice(0, 4)),
+    mit((b) => [b[1], b[0], ...b.slice(2)]),
+    mit((b) => b.map((x, i) => (i === 0 ? { ...x, minuten: null } : x))),
+    mit((b) => b.map((x, i) => (i === 0 ? { ...x, minuten: 'zwei' } : x))),
+    mit((b) => b.map((x, i) => (i === 1 ? { ...x, punkte: [] } : x))),
+    mit((b) => b.map((x, i) => (i === 1 ? { ...x, punkte: [1, null] } : x))),
+    mit((b) => b.map((x, i) => (i === 1 ? 'x' : x))),
+  ]) {
+    assert.throws(() => parseAgendaAusgabe(kaputt), undefined, `soll ablehnen: ${JSON.stringify(kaputt)}`)
+  }
+})
+
+test('Agenda: eigene Funktionen, eigener Prompt, eigene Aufgabe; die Datenbank setzt den Rest', async () => {
+  const x = db()
+  const { d, runden } = stapel(() => ({ roh: JSON.stringify(AGENDA_GUT) }), { rpc: x.rpc })
+  const r = await erstelleAgenda(d, { monat: '2026-09', neu: false })
+  assert.deepEqual([r.uebersprungen, r.versuche], [false, 1])
+  assert.deepEqual(x.aufrufe.map((a) => a.name), ['agenda_ki_eingabe', 'agenda_lesen', 'agenda_ki_pruefen', 'agenda_ki_speichern'])
+  assert.deepEqual([runden[0].aufgabe, runden[0].version, runden[0].auftraege[0].system], [AUFGABE_AGENDA, PROMPT_VERSION_AGENDA, SYSTEM_PROMPT_AGENDA])
+  assert.equal(runden[0].auftraege[0].nachricht, baueNachricht(AGENDA_EINGABE))
+  const pruefen = x.aufrufe.find((a) => a.name === 'agenda_ki_pruefen')!.args
+  assert.deepEqual(Object.keys(pruefen).sort(), ['p_bloecke', 'p_monat'])
+  assert.equal((pruefen.p_bloecke as unknown[]).length, 5)
+  const speichern = x.aufrufe.find((a) => a.name === 'agenda_ki_speichern')!.args
+  assert.deepEqual(Object.keys(speichern).sort(), ['p_anbieter', 'p_bloecke', 'p_modell', 'p_monat', 'p_prompt_version', 'p_versuche'])
+  assert.deepEqual([speichern.p_monat, speichern.p_prompt_version, speichern.p_anbieter, speichern.p_versuche], ['2026-09-01', PROMPT_VERSION_AGENDA, 'claude', 1])
+  assert.deepEqual(speichern.p_bloecke, AGENDA_GUT.bloecke, 'nur Blöcke, Minuten und Punkte: Überschriften und Hinweise setzt die Datenbank')
+  assert.ok(!('p_geprueft' in speichern) && !('geprueft' in speichern))
+})
+
+test('Agenda: ein Fehler im Aufbau geht mit der Meldung der Datenbank an die KI zurück', async () => {
+  const x = db({
+    agenda_ki_pruefen: (_a, n) => (n === 1
+      ? { data: { geprueft: false, abweichungen: [], struktur_fehler: 'Der Block „Einstieg und Beteiligung“ dauert genau 2 Minuten.' }, error: null }
+      : { data: { geprueft: true, abweichungen: [], struktur_fehler: null }, error: null }),
+  })
+  const { d, runden } = stapel((_a, runde) => ({ roh: JSON.stringify(runde === 1 ? { bloecke: AGENDA_GUT.bloecke.map((b, i) => (i === 0 ? { ...b, minuten: 5 } : b)) } : AGENDA_GUT) }), { rpc: x.rpc })
+  const r = await erstelleAgenda(d, { monat: '2026-09', neu: false })
+  assert.equal(r.versuche, 2)
+  assert.match(runden[1].auftraege[0].nachricht, /^Deine letzte Antwort passt nicht zur Vorgabe: Der Block „Einstieg und Beteiligung“ dauert genau 2 Minuten\. Halte dich genau an die fünf Blöcke/)
+  assert.deepEqual((x.aufrufe.find((a) => a.name === 'agenda_ki_speichern')!.args.p_bloecke as { minuten: number }[])[0].minuten, 2, 'gespeichert wird die zweite Fassung')
+})
+
+test('Agenda: erfundene Zahlen führen zur Wiederholung wie bei den Analysen; bleibt der Aufbau falsch, lehnt die Datenbank ab', async () => {
+  const x = db({ agenda_ki_pruefen: (_a, n) => (n === 1 ? { data: { geprueft: false, abweichungen: ['4,71'], struktur_fehler: null }, error: null } : { data: { geprueft: true, abweichungen: [], struktur_fehler: null }, error: null }) })
+  const { d, runden } = stapel(() => ({ roh: JSON.stringify(AGENDA_GUT) }), { rpc: x.rpc })
+  await erstelleAgenda(d, { monat: '2026-09', neu: false })
+  assert.match(runden[1].auftraege[0].nachricht, /^Deine letzte Antwort enthielt Zahlen, die nicht in den Daten stehen: 4,71\./)
+
+  const falsch = db({
+    agenda_ki_pruefen: () => ({ data: { geprueft: false, abweichungen: [], struktur_fehler: 'Die Agenda braucht fünf Blöcke in fester Reihenfolge.' }, error: null }),
+    agenda_ki_speichern: () => ({ data: null, error: { code: '22023', message: 'Die Agenda braucht fünf Blöcke in fester Reihenfolge.' } }),
+  })
+  const s = stapel(() => ({ roh: JSON.stringify(AGENDA_GUT) }), { rpc: falsch.rpc })
+  await assert.rejects(erstelleAgenda(s.d, { monat: '2026-09', neu: false }), (e: unknown) => e instanceof AnalyseFehler && e.status === 422 && /fünf Blöcke/.test(e.message))
+  assert.equal(s.runden.length, MAX_AUFRUFE)
+})
+
+test('Agenda: gleiche Eingabe und Version = kein neuer Aufruf; die Vorlage zählt nicht als KI-Agenda; Rechte kommen durch', async () => {
+  const vorhanden = (anbieter: string, hash = 'a1', version = PROMPT_VERSION_AGENDA) => db({ agenda_lesen: () => ({ data: { eingabe_hash: hash, prompt_version: version, anbieter, status: 'freigegeben' }, error: null }) })
+  let gerufen = false
+  const gleich = vorhanden('webhook')
+  const a = stapel(() => ({ roh: JSON.stringify(AGENDA_GUT) }), { rpc: gleich.rpc, anbieter: () => { gerufen = true; throw new AnalyseFehler(NICHT_EINGERICHTET, 503) } })
+  const r = await erstelleAgenda(a.d, { monat: '2026-09', neu: false })
+  assert.deepEqual([r.uebersprungen, r.versuche, gerufen, a.runden.length], [true, 0, false, 0])
+  for (const [x, neu] of [[vorhanden('vorlage'), false], [vorhanden('webhook', 'anderer'), false], [vorhanden('webhook', 'a1', 'agenda-ki-v0'), false], [vorhanden('webhook'), true]] as const) {
+    const s = stapel(() => ({ roh: JSON.stringify(AGENDA_GUT) }), { rpc: x.rpc })
+    const e = await erstelleAgenda(s.d, { monat: '2026-09', neu })
+    assert.deepEqual([e.uebersprungen, s.runden.length, x.anzahl('agenda_ki_speichern')], [false, 1, 1])
+  }
+  const verboten = db({ agenda_ki_eingabe: () => ({ data: null, error: { code: '42501', message: 'Nur für Admins.' } }) })
+  await assert.rejects(erstelleAgenda(stapel(() => ({ roh: '' }), { rpc: verboten.rpc }).d, { monat: '2026-09', neu: false }), (e: unknown) => e instanceof AnalyseFehler && e.status === 403 && e.message === 'Nur für Admins.')
+})
+
+test('Agenda: über den Webhook geht die Anfrage mit aufgabe = agenda an den einen Webhook', async () => {
+  const ENV_W = { SUPABASE_URL: 'https://p.supabase.co', SUPABASE_ANON_KEY: 'anon', AI_PROVIDER: 'webhook', AI_WEBHOOK_URL: 'https://tobitest2008.app.n8n.cloud/webhook/dawiid-ki', AI_WEBHOOK_SECRET: 'geheim' }
+  const u = umgebung({}, (url) => (url === ENV_W.AI_WEBHOOK_URL ? new Response(JSON.stringify({ ergebnisse: [{ ref: '1', code: 200, ausgabe: AGENDA_GUT }] }), { status: 200 }) : null))
+  const r = await behandleAnfrage(anfrage({ aufgabe: 'agenda', monat: '2026-09' }), ENV_W, u.fetchFn)
+  assert.equal(r.status, 200)
+  const body = (await r.json()) as { ok: boolean; uebersprungen: boolean; versuche: number }
+  assert.deepEqual([body.ok, body.uebersprungen, body.versuche], [true, false, 1])
+  const w = u.gesehen.find((g) => g.url === ENV_W.AI_WEBHOOK_URL)!
+  assert.deepEqual([w.body.aufgabe, w.body.prompt_version, w.body.auftraege[0].system === SYSTEM_PROMPT_AGENDA, w.kopf['x-webhook-secret']], [AUFGABE_AGENDA, PROMPT_VERSION_AGENDA, true, 'geheim'])
+  assert.deepEqual(u.gesehen.filter((g) => g.url.includes('/rpc/')).map((g) => g.url.split('/rpc/')[1]), ['agenda_ki_eingabe', 'agenda_lesen', 'agenda_ki_pruefen', 'agenda_ki_speichern'])
 })

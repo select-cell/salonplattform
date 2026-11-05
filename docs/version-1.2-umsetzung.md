@@ -53,7 +53,7 @@ Die Reihenfolge war A, B, D, C, E, F (D vor C, damit der Monatsbericht die Komme
 
 **Verantwortlicher:** Team-Dashboard mit Abschnitt „Ausfüllzeit“; „Monatsbericht als PDF“ lädt ein PDF. Leitung → Kommentare: Kennzahlen, keine Texte. Leitung → Monatsabschluss: Monat abschließen; der Abschnitt „Analysen“ fehlt, stattdessen steht dort „Die KI-Analysen sind zurzeit nur für Admins.“ (seit Version 1.3). Leitung → Fokus: ein Verhalten zum Fokus machen. Leitung → Agenda: erzeugen, bearbeiten, freigeben; das nächste Monatsbericht-PDF enthält sie. Kein Menüpunkt „Termine“.
 
-**Admin:** Leitung → Monatsabschluss: Einzelanalysen („Erstellen“ liefert einen Entwurf oder ohne KI „Die KI ist noch nicht eingerichtet.“), „Alle fehlenden erstellen“ (Sammellauf) und die Gesamtauswertung des Teams. Leitung → Termine: Termin und Serie anlegen, ändern, pausieren, entfernen. „Info und Datenschutz“: Export-Protokoll. Versand-Probelauf wie oben.
+**Admin:** Leitung → Agenda: „Mit KI formulieren“ (neben der Vorlage „Agenda erzeugen“). Leitung → Monatsabschluss: Einzelanalysen („Erstellen“ liefert einen Entwurf oder ohne KI „Die KI ist noch nicht eingerichtet.“), „Alle fehlenden erstellen“ (Sammellauf) und die Gesamtauswertung des Teams. Leitung → Termine: Termin und Serie anlegen, ändern, pausieren, entfernen. „Info und Datenschutz“: Export-Protokoll. Versand-Probelauf wie oben.
 
 ## Hinweise und offene Punkte
 

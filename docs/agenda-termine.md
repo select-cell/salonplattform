@@ -8,7 +8,7 @@ Die Leitung markiert Verhalten, die gerade besonders wichtig sind (Begründung, 
 
 ## Agenda (`/app/leitung/agenda`, auch `?monat=YYYY-MM` aus der Mail)
 
-Entsteht **aus den Daten ohne KI** (feste Vorlage `agenda-vorlage-v1`, alle Zahlen aus SQL). Fünf Blöcke in fester Reihenfolge; das **Zeitbudget prüft die Datenbank** (`22023`):
+Entsteht **aus den Daten ohne KI** (feste Vorlage `agenda-vorlage-v1`, alle Zahlen aus SQL); seit Version 1.3 kann der Admin sie zusätzlich [von der KI formulieren lassen](#agenda-mit-ki-version-13). Fünf Blöcke in fester Reihenfolge; das **Zeitbudget prüft die Datenbank** (`22023`):
 
 | Block | Minuten (Vorlage) | Inhalt |
 |---|---|---|
@@ -21,6 +21,16 @@ Entsteht **aus den Daten ohne KI** (feste Vorlage `agenda-vorlage-v1`, alle Zahl
 Summe 15 bis 20 (Vorlage 18). **Hinweis „Stand unvollständig“** (zum Zeitpunkt des Erzeugens), wenn der Monat nicht abgeschlossen ist oder Abgaben oder Einzelanalysen fehlen. **Nur Teamebene:** keine Rangliste, keine Absender. Zu den Fokus-Verhalten stehen auf der **Plattform** bis zu zwei **anonymisierte Kommentar-Beispiele**, **nie in Mails und nie im PDF**.
 
 Gespeichert als `analysen` vom Typ `team_agenda`; Entwurf → bearbeiten → freigeben wie bei E. `agenda_erzeugen(monat, neu)` ersetzt eine vorhandene Agenda nur mit `neu = true`. Beim Bearbeiten bleiben Überschriften, Reihenfolge und Hinweise fest. Die freigegebene Agenda steht am Ende des Monatsberichts (PDF).
+
+### Agenda mit KI (Version 1.3)
+
+Der Admin hat auf der Seite „Agenda“ neben „Agenda erzeugen“ (Vorlage) den Knopf **„Mit KI formulieren“** (und „Neu mit KI formulieren“). Die Vorlage bleibt bestehen und ist der Rückfall: Scheitert die KI, ändert sich nichts an einer vorhandenen Agenda.
+
+- **Eingabe** (`agenda_ki_eingabe`): nur Teamwerte wie bei der Gesamtauswertung, die Fokus-Verhalten von heute (nur Nummer und Titel, **ohne** die Begründung der Leitung) und das Zeitbudget je Block. Keine Namen, keine Kommentartexte.
+- **Prüfung** (`agenda_ki_pruefen`): fünf Blöcke in fester Reihenfolge, Minuten je Block und 15 bis 20 insgesamt, jeder Punkt höchstens 600 Zeichen, und **jede Zahl** im Text muss in der Eingabe stehen (auch die Zahlen des Zeitbudgets). Ein Fehler im Aufbau geht mit der Meldung der Datenbank an die KI zurück („Der Block „Einstieg und Beteiligung“ dauert genau 2 Minuten.“), höchstens drei Versuche.
+- **Speichern** (`agenda_ki_speichern`): als Entwurf in `analysen` (Typ `team_agenda`, wie die Vorlage). Überschriften, Hinweis „Stand unvollständig“ und Zeitbudget setzt und prüft die Datenbank; `geprueft` rechnet sie selbst. Anbieter, Prompt-Version (`agenda-ki-v1`), Versuche und Eingabe-Hash stehen am Eintrag.
+- **Danach** wie bei der Vorlage: Bearbeiten (bei einer KI-Agenda läuft der Faktencheck erneut), Freigeben, PDF und Mail. Verantwortliche lesen, bearbeiten und geben sie frei wie bisher; **erzeugen** lassen kann die KI-Fassung zurzeit nur der Admin (`salons.ki_nur_admin`). „Neu erzeugen“ (Vorlage) setzt Anbieter und Faktencheck zurück.
+- Über n8n läuft das als dritter Strang `agenda` desselben Webhooks (siehe [n8n/README.md](../n8n/README.md)).
 
 ## Termine (`/app/leitung/termine`, nur Admin)
 

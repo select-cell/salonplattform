@@ -33,7 +33,7 @@ function agendaZeile(status = 'entwurf', extra = {}) {
 }
 
 const UEBERSICHT = {
-  monat: '2026-09', monate: ['2026-09', '2026-08'], eigene_analyse_nur_admin: false, abschluss: null,
+  monat: '2026-09', monate: ['2026-09', '2026-08'], eigene_analyse_nur_admin: false, ki: false, abschluss: null,
   aktuell: { abgaben: 3, erwartet: 4 }, nicht_abgegeben: [], personen: [],
 }
 
@@ -54,12 +54,25 @@ function fokusWelt() {
   }
 }
 
-function agendaWelt(start = null) {
-  const z = { agenda: start }
+/** ki: darf die aufrufende Person die KI nutzen (Standard seit Version 1.3: nur der Admin) */
+function agendaWelt(start = null, { ki = false, kiFehler = null } = {}) {
+  const z = { agenda: start, ki: [], kiGeprueft: true, kiFehler }
   return {
     z,
     antworten: {
-      abschluss_uebersicht: (b) => ({ ...UEBERSICHT, monat: b.p_monat ? b.p_monat.slice(0, 7) : UEBERSICHT.monat }),
+      'fn:analyse-erstellen': (b) => {
+        z.ki.push(b)
+        if (z.kiFehler) return z.kiFehler
+        const vorhanden = z.agenda && z.agenda.anbieter && z.agenda.anbieter !== 'vorlage'
+        if (vorhanden && !b.neu) return { ok: true, uebersprungen: true, versuche: 0, analyse: z.agenda }
+        z.agenda = agendaZeile('entwurf', {
+          monat: b.monat, anbieter: 'webhook', modell: null, prompt_version: 'agenda-ki-v1', versuche: 2, geprueft: z.kiGeprueft,
+          pruef_hinweis: z.kiGeprueft ? null : 'Faktencheck nicht bestanden: 4,71 steht nicht in den Daten',
+          agenda: { vorlage: 'agenda-ki-v1', monat: b.monat, minuten_gesamt: 18, unvollstaendig: false, hinweise: [], bloecke: bloecke().map((x) => ({ ...x, punkte: x.punkte.filter((p) => !p.beispiel) })) },
+        })
+        return { ok: true, uebersprungen: false, versuche: 2, analyse: z.agenda }
+      },
+      abschluss_uebersicht: (b) => ({ ...UEBERSICHT, ki, monat: b.p_monat ? b.p_monat.slice(0, 7) : UEBERSICHT.monat }),
       agenda_lesen: (b) => (z.agenda && b.p_monat.startsWith(z.agenda.monat) ? z.agenda : null),
       agenda_erzeugen: (b) => { z.agenda = agendaZeile('entwurf', { monat: b.p_monat.slice(0, 7) }); return z.agenda },
       agenda_bearbeiten: (b) => {
@@ -253,6 +266,92 @@ export default async function (browser) {
   t.check(erzeugen2.length === 2 && erzeugen2[1].body.p_neu === true, 'Zweiter Aufruf mit neu = true')
   t.check(konsole.length === 0, `keine Konsolenfehler ${konsole.join(' | ')}`)
   await context.close()
+
+  t.abschnitt('Agenda mit KI')
+  {
+    // Verantwortliche ohne KI-Recht sehen keinen KI-Knopf, auch nicht bei einer vorhandenen Agenda
+    const v = agendaWelt(null, { ki: false })
+    const { page: p, context: c, aufrufe: a } = await neueSeite(browser, { rolle: 'chef', antworten: v.antworten })
+    await p.goto(BASE + '/app/leitung/agenda')
+    await kennt(p)
+    await p.getByRole('button', { name: 'Agenda erzeugen' }).waitFor()
+    t.check((await p.getByRole('button', { name: /KI/ }).count()) === 0, 'Verantwortlicher ohne KI-Recht: kein Knopf „Mit KI formulieren“')
+    await p.getByRole('button', { name: 'Agenda erzeugen' }).click()
+    await p.getByText(/Agenda erzeugt\. Bitte lesen/).waitFor()
+    t.check((await p.getByRole('button', { name: /KI/ }).count()) === 0 && (await p.getByTestId('agenda-ki').count()) === 0, 'Auch mit Agenda: kein KI-Knopf, keine KI-Hinweise')
+    t.check(!a.some((x) => x.rpc.startsWith('fn:')), 'Es wird keine Edge Function gerufen')
+    await c.close()
+  }
+  {
+    const k = agendaWelt(null, { ki: true })
+    const { page: p, context: c, aufrufe: a, konsole: kk } = await neueSeite(browser, { rolle: 'admin', antworten: k.antworten })
+    await p.goto(BASE + '/app/leitung/agenda')
+    await kennt(p)
+    await p.getByRole('button', { name: 'Mit KI formulieren' }).waitFor()
+    t.check(await p.getByRole('button', { name: 'Agenda erzeugen' }).isVisible(), 'Admin: die Vorlage („Agenda erzeugen“) bleibt daneben bestehen')
+    await p.getByRole('button', { name: 'Mit KI formulieren' }).click()
+    await p.getByTestId('agenda-ki').waitFor()
+    const ki = a.filter((x) => x.rpc === 'fn:analyse-erstellen')
+    t.check(ki.length === 1 && ki[0].body.aufgabe === 'agenda' && ki[0].body.monat === '2026-09' && ki[0].body.neu === false && !('person_id' in ki[0].body), 'Edge Function mit aufgabe = agenda, Monat und neu = false')
+    t.check(!a.some((x) => x.rpc === 'agenda_erzeugen'), 'Die Vorlage wird dabei nicht erzeugt')
+    t.check(/Agenda von der KI formuliert\. Bitte lesen/.test(await p.locator('main').innerText()), 'Meldung „Agenda von der KI formuliert“')
+    const abz = await p.getByTestId('agenda-ki').innerText()
+    t.check(/Von der KI formuliert/.test(abz) && /Faktencheck bestanden/.test(abz), 'Abzeichen: von der KI formuliert, Faktencheck bestanden')
+    t.check(/Formuliert von der KI \(webhook\), 2 Versuche/.test(await p.locator('main').innerText()), 'Hinweis auf Anbieter und Versuche')
+    t.check((await p.locator('main section h2.ausw-titel').allInnerTexts()).length === 5, 'Fünf Blöcke wie bei der Vorlage')
+    t.check((await p.getByTestId('stand-unvollstaendig').count()) === 0, 'Ohne Lücken in den Daten kein Hinweis „Stand unvollständig“')
+
+    // Neu mit KI formulieren: unbearbeitet ohne Rückfrage, nach dem Bearbeiten mit Rückfrage
+    await p.getByRole('button', { name: 'Neu mit KI formulieren' }).click()
+    await p.getByText(/Agenda von der KI formuliert\./).waitFor()
+    t.check(a.filter((x) => x.rpc === 'fn:analyse-erstellen').length === 2 && a.filter((x) => x.rpc === 'fn:analyse-erstellen')[1].body.neu === true, 'Neu formulieren: zweiter Aufruf mit neu = true, ohne Rückfrage (nichts bearbeitet)')
+    await p.getByRole('button', { name: 'Bearbeiten' }).click()
+    await p.locator('#punkte-vereinbarungen').fill('Wir einigen uns auf einen Schritt.')
+    await p.getByRole('button', { name: 'Speichern' }).click()
+    await p.getByText(/Gespeichert\. Die Agenda ist wieder ein Entwurf/).waitFor()
+    await p.getByRole('button', { name: 'Neu mit KI formulieren' }).click()
+    await p.getByRole('group', { name: 'Neu formulieren?' }).waitFor()
+    t.check(/wurde bearbeitet/.test(await p.locator('main').innerText()) && /die KI die Agenda neu schreiben/.test(await p.locator('main').innerText()) && a.filter((x) => x.rpc === 'fn:analyse-erstellen').length === 2, 'Rückfrage nach dem Bearbeiten, noch kein neuer KI-Aufruf')
+    await p.getByRole('button', { name: 'Abbrechen' }).click()
+    await p.getByRole('button', { name: 'Neu mit KI formulieren' }).click()
+    await p.getByRole('button', { name: 'Ja, neu formulieren' }).click()
+    await p.getByText(/Agenda von der KI formuliert\./).waitFor()
+    t.check(a.filter((x) => x.rpc === 'fn:analyse-erstellen').length === 3, 'Nach der Bestätigung: dritter Aufruf')
+
+    // Die Vorlage ersetzt die KI-Agenda
+    k.z.agenda = { ...k.z.agenda, anbieter: 'vorlage' }
+    await p.reload()
+    await kennt(p)
+    await p.getByRole('button', { name: 'Neu erzeugen' }).waitFor()
+    t.check((await p.getByTestId('agenda-ki').count()) === 0, 'Eine Agenda aus der Vorlage trägt keine KI-Abzeichen')
+    t.check(kk.length === 0, `keine Konsolenfehler ${kk.join(' | ')}`)
+    await c.close()
+  }
+  {
+    // Faktencheck nicht bestanden: deutlicher Hinweis, Freigabe bleibt möglich
+    const k = agendaWelt(null, { ki: true })
+    k.z.kiGeprueft = false
+    const { page: p, context: c } = await neueSeite(browser, { rolle: 'admin', antworten: k.antworten })
+    await p.goto(BASE + '/app/leitung/agenda')
+    await kennt(p)
+    await p.getByRole('button', { name: 'Mit KI formulieren' }).click()
+    await p.getByTestId('pruef-hinweis').waitFor()
+    t.check(/der Faktencheck ist nicht bestanden/.test(await p.locator('main').innerText()), 'Meldung nennt den nicht bestandenen Faktencheck')
+    t.check(/4,71 steht nicht in den Daten/.test(await p.getByTestId('pruef-hinweis').innerText()) && /Faktencheck nicht bestanden/.test(await p.getByTestId('agenda-ki').innerText()), 'Abzeichen und Hinweis zeigen die Abweichung')
+    t.check(await p.getByRole('button', { name: 'Freigeben', exact: true }).isEnabled(), 'Freigabe bleibt möglich (die Leitung entscheidet)')
+    await c.close()
+  }
+  {
+    // KI nicht eingerichtet
+    const k = agendaWelt(null, { ki: true, kiFehler: { status: 503, body: { ok: false, fehler: 'Die KI ist noch nicht eingerichtet.' } } })
+    const { page: p, context: c } = await neueSeite(browser, { rolle: 'admin', antworten: k.antworten })
+    await p.goto(BASE + '/app/leitung/agenda')
+    await kennt(p)
+    await p.getByRole('button', { name: 'Mit KI formulieren' }).click()
+    await p.getByRole('alert').filter({ hasText: 'Die KI ist noch nicht eingerichtet.' }).waitFor()
+    t.check(await p.getByRole('button', { name: 'Mit KI formulieren' }).isEnabled() && await p.getByRole('button', { name: 'Agenda erzeugen' }).isEnabled(), 'Danach lässt sich erneut versuchen oder die Vorlage nehmen')
+    await c.close()
+  }
 
   // Link aus der Mail wählt den Monat
   {

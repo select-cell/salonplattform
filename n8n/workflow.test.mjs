@@ -5,8 +5,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
 import {
-  AUFGABE_EINZEL, AUFGABE_GESAMT, PROMPT_VERSION, PROMPT_VERSION_GESAMT, SYSTEM_PROMPT, SYSTEM_PROMPT_GESAMT,
-  baueNachricht, erstelleAlle, erstelleGesamt, parseAusgabe, parseGesamtAusgabe, rufeAnbieterBatch,
+  AUFGABE_AGENDA, AUFGABE_EINZEL, AUFGABE_GESAMT, PROMPT_VERSION, PROMPT_VERSION_AGENDA, PROMPT_VERSION_GESAMT, SYSTEM_PROMPT,
+  SYSTEM_PROMPT_AGENDA, SYSTEM_PROMPT_GESAMT, baueNachricht, erstelleAgenda, erstelleAlle, erstelleGesamt, parseAgendaAusgabe,
+  parseAusgabe, parseGesamtAusgabe, rufeAnbieterBatch,
 } from '../supabase/functions/analyse-erstellen/analyse.ts'
 
 const lies = (pfad) => JSON.parse(readFileSync(new URL(pfad, import.meta.url), 'utf8'))
@@ -81,7 +82,18 @@ const GESAMT_AUSGABE = {
   vereinbarungen_vorschlaege: ['Ein Verhalten gemeinsam üben.', 'Im nächsten Monat erneut ansehen.'],
   datenlage_hinweis: null,
 }
-const guterAgent = (k) => ({ output: JSON.stringify(k.aufgabe === AUFGABE_GESAMT ? GESAMT_AUSGABE : EINZEL_AUSGABE) })
+const AGENDA_AUSGABE = {
+  bloecke: [
+    { id: 'einstieg', minuten: 2, punkte: ['Danke an alle. 3 von 4 haben abgegeben.', 'Die Zahlen gelten für September 2026.'] },
+    { id: 'kennzahlen', minuten: 3, punkte: ['Das Fremdbild des Teams liegt bei 3,8, das Selbstbild bei 3,3.', 'Die Differenz beträgt −0,5.'] },
+    { id: 'fokus', minuten: 7, punkte: ['Fokus-Verhalten 1: das Fremdbild liegt bei 4,0.', 'Die größte Veränderung zum Vormonat zeigt Verhalten 1 mit +2,0.'] },
+    { id: 'entwicklung', minuten: 4, punkte: ['Verhalten 2 hat mit 3,3 das niedrigste Fremdbild.', 'Gemeinsam überlegen, was hilft.'] },
+    { id: 'vereinbarungen', minuten: 2, punkte: ['Was nehmen wir uns vor?', 'Wer übernimmt welchen Schritt?'] },
+  ],
+}
+const guterAgent = (k) => ({
+  output: JSON.stringify(k.aufgabe === AUFGABE_GESAMT ? GESAMT_AUSGABE : k.aufgabe === AUFGABE_AGENDA ? AGENDA_AUSGABE : EINZEL_AUSGABE),
+})
 
 // ---- Aufbau -----------------------------------------------------------------------------------------------------
 
@@ -109,11 +121,11 @@ test('Aufbau: ein Webhook mit Header-Prüfung, Antwort über „Respond to Webho
 
 test('Aufbau: Stränge — der Schalter leitet jede Aufgabe an ihren Agenten, jeder Agent hat sein Claude-Modell', () => {
   const regeln = knoten('Aufgabe wählen').parameters.rules.values
-  assert.deepEqual(regeln.map((r) => r.conditions.conditions[0].rightValue), [AUFGABE_EINZEL, AUFGABE_GESAMT], 'Namen wie in der Edge Function')
+  assert.deepEqual(regeln.map((r) => r.conditions.conditions[0].rightValue), [AUFGABE_EINZEL, AUFGABE_GESAMT, AUFGABE_AGENDA], 'Namen wie in der Edge Function')
   assert.ok(regeln.every((r) => r.conditions.conditions[0].leftValue === '={{ $json.aufgabe }}'))
   const ausgaenge = workflow.connections['Aufgabe wählen'].main
-  assert.deepEqual(ausgaenge.map((a) => a.map((z) => z.node)), [['Agent Einzelanalyse'], ['Agent Gesamtauswertung']])
-  for (const [agent, modell] of [['Agent Einzelanalyse', 'Claude Einzelanalyse'], ['Agent Gesamtauswertung', 'Claude Gesamtauswertung']]) {
+  assert.deepEqual(ausgaenge.map((a) => a.map((z) => z.node)), [['Agent Einzelanalyse'], ['Agent Gesamtauswertung'], ['Agent Agenda']])
+  for (const [agent, modell] of [['Agent Einzelanalyse', 'Claude Einzelanalyse'], ['Agent Gesamtauswertung', 'Claude Gesamtauswertung'], ['Agent Agenda', 'Claude Agenda']]) {
     const a = knoten(agent)
     assert.equal(a.type, '@n8n/n8n-nodes-langchain.agent')
     assert.equal(a.parameters.text, '={{ $json.nachricht }}')
@@ -137,12 +149,12 @@ test('Aufbau: angeheftete Beispielanfrage entspricht einzelanalyse-anna.json', (
 })
 
 test('Testanfragen passen zur Edge Function (sonst: node n8n/testanfragen-erzeugen.mjs)', () => {
-  assert.deepEqual(Object.keys(anfragen).sort(), ['einzelanalyse-anna', 'einzelanalyse-berta', 'einzelanalyse-ludwig', 'gesamtauswertung', 'sammellauf'])
+  assert.deepEqual(Object.keys(anfragen).sort(), ['agenda', 'einzelanalyse-anna', 'einzelanalyse-berta', 'einzelanalyse-ludwig', 'gesamtauswertung', 'sammellauf'])
   assert.equal(anfragen.sammellauf.auftraege.length, 3)
   assert.equal(anfragen.gesamtauswertung.auftraege.length, 1)
   for (const [name, a] of Object.entries(anfragen)) {
-    const soll = a.aufgabe === AUFGABE_GESAMT ? [PROMPT_VERSION_GESAMT, SYSTEM_PROMPT_GESAMT] : [PROMPT_VERSION, SYSTEM_PROMPT]
-    assert.ok([AUFGABE_EINZEL, AUFGABE_GESAMT].includes(a.aufgabe), `${name}: Aufgabe`)
+    const soll = { [AUFGABE_GESAMT]: [PROMPT_VERSION_GESAMT, SYSTEM_PROMPT_GESAMT], [AUFGABE_AGENDA]: [PROMPT_VERSION_AGENDA, SYSTEM_PROMPT_AGENDA], [AUFGABE_EINZEL]: [PROMPT_VERSION, SYSTEM_PROMPT] }[a.aufgabe]
+    assert.ok(soll, `${name}: Aufgabe`)
     assert.equal(a.prompt_version, soll[0], `${name}: prompt_version`)
     assert.equal(new Set(a.auftraege.map((x) => x.ref)).size, a.auftraege.length, `${name}: eindeutige ref`)
     for (const x of a.auftraege) {
@@ -154,6 +166,8 @@ test('Testanfragen passen zur Edge Function (sonst: node n8n/testanfragen-erzeug
     }
   }
   assert.equal(anfragen.gesamtauswertung.auftraege[0].eingabe.bewertet, 'das Team')
+  assert.equal(anfragen.agenda.auftraege[0].eingabe.team.bewertet, 'das Team')
+  assert.equal(anfragen.agenda.auftraege[0].eingabe.zeitbudget.bloecke.length, 5)
 })
 
 // ---- Anfrage prüfen ---------------------------------------------------------------------------------------------
@@ -167,6 +181,9 @@ test('Anfrage prüfen: ein Item je Auftrag, mit Strang, Prompt und Einstellungen
   assert.equal(items[0].hinweisSchluessel, 'kommentar_qualitaet_hinweis')
   const gesamt = await laufeAlle('Anfrage prüfen', [eingang(anfragen.gesamtauswertung)])
   assert.deepEqual([gesamt.length, gesamt[0].strang, gesamt[0].hinweisSchluessel, gesamt[0].system === SYSTEM_PROMPT_GESAMT], [1, 'Gesamtauswertung', 'datenlage_hinweis', true])
+  const agenda = await laufeAlle('Anfrage prüfen', [eingang(anfragen.agenda)])
+  assert.deepEqual([agenda.length, agenda[0].strang, agenda[0].form, agenda[0].system === SYSTEM_PROMPT_AGENDA, agenda[0].prompt_version], [1, 'Agenda', 'agenda', true, PROMPT_VERSION_AGENDA])
+  assert.deepEqual([agenda[0].bloecke.map((b) => b[0]), agenda[0].gesamt], [['einstieg', 'kennzahlen', 'fokus', 'entwicklung', 'vvereinbarungen'.slice(1)], [15, 20]])
 })
 
 test('Anfrage prüfen: auch der reine Inhalt einer Testanfrage (ohne „body“) wird angenommen', async () => {
@@ -193,7 +210,7 @@ test('Anfrage prüfen: unvollständige Anfragen werden mit Grund abgelehnt', asy
     return r[0].fehler
   }
   const a = anfragen['einzelanalyse-anna']
-  assert.match((await fehler({ ...a, aufgabe: 'etwas' }))[0], /aufgabe ist unbekannt \(erlaubt: einzelanalyse, gesamtauswertung\)/)
+  assert.match((await fehler({ ...a, aufgabe: 'etwas' }))[0], /aufgabe ist unbekannt \(erlaubt: einzelanalyse, gesamtauswertung, agenda\)/)
   assert.match((await fehler({ prompt_version: 'x' }))[0], /aufgabe ist unbekannt/)
   assert.deepEqual(await fehler({ ...a, auftraege: [] }), ['auftraege fehlt oder ist leer'])
   assert.deepEqual(await fehler({ ...a, auftraege: Array.from({ length: 11 }, (_, i) => ({ ...a.auftraege[0], ref: String(i) })) }), ['auftraege: höchstens 10'])
@@ -236,6 +253,23 @@ test('Antwort lesen: Hinweise je Aufgabe (Anzahl, Buchstaben-Bezeichnung, fehlen
   assert.deepEqual([g.aufgabe, g.meta.strang, g.meta.hinweise], [AUFGABE_GESAMT, 'Gesamtauswertung', ['datenlage_hinweis fehlt (wird als leer gewertet)']])
   const kollege = await lesen({ output: JSON.stringify({ ...GESAMT_AUSGABE, zusammenfassung: 'Kollege B' }) }, anfragen.gesamtauswertung)
   assert.deepEqual(kollege.meta.hinweise, [], 'für die Gesamtauswertung gilt die Regel zu Buchstaben nicht')
+})
+
+test('Antwort lesen: Agenda — Blöcke, Reihenfolge, Minuten und Summe werden zur Orientierung geprüft', async () => {
+  const gut = await lesen({ output: JSON.stringify(AGENDA_AUSGABE) }, anfragen.agenda)
+  assert.deepEqual([gut.aufgabe, gut.meta.strang, gut.meta.hinweise], [AUFGABE_AGENDA, 'Agenda', []])
+  assert.deepEqual(gut.ausgabe, AGENDA_AUSGABE)
+  const mit = (f) => lesen({ output: JSON.stringify({ bloecke: f(structuredClone(AGENDA_AUSGABE.bloecke)) }) }, anfragen.agenda).then((r) => r.meta.hinweise)
+  assert.deepEqual(await mit((b) => b.map((x, i) => (i === 0 ? { ...x, minuten: 3 } : x))), ['einstieg: 3 Minuten (erlaubt 2 bis 2)'])
+  assert.deepEqual(await mit((b) => b.map((x, i) => (i === 2 ? { ...x, minuten: 8 } : i === 3 ? { ...x, minuten: 3 } : x))), [], '2 + 3 + 8 + 3 + 2 = 18: in Ordnung')
+  assert.deepEqual(await mit((b) => b.map((x, i) => (i === 1 ? { ...x, minuten: 2.5 } : x))), ['kennzahlen: minuten ist keine ganze Zahl'])
+  assert.deepEqual(await mit((b) => b.map((x, i) => (i === 4 ? { ...x, minuten: 3 } : i === 3 ? { ...x, minuten: 4 } : i === 2 ? { ...x, minuten: 8 } : x))).then((h) => h.length), 0, '2 + 3 + 8 + 4 + 3 = 20: gerade noch in Ordnung')
+  assert.deepEqual(await mit((b) => b.slice(0, 4)), ['bloecke: 5 Blöcke erwartet'])
+  assert.deepEqual(await mit((b) => [b[1], b[0], ...b.slice(2)]), ['Block 1: id „einstieg“ erwartet', 'Block 2: id „kennzahlen“ erwartet'])
+  assert.deepEqual(await mit((b) => b.map((x, i) => (i === 4 ? { ...x, punkte: [] } : x))), ['vereinbarungen: punkte fehlt oder ist leer'])
+  assert.deepEqual(await mit((b) => b.map((x, i) => (i === 4 ? { ...x, punkte: ['a', 'b', 'c', 'd', 'e'] } : x))), ['vereinbarungen: 5 Punkte (erwartet 2 bis 4)'])
+  const analyseFormat = await lesen({ output: JSON.stringify(EINZEL_AUSGABE) }, anfragen.agenda)
+  assert.deepEqual(analyseFormat.meta.hinweise, ['bloecke: 5 Blöcke erwartet'], 'eine Analyse statt einer Agenda fällt auf')
 })
 
 test('Antwort lesen: kein JSON → Text geht weiter, die Plattform fragt selbst erneut', async () => {
@@ -289,6 +323,17 @@ test('Zahlencheck: erfundene Zahlen werden genannt, Vorzeichen zählt nicht, 3,5
   assert.deepEqual(g.meta.zahlen_nicht_in_daten, ['4,71'])
 })
 
+test('Zahlencheck: Agenda — Zahlen aus den Teamdaten und dem Zeitbudget bestehen, erfundene werden genannt, Minuten-Felder zählen nicht', async () => {
+  const gut = await zahlen(AGENDA_AUSGABE, anfragen.agenda)
+  assert.deepEqual(gut.meta.zahlen_nicht_in_daten, [])
+  assert.equal(gut.meta.faktencheck_orientierung, 'bestanden')
+  const erfunden = { bloecke: AGENDA_AUSGABE.bloecke.map((b, i) => (i === 1 ? { ...b, punkte: ['Das Fremdbild liegt bei 4,71.', 'Es waren 12 Personen da.'] } : b)) }
+  const r = await zahlen(erfunden, anfragen.agenda)
+  assert.deepEqual([...r.meta.zahlen_nicht_in_daten].sort(), ['12', '4,71'])
+  const minuten = { bloecke: AGENDA_AUSGABE.bloecke.map((b, i) => (i === 2 ? { ...b, minuten: 9, punkte: ['Dafür sind 6 bis 8 Minuten vorgesehen.'] } : b)) }
+  assert.deepEqual((await zahlen(minuten, anfragen.agenda)).meta.zahlen_nicht_in_daten, [], 'das Feld minuten ist keine Zahl im Text; „6 bis 8“ steht im Zeitbudget')
+})
+
 test('Zahlencheck: Fehler und Text-Antworten gehen unverändert durch', async () => {
   assert.equal((await zahlen('Das kann ich leider nicht.')).meta.faktencheck_orientierung, undefined)
   const geprueft = await laufeAlle('Anfrage prüfen', [eingang(anfragen['einzelanalyse-anna'])])
@@ -329,6 +374,17 @@ test('Durchlauf: Gesamtauswertung läuft durch den Strang Gesamtauswertung', asy
   assert.equal(r.body.aufgabe, AUFGABE_GESAMT)
   assert.deepEqual(r.body.ergebnisse[0].ausgabe, GESAMT_AUSGABE)
   assert.deepEqual(r.body.ergebnisse[0].meta.zahlen_nicht_in_daten, [])
+})
+
+test('Durchlauf: Agenda läuft durch den Strang Agenda', async () => {
+  const gesehen = []
+  const r = await simuliere(anfragen.agenda, (k, agent) => { gesehen.push([agent, k.system === SYSTEM_PROMPT_AGENDA]); return guterAgent(k) })
+  assert.deepEqual(gesehen, [['Agent Agenda', true]])
+  assert.equal(r.status, 200)
+  assert.equal(r.body.aufgabe, AUFGABE_AGENDA)
+  assert.deepEqual(r.body.ergebnisse[0].ausgabe, AGENDA_AUSGABE)
+  assert.deepEqual([r.body.ergebnisse[0].meta.hinweise, r.body.ergebnisse[0].meta.zahlen_nicht_in_daten], [[], []])
+  assert.equal(parseAgendaAusgabe(r.body.ergebnisse[0].ausgabe).bloecke.length, 5, 'die Edge Function liest sie')
 })
 
 test('Durchlauf: scheitert ein Auftrag, kommen die anderen trotzdem zurück (Status 200); scheitern alle, steht es im Status', async () => {
@@ -381,6 +437,32 @@ test('Edge Function ↔ Workflow: die Anfrage der Edge Function ist gültig, die
   assert.ok('fehler' in r['3'] && r['3'].fehler.status === 502)
 })
 
+test('Edge Function ↔ Workflow: die Agenda wird über den Strang formuliert und mit Aufbau und Zahlen geprüft gespeichert', async () => {
+  const gespeichert = []
+  const pruefungen = []
+  const rpc = async (name, a) => {
+    const antworten = {
+      agenda_ki_eingabe: { eingabe: anfragen.agenda.auftraege[0].eingabe, hash: 'a' },
+      agenda_lesen: null,
+      agenda_ki_pruefen: { geprueft: true, abweichungen: [], struktur_fehler: null },
+      agenda_ki_speichern: { status: 'entwurf', geprueft: true },
+    }
+    if (name === 'agenda_ki_speichern') gespeichert.push(a)
+    if (name === 'agenda_ki_pruefen') pruefungen.push(a)
+    return { data: antworten[name], error: null }
+  }
+  const protokoll = []
+  const fetchFn = webhookFetch(guterAgent, protokoll)
+  const d = { rpc, anbieter: () => WEBHOOK, ki: async () => { throw new Error('nicht benutzt') }, kiBatch: (c, a, v, auftraege, o) => rufeAnbieterBatch(c, a, v, auftraege, fetchFn, o) }
+  const r = await erstelleAgenda(d, { monat: '2026-09', neu: false })
+  assert.deepEqual([r.uebersprungen, r.versuche], [false, 1])
+  assert.equal(protokoll.length, 1)
+  assert.deepEqual([protokoll[0].aufgabe, protokoll[0].prompt_version, protokoll[0].auftraege[0].system === SYSTEM_PROMPT_AGENDA], [AUFGABE_AGENDA, PROMPT_VERSION_AGENDA, true])
+  assert.deepEqual(pruefungen[0].p_bloecke, AGENDA_AUSGABE.bloecke)
+  assert.deepEqual(gespeichert[0].p_bloecke, AGENDA_AUSGABE.bloecke)
+  assert.deepEqual([gespeichert[0].p_prompt_version, gespeichert[0].p_anbieter], [PROMPT_VERSION_AGENDA, 'webhook'])
+})
+
 test('Edge Function ↔ Workflow: Sammellauf und Gesamtauswertung speichern über die Datenbank-Funktionen', async () => {
   const gespeichert = []
   const personen = ['aaaaaaaa-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000003']
@@ -407,17 +489,23 @@ test('Edge Function ↔ Workflow: Sammellauf und Gesamtauswertung speichern übe
     kiBatch: (c, a, v, auftraege, o) => rufeAnbieterBatch(c, a, v, auftraege, fetchFn, o),
   }
 
-  const sammel = await erstelleAlle(d, { monat: '2026-09', ausgenommen: [] })
-  assert.deepEqual(sammel.erstellt.map((e) => e.person_id), personen)
-  assert.deepEqual([sammel.fehlgeschlagen.length, sammel.verbleibend], [0, 0])
-  assert.equal(protokoll.length, 1)
+  // Der Sammellauf bearbeitet je Aufruf ein Paket von zwei Personen; die Oberfläche ruft erneut auf
+  const erster = await erstelleAlle(d, { monat: '2026-09', ausgenommen: [] })
+  assert.deepEqual(erster.erstellt.map((e) => e.person_id), personen.slice(0, 2))
+  assert.deepEqual([erster.fehlgeschlagen.length, erster.verbleibend], [0, 1])
+  assert.equal(protokoll.length, 1, 'ein Aufruf für das ganze Paket')
+  assert.deepEqual(protokoll[0].auftraege.map((a) => a.ref), ['1', '2'])
+  const zweiter = await erstelleAlle(d, { monat: '2026-09', ausgenommen: personen.slice(0, 2) })
+  assert.deepEqual(zweiter.erstellt.map((e) => e.person_id), personen.slice(2))
+  assert.deepEqual([zweiter.fehlgeschlagen.length, zweiter.verbleibend], [0, 0])
+  assert.equal(protokoll.length, 2)
   assert.deepEqual(gespeichert.map(([n, a]) => [n, a.p_person]), personen.map((p) => ['analyse_speichern', p]))
   assert.ok(gespeichert.every(([, a]) => a.p_prompt_version === PROMPT_VERSION && a.p_anbieter === 'webhook'))
 
   gespeichert.length = 0
   const gesamt = await erstelleGesamt(d, { monat: '2026-09', neu: false })
   assert.deepEqual([gesamt.uebersprungen, gesamt.versuche], [false, 1])
-  assert.equal(protokoll[1].aufgabe, AUFGABE_GESAMT)
+  assert.equal(protokoll[2].aufgabe, AUFGABE_GESAMT)
   assert.equal(gespeichert[0][0], 'gesamt_speichern')
   assert.equal(gespeichert[0][1].p_prompt_version, PROMPT_VERSION_GESAMT)
   assert.equal(gespeichert[0][1].p_ausgabe.zusammenfassung, GESAMT_AUSGABE.zusammenfassung)

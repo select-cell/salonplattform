@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Abschnitt, DatenZustand, Kennzahl, Leer, Monatswahl } from '../../../components/auswertung/Bausteine'
 import { Icon } from '../../../components/Icon'
-import { bearbeiteAgenda, erzeugeAgenda, gibAgendaFrei, holeAbschlussUebersicht, holeAgenda } from '../../../lib/api'
-import { BLOCK_GRENZEN, pruefeZeitbudget, summeMinuten, type AgendaBlock, type AgendaDaten, type AgendaZeile } from '../../../lib/agenda'
-import { zeitpunkt } from '../../../lib/abschluss'
+import { bearbeiteAgenda, erstelleAgendaMitKi, erzeugeAgenda, gibAgendaFrei, holeAbschlussUebersicht, holeAgenda } from '../../../lib/api'
+import { BLOCK_GRENZEN, pruefeZeitbudget, summeMinuten, vonKi, type AgendaBlock, type AgendaDaten, type AgendaZeile } from '../../../lib/agenda'
+import { kiErlaubt, zeitpunkt } from '../../../lib/abschluss'
 import { monatName } from '../../../lib/auswertung'
 import { useDaten } from '../../../lib/useDaten'
 
@@ -15,9 +15,13 @@ interface Meldung {
 const fehlertext = (e: unknown) => (e instanceof Error && e.message ? e.message : 'Das hat nicht geklappt. Bitte versuche es erneut.')
 const MONAT = /^\d{4}-(0[1-9]|1[0-2])$/
 
+/** Wie eine vorhandene Agenda ersetzt werden soll (für die Rückfrage) */
+type Ersatz = 'vorlage' | 'ki'
+
 /**
- * Leitung → Agenda: die Agenda fürs Teammeeting (15 bis 20 Minuten) aus den Daten des Monats, ohne KI.
- * Auch der Link aus der Mail (`/app/leitung/agenda?monat=2026-09`) landet hier.
+ * Leitung → Agenda: die Agenda fürs Teammeeting (15 bis 20 Minuten) aus den Daten des Monats. Die Vorlage braucht keine KI;
+ * der Admin kann sie zusätzlich von der KI formulieren lassen (Version 1.3). Auch der Link aus der Mail
+ * (`/app/leitung/agenda?monat=2026-09`) landet hier.
  */
 export default function Agenda() {
   const params = useParams()
@@ -26,8 +30,8 @@ export default function Agenda() {
   const wunsch = [params.monat, suche.get('monat')].find((m): m is string => !!m && MONAT.test(m))
   const [monatWahl, setMonatWahl] = useState<string | undefined>(wunsch)
   const [meldung, setMeldung] = useState<Meldung | null>(null)
-  const [arbeitet, setArbeitet] = useState(false)
-  const [rueckfrage, setRueckfrage] = useState(false)
+  const [arbeitet, setArbeitet] = useState<'vorlage' | 'ki' | null>(null)
+  const [rueckfrage, setRueckfrage] = useState<Ersatz | null>(null)
 
   const uebersicht = useDaten(() => holeAbschlussUebersicht(monatWahl), [monatWahl])
   const monat = uebersicht.daten?.monat
@@ -36,24 +40,36 @@ export default function Agenda() {
   const wechsle = (m: string) => {
     setMonatWahl(m)
     setMeldung(null)
-    setRueckfrage(false)
+    setRueckfrage(null)
     navigate(`/app/leitung/agenda/${m}`, { replace: true })
   }
 
-  async function aktion(job: () => Promise<unknown>, okText: string) {
-    setArbeitet(true)
+  async function aktion(job: () => Promise<unknown>, okText: string | ((ergebnis: unknown) => string), art: 'vorlage' | 'ki' = 'vorlage') {
+    setArbeitet(art)
     setMeldung(null)
     try {
-      await job()
-      setMeldung({ art: 'ok', text: okText })
-      setRueckfrage(false)
+      const ergebnis = await job()
+      setMeldung({ art: 'ok', text: typeof okText === 'function' ? okText(ergebnis) : okText })
+      setRueckfrage(null)
       agenda.neuLaden()
     } catch (e) {
       setMeldung({ art: 'fehler', text: fehlertext(e) })
     } finally {
-      setArbeitet(false)
+      setArbeitet(null)
     }
   }
+
+  /** Die KI formuliert die Agenda; gleiche Daten wie beim letzten Mal ergeben keinen neuen Aufruf, außer `neu` ist gesetzt */
+  const mitKi = (monatKey: string, neu: boolean) =>
+    aktion(
+      () => erstelleAgendaMitKi(monatKey, neu),
+      (e) => {
+        const r = e as Awaited<ReturnType<typeof erstelleAgendaMitKi>>
+        if (r.uebersprungen) return 'Für diesen Monat hat sich nichts geändert, die vorhandene Agenda der KI bleibt.'
+        return `Agenda von der KI formuliert${r.agenda.geprueft === false ? ', der Faktencheck ist nicht bestanden. Bitte genau lesen' : ''}. Bitte lesen, bei Bedarf bearbeiten und dann freigeben.`
+      },
+      'ki',
+    )
 
   const a = agenda.daten
 
@@ -63,8 +79,9 @@ export default function Agenda() {
         <p className="overline">Leitung</p>
         <h1 style={{ marginTop: 8 }}>Agenda fürs Teammeeting</h1>
         <p>
-          Fünf Blöcke in fester Reihenfolge, 15 bis 20 Minuten. Alle Zahlen kommen aus den Daten des Monats, es gibt keine KI. Die Agenda zeigt nur das Team, keine Rangliste
-          und keine Absender.
+          Fünf Blöcke in fester Reihenfolge, 15 bis 20 Minuten. Alle Zahlen kommen aus den Daten des Monats. Die Vorlage braucht keine KI; der Admin kann die Agenda
+          zusätzlich von der KI formulieren lassen (nur Teamwerte, die Datenbank prüft Aufbau, Minuten und Zahlen). Die Agenda zeigt nur das Team, keine Rangliste und keine
+          Absender.
         </p>
       </header>
 
@@ -90,24 +107,37 @@ export default function Agenda() {
                       Für {monatName(uebersicht.daten.monat)} gibt es noch keine Agenda. Sie entsteht aus den Team-Kennzahlen, dem Fokus und den größten Differenzen und
                       Veränderungen.
                     </p>
-                    <button
-                      type="button"
-                      className="btn"
-                      style={{ justifySelf: 'start' }}
-                      disabled={arbeitet}
-                      onClick={() => aktion(() => erzeugeAgenda(uebersicht.daten!.monat), 'Agenda erzeugt. Bitte lesen, bei Bedarf bearbeiten und dann freigeben.')}
-                    >
-                      {arbeitet ? 'Wird erzeugt …' : 'Agenda erzeugen'}
-                    </button>
+                    <div className="aktionen">
+                      <button
+                        type="button"
+                        className="btn"
+                        disabled={arbeitet !== null}
+                        onClick={() => aktion(() => erzeugeAgenda(uebersicht.daten!.monat), 'Agenda erzeugt. Bitte lesen, bei Bedarf bearbeiten und dann freigeben.')}
+                      >
+                        {arbeitet === 'vorlage' ? 'Wird erzeugt …' : 'Agenda erzeugen'}
+                      </button>
+                      {kiErlaubt(uebersicht.daten) && (
+                        <button type="button" className="btn btn--ghost" disabled={arbeitet !== null} onClick={() => mitKi(uebersicht.daten!.monat, false)}>
+                          {arbeitet === 'ki' ? 'Die KI formuliert …' : 'Mit KI formulieren'}
+                        </button>
+                      )}
+                    </div>
+                    {arbeitet === 'ki' && (
+                      <p className="klein muted" role="status" data-testid="ki-arbeitet">
+                        Die KI formuliert die Agenda. Das kann bis zu einer Minute dauern.
+                      </p>
+                    )}
                   </Abschnitt>
                 ) : (
                   <AgendaAnsicht
                     key={`${a.monat}-${a.aktualisiert_am}`}
                     zeile={a}
+                    ki={kiErlaubt(uebersicht.daten)}
                     arbeitet={arbeitet}
                     rueckfrage={rueckfrage}
                     onRueckfrage={setRueckfrage}
                     onNeu={() => aktion(() => erzeugeAgenda(a.monat, true), 'Agenda neu erzeugt (Entwurf).')}
+                    onNeuKi={() => mitKi(a.monat, true)}
                     onFrei={(frei) => aktion(() => gibAgendaFrei(a.monat, frei), frei ? 'Freigegeben. Die Agenda steht jetzt am Ende des Monatsberichts (PDF).' : 'Freigabe zurückgenommen, die Agenda ist wieder ein Entwurf.')}
                     onSpeichern={(daten) => aktion(() => bearbeiteAgenda(a.monat, daten), 'Gespeichert. Die Agenda ist wieder ein Entwurf und muss neu freigegeben werden.')}
                   />
@@ -121,13 +151,16 @@ export default function Agenda() {
 }
 
 function AgendaAnsicht({
-  zeile, arbeitet, rueckfrage, onRueckfrage, onNeu, onFrei, onSpeichern,
+  zeile, ki, arbeitet, rueckfrage, onRueckfrage, onNeu, onNeuKi, onFrei, onSpeichern,
 }: {
   zeile: AgendaZeile
-  arbeitet: boolean
-  rueckfrage: boolean
-  onRueckfrage: (b: boolean) => void
+  /** darf die aufrufende Person die KI nutzen? */
+  ki: boolean
+  arbeitet: 'vorlage' | 'ki' | null
+  rueckfrage: Ersatz | null
+  onRueckfrage: (b: Ersatz | null) => void
   onNeu: () => void
+  onNeuKi: () => void
   onFrei: (frei: boolean) => void
   onSpeichern: (daten: AgendaDaten) => void
 }) {
@@ -141,6 +174,20 @@ function AgendaAnsicht({
         <Kennzahl label="Stand" wert={frei ? 'Freigegeben' : 'Entwurf'} ton={frei ? 'gruen' : 'neutral'} zusatz={frei ? `von ${zeile.freigegeben_von}, ${zeitpunkt(zeile.freigegeben_am)}` : `erstellt ${zeitpunkt(zeile.erstellt_am)}`} />
         <Kennzahl label="Dauer" wert={`${summeMinuten(ag.bloecke)} Min.`} zusatz="Ziel: 15 bis 20 Minuten" />
       </div>
+
+      {vonKi(zeile) && (
+        <div className="badges" data-testid="agenda-ki">
+          <span className="badge badge--akzent">Von der KI formuliert</span>
+          <span className={`badge ${zeile.geprueft === false ? 'badge--rot' : 'badge--gruen'}`}>{zeile.geprueft === false ? 'Faktencheck nicht bestanden' : 'Faktencheck bestanden'}</span>
+          {zeile.bearbeitet && <span className="badge">bearbeitet</span>}
+        </div>
+      )}
+      {vonKi(zeile) && zeile.geprueft === false && zeile.pruef_hinweis && (
+        <p className="hinweis hinweis--fehler" role="alert" data-testid="pruef-hinweis">
+          <Icon name="achtung" groesse={18} />
+          <span>{zeile.pruef_hinweis}. Bitte prüfe die Stelle und korrigiere sie, bevor du freigibst. Eine Freigabe bleibt trotzdem möglich.</span>
+        </p>
+      )}
 
       {ag.unvollstaendig && (
         <div className="hinweis" data-testid="stand-unvollstaendig">
@@ -169,43 +216,57 @@ function AgendaAnsicht({
           ))}
           <p className="klein muted">
             Kommentar-Beispiele stehen nur hier auf der Plattform, nie in der Mail und nie im PDF. Die freigegebene Agenda steht am Ende des Monatsberichts (PDF).
+            {vonKi(zeile) && ` Formuliert von der KI (${zeile.anbieter}${zeile.modell ? `, ${zeile.modell}` : ''})${zeile.versuche && zeile.versuche > 1 ? `, ${zeile.versuche} Versuche` : ''}.`}
             {zeile.bearbeitet_von && ` Bearbeitet von ${zeile.bearbeitet_von} am ${zeitpunkt(zeile.bearbeitet_am)}.`}
           </p>
+          {arbeitet === 'ki' && (
+            <p className="klein muted" role="status" data-testid="ki-arbeitet">
+              Die KI formuliert die Agenda. Das kann bis zu einer Minute dauern.
+            </p>
+          )}
 
           {rueckfrage ? (
-            <div className="stack-s" role="group" aria-label="Neu erzeugen?">
+            <div className="stack-s" role="group" aria-label={rueckfrage === 'ki' ? 'Neu formulieren?' : 'Neu erzeugen?'}>
               <p className="hinweis hinweis--fehler">
                 <Icon name="achtung" groesse={18} />
                 <span>
-                  {frei ? 'Diese Agenda ist freigegeben' : 'Diese Agenda wurde bearbeitet'}. Neu erzeugen ersetzt sie durch einen frischen Entwurf aus den aktuellen Daten.
+                  {frei ? 'Diese Agenda ist freigegeben' : 'Diese Agenda wurde bearbeitet'}.{' '}
+                  {rueckfrage === 'ki'
+                    ? 'Neu formulieren lässt die KI die Agenda neu schreiben und ersetzt sie durch einen frischen Entwurf.'
+                    : 'Neu erzeugen ersetzt sie durch einen frischen Entwurf aus den aktuellen Daten.'}
                 </span>
               </p>
               <div className="aktionen">
-                <button type="button" className="btn" disabled={arbeitet} onClick={onNeu}>
-                  Ja, neu erzeugen
+                <button type="button" className="btn" disabled={arbeitet !== null} onClick={rueckfrage === 'ki' ? onNeuKi : onNeu}>
+                  {rueckfrage === 'ki' ? 'Ja, neu formulieren' : 'Ja, neu erzeugen'}
                 </button>
-                <button type="button" className="btn btn--ghost" onClick={() => onRueckfrage(false)}>
+                <button type="button" className="btn btn--ghost" onClick={() => onRueckfrage(null)}>
                   Abbrechen
                 </button>
               </div>
             </div>
           ) : (
             <div className="aktionen">
-              <button type="button" className="btn btn--ghost" disabled={arbeitet} onClick={() => setBearbeiten(true)}>
+              <button type="button" className="btn btn--ghost" disabled={arbeitet !== null} onClick={() => setBearbeiten(true)}>
                 Bearbeiten
               </button>
               {frei ? (
-                <button type="button" className="btn btn--ghost" disabled={arbeitet} onClick={() => onFrei(false)}>
+                <button type="button" className="btn btn--ghost" disabled={arbeitet !== null} onClick={() => onFrei(false)}>
                   Freigabe zurücknehmen
                 </button>
               ) : (
-                <button type="button" className="btn" disabled={arbeitet} onClick={() => onFrei(true)}>
+                <button type="button" className="btn" disabled={arbeitet !== null} onClick={() => onFrei(true)}>
                   Freigeben
                 </button>
               )}
-              <button type="button" className="btn btn--ghost" disabled={arbeitet} onClick={() => (frei || zeile.bearbeitet ? onRueckfrage(true) : onNeu())}>
+              <button type="button" className="btn btn--ghost" disabled={arbeitet !== null} onClick={() => (frei || zeile.bearbeitet ? onRueckfrage('vorlage') : onNeu())}>
                 Neu erzeugen
               </button>
+              {ki && (
+                <button type="button" className="btn btn--ghost" disabled={arbeitet !== null} onClick={() => (frei || zeile.bearbeitet ? onRueckfrage('ki') : onNeuKi())}>
+                  {arbeitet === 'ki' ? 'Die KI formuliert …' : 'Neu mit KI formulieren'}
+                </button>
+              )}
             </div>
           )}
         </>
@@ -218,7 +279,7 @@ function Editor({
   zeile, arbeitet, onAbbrechen, onSpeichern,
 }: {
   zeile: AgendaZeile
-  arbeitet: boolean
+  arbeitet: 'vorlage' | 'ki' | null
   onAbbrechen: () => void
   onSpeichern: (daten: AgendaDaten) => void
 }) {
@@ -299,7 +360,7 @@ function Editor({
         </div>
       )}
       <div className="aktionen">
-        <button type="button" className="btn" disabled={arbeitet} onClick={speichern}>
+        <button type="button" className="btn" disabled={arbeitet !== null} onClick={speichern}>
           {arbeitet ? 'Wird gespeichert …' : 'Speichern'}
         </button>
         <button type="button" className="btn btn--ghost" onClick={onAbbrechen}>

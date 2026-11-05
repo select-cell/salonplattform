@@ -318,6 +318,16 @@ export async function bearbeiteAgenda(monat: string, agenda: AgendaDaten): Promi
   return data as AgendaZeile
 }
 
+/**
+ * Lässt die KI die Agenda formulieren (Edge Function `analyse-erstellen`, aufgabe = agenda; nur Admin).
+ * Die Datenbank prüft Aufbau, Zeitbudget und jede Zahl. Die Vorlage (`erzeugeAgenda`) bleibt daneben bestehen.
+ */
+export async function erstelleAgendaMitKi(monat: string, neu = false): Promise<{ uebersprungen: boolean; versuche: number; agenda: AgendaZeile }> {
+  const r = (await rufeKi({ aufgabe: 'agenda', monat, neu })) as { uebersprungen?: boolean; versuche?: number; analyse?: AgendaZeile }
+  if (!r.analyse) throw new Error('Die Agenda konnte nicht erstellt werden.')
+  return { uebersprungen: !!r.uebersprungen, versuche: r.versuche ?? 0, agenda: r.analyse }
+}
+
 export async function gibAgendaFrei(monat: string, frei = true): Promise<AgendaZeile> {
   const { data, error } = await supabase.rpc('agenda_freigeben', { p_monat: `${monat}-01`, p_freigeben: frei })
   if (error) throw new Error(error.message)
