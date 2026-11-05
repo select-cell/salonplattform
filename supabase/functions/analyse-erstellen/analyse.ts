@@ -12,7 +12,7 @@
 // hat keinen service_role-Schlüssel: Sie ruft die Funktionen im Namen der angemeldeten Person auf (nur Admin,
 // solange salons.ki_nur_admin an ist; das prüft die Datenbank).
 //
-// Mit AI_PROVIDER=webhook geht alles an EINEN Webhook (n8n). Dort entscheidet das Feld `aufgabe`, welcher Strang
+// Standardmäßig (ohne AI_PROVIDER) geht alles an EINEN Webhook (n8n, Adresse fest im Code: STANDARD_WEBHOOK_URL). Dort entscheidet das Feld `aufgabe`, welcher Strang
 // die Anfrage bearbeitet; die Antwort geht direkt als Antwort des Webhooks zurück an diese Function, die sie prüfen
 // und speichern lässt.
 
@@ -284,16 +284,26 @@ export interface AnbieterConfig {
 export const NICHT_EINGERICHTET = 'Die KI ist noch nicht eingerichtet.'
 const STANDARD_MODELL = 'claude-sonnet-5-5'
 
-/** Liest die Secrets. Ohne Einrichtung: 503 „Die KI ist noch nicht eingerichtet.“ */
+/**
+ * Der n8n-Webhook, an den alle KI-Aufgaben gehen (Production URL, Strang je nach Feld `aufgabe`). Die Adresse ist kein Geheimnis,
+ * deshalb steht sie hier im Code und nicht in den Secrets. Gilt, solange AI_WEBHOOK_URL nicht gesetzt ist.
+ */
+export const STANDARD_WEBHOOK_URL = 'https://tobitest2008.app.n8n.cloud/webhook/dawiid-ki'
+
+/**
+ * Liest die Einstellungen. Ohne jede Einstellung geht alles an den n8n-Webhook oben (der Standard); „claude“ ruft die Anthropic-API
+ * direkt (braucht ANTHROPIC_API_KEY). Das Geheimnis AI_WEBHOOK_SECRET gehört nicht in den Code: Es ist optional und kommt aus den Secrets.
+ * Ungültig (kein https, Claude ohne Schlüssel, unbekannter Anbieter): 503 „Die KI ist noch nicht eingerichtet.“
+ */
 export function anbieterAusUmgebung(env: Record<string, string | undefined>): AnbieterConfig {
-  const name = (env.AI_PROVIDER ?? '').trim().toLowerCase()
+  const name = (env.AI_PROVIDER ?? '').trim().toLowerCase() || 'webhook'
   if (name === 'claude') {
     const schluessel = (env.ANTHROPIC_API_KEY ?? '').trim()
     if (!schluessel) throw new AnalyseFehler(NICHT_EINGERICHTET, 503)
     return { name: 'claude', modell: (env.ANTHROPIC_MODEL ?? '').trim() || STANDARD_MODELL, schluessel }
   }
   if (name === 'webhook') {
-    const url = (env.AI_WEBHOOK_URL ?? '').trim()
+    const url = (env.AI_WEBHOOK_URL ?? '').trim() || STANDARD_WEBHOOK_URL
     if (!/^https:\/\//i.test(url)) throw new AnalyseFehler(NICHT_EINGERICHTET, 503)
     return { name: 'webhook', modell: null, url, geheimnis: (env.AI_WEBHOOK_SECRET ?? '').trim() || undefined }
   }

@@ -51,11 +51,12 @@ Eingabe holen → gleiche Eingabe **und** Prompt-Version wie gespeichert = **kei
 
 | Secret | Bedeutung |
 |---|---|
-| `AI_PROVIDER` | `claude` oder `webhook` |
-| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | bei `claude` (Modell optional) |
-| `AI_WEBHOOK_URL`, `AI_WEBHOOK_SECRET` | bei `webhook`: die Production URL des n8n-Webhooks (https; Secret optional, kommt als `Authorization: Bearer` und `x-webhook-secret`) |
+| `AI_WEBHOOK_SECRET` | das Geheimnis des n8n-Webhooks (optional; kommt als `Authorization: Bearer` und `x-webhook-secret`) |
+| `AI_PROVIDER` | optional; Standard ist `webhook`, `claude` ruft die Anthropic-API direkt |
+| `AI_WEBHOOK_URL` | optional; Standard ist die feste Adresse im Code (`STANDARD_WEBHOOK_URL`: `https://tobitest2008.app.n8n.cloud/webhook/dawiid-ki`), eine gesetzte Adresse hat Vorrang (https) |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | nur bei `claude` (Modell optional) |
 
-Ohne Einrichtung meldet die Seite „Die KI ist noch nicht eingerichtet.“; alles andere läuft. Der Prompt liegt versioniert im Repo (`PROMPT_VERSION` in `analyse.ts`). Wer ihn ändert, erhöht die Version; dann gilt die Eingabe als neu. Die Branche („Friseursalon“) steht im ersten Satz von `SYSTEM_PROMPT`.
+Die Adresse des Webhooks ist kein Geheimnis und steht im Code; ohne weitere Einstellung gehen alle KI-Aufgaben an diesen Webhook. Die Seite meldet „Die KI ist noch nicht eingerichtet.“ nur bei `claude` ohne Schlüssel, bei einer Adresse ohne `https` oder bei einem unbekannten Anbieter; alles andere läuft. Der Prompt liegt versioniert im Repo (`PROMPT_VERSION` in `analyse.ts`). Wer ihn ändert, erhöht die Version; dann gilt die Eingabe als neu. Die Branche („Friseursalon“) steht im ersten Satz von `SYSTEM_PROMPT`.
 
 **Ein Webhook für alles:** Mit `AI_PROVIDER=webhook` geht jede KI-Anfrage an den **einen** Webhook. Anfrage: `{ aufgabe, prompt_version, auftraege: [{ ref, system, nachricht, eingabe }] }` mit `aufgabe` = `einzelanalyse` (auch für den Sammellauf mit mehreren Aufträgen), `gesamtauswertung` oder `agenda`. Antwort **direkt als Antwort des Webhooks**: `{ ergebnisse: [{ ref, code, ausgabe | fehler }] }`, die `ausgabe` ein JSON-Objekt mit den Schlüsseln des jeweiligen Prompts (Einzelanalyse: `zusammenfassung`, `staerken`, `entwicklungsfelder`, `gespraechsfragen`, `vereinbarungen_vorschlaege`, `kommentar_qualitaet_hinweis`; Gesamtauswertung: dieselben, statt des letzten `datenlage_hinweis`). `ref` ist eine laufende Nummer, nie eine Kennung aus der Datenbank. n8n schreibt nichts in die Datenbank: Die Edge Function lässt jede Antwort von der Datenbank prüfen und speichern.
 

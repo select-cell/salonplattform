@@ -28,7 +28,7 @@ Die Reihenfolge war A, B, D, C, E, F (D vor C, damit der Monatsbericht die Komme
 ## Was in der Produktion schon installiert ist
 
 - Alle Migrationen oben, die Funktionen sind mit der getesteten Fassung verglichen.
-- Edge Function `analyse-erstellen` (JWT-Prüfung an, ohne KI-Secrets meldet sie „Die KI ist noch nicht eingerichtet.“).
+- Edge Function `analyse-erstellen` (JWT-Prüfung an; der n8n-Webhook steht fest im Code, ohne weitere Einstellung gehen alle KI-Aufgaben dorthin).
 - Edge Function `agenda-versand` (JWT-Prüfung **aus**, weil der Zeitplan keinen JWT hat). Ohne Secrets antwortet sie auf jeden Aufruf mit `503` und fasst die Datenbank nicht an; mit einem falschen `x-cron-secret` gibt es `401`. Es geht also keine Mail raus, bevor ihr Secrets setzt, Termine anlegt und den Zeitplan einschaltet.
 - Alle neuen Tabellen sind für alle Anmeldungen gesperrt, die Versandfunktionen nur für `service_role` aufrufbar.
 
@@ -37,7 +37,7 @@ Die Reihenfolge war A, B, D, C, E, F (D vor C, damit der Monatsbericht die Komme
 1. **Neue Oberfläche veröffentlichen.** `npm run build` mit der echten `.env` (oder die gebaute ZIP-Datei), `dist` auf Netlify hochladen. Auf den ersten Blick prüfen: Anmeldung, Umfrage ausfüllen (am Ende steht die eigene aktive Zeit).
 2. **Alte Abgabe-Funktion sperren:** `supabase/nach_dem_deploy.sql` im SQL-Editor ausführen. Erst wenn die neue Oberfläche online ist und eine Abgabe geklappt hat, sonst bricht die noch laufende alte Oberfläche beim Abgeben ab.
 3. **E-Mail-Vorlagen** aus `supabase/email-vorlagen/` im Supabase-Dashboard einfügen (Magic Link und Einladung), damit die Mails „DAWIID“ sagen.
-4. **KI einrichten** (für Einzelanalyse, Sammellauf und Gesamtauswertung; zurzeit nur für den Admin, Version 1.3), Supabase → Edge Functions → Secrets: `AI_PROVIDER` (`claude` oder `webhook`) und bei `claude` `ANTHROPIC_API_KEY` (optional `ANTHROPIC_MODEL`), bei `webhook` `AI_WEBHOOK_URL` und `AI_WEBHOOK_SECRET`. Für `webhook` liegt ein fertiger n8n-Workflow in `n8n/` (ein Webhook, ein Strang je Aufgabe, je ein KI-Agent; Anleitung: [n8n/README.md](../n8n/README.md)). Ohne diese Secrets läuft alles andere trotzdem.
+4. **KI einrichten** (für Einzelanalyse, Sammellauf und Gesamtauswertung; zurzeit nur für den Admin, Version 1.3), Der n8n-Webhook (`https://tobitest2008.app.n8n.cloud/webhook/dawiid-ki`) steht fest im Code (`STANDARD_WEBHOOK_URL`), dafür ist kein Secret nötig. In Supabase → Edge Functions → Secrets gehört nur das Geheimnis `AI_WEBHOOK_SECRET` (dasselbe wie in n8n); optional `AI_WEBHOOK_URL` (überschreibt die Adresse), `AI_PROVIDER=claude` mit `ANTHROPIC_API_KEY` (optional `ANTHROPIC_MODEL`) für die direkte Anthropic-API. Für `webhook` liegt ein fertiger n8n-Workflow in `n8n/` (ein Webhook, ein Strang je Aufgabe, je ein KI-Agent; Anleitung: [n8n/README.md](../n8n/README.md)). Ohne das Geheimnis lehnt n8n die Anfragen ab (Meldung „Der KI-Zugang wurde abgelehnt“), alles andere läuft trotzdem.
 5. **Mailversand einrichten** (für Agenda und Erinnerung):
    - Bei Resend ein Konto anlegen, die Absender-Domain bestätigen, einen API-Schlüssel erzeugen.
    - Secrets setzen: `RESEND_API_KEY`, `MAIL_ABSENDER` (zum Beispiel `Salon <agenda@deine-domain.de>`), `PLATTFORM_URL` (Adresse der Plattform), `CRON_SECRET` (selbst ausgedacht, mindestens 24 Zeichen).

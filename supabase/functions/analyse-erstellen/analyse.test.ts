@@ -4,7 +4,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   AUFGABE_AGENDA, AUFGABE_EINZEL, AUFGABE_GESAMT, AnalyseFehler, MAX_AUFRUFE, NICHT_EINGERICHTET, PAKET_GROESSE, PROMPT_VERSION, PROMPT_VERSION_AGENDA, PROMPT_VERSION_GESAMT,
-  SYSTEM_PROMPT, SYSTEM_PROMPT_AGENDA, SYSTEM_PROMPT_GESAMT, ZEITBUDGET_MS, anbieterAusUmgebung, arbeiteZiele, baueNachricht, behandleAnfrage,
+  STANDARD_WEBHOOK_URL, SYSTEM_PROMPT, SYSTEM_PROMPT_AGENDA, SYSTEM_PROMPT_GESAMT, ZEITBUDGET_MS, anbieterAusUmgebung, arbeiteZiele, baueNachricht, behandleAnfrage,
   erstelleAgenda, erstelleAlle, erstelleAnalyse, erstelleGesamt, parseAgendaAusgabe, parseAusgabe, parseGesamtAusgabe, rufeAnbieter, rufeAnbieterBatch,
   textAusAusgabe, textAusGesamt,
   type Abhaengigkeiten, type AnbieterConfig, type Auftrag, type KiAntwort, type RpcAntwort, type Ziel,
@@ -153,13 +153,23 @@ test('Prompt: Version, Regeln und kein Name', () => {
 test('anbieterAusUmgebung: ohne Einrichtung 503 „noch nicht eingerichtet“', () => {
   const fehlt = (env: Record<string, string | undefined>) =>
     assert.throws(() => anbieterAusUmgebung(env), (e: unknown) => e instanceof AnalyseFehler && e.status === 503 && e.message === NICHT_EINGERICHTET)
-  fehlt({})
-  fehlt({ AI_PROVIDER: '' })
   fehlt({ AI_PROVIDER: 'claude' })
   fehlt({ AI_PROVIDER: 'claude', ANTHROPIC_API_KEY: '   ' })
-  fehlt({ AI_PROVIDER: 'webhook' })
   fehlt({ AI_PROVIDER: 'webhook', AI_WEBHOOK_URL: 'http://unsicher.example/hook' })
   fehlt({ AI_PROVIDER: 'etwas-anderes', ANTHROPIC_API_KEY: 'x' })
+})
+
+test('anbieterAusUmgebung: ohne Einstellungen geht alles an den n8n-Webhook im Code', () => {
+  assert.equal(STANDARD_WEBHOOK_URL, 'https://tobitest2008.app.n8n.cloud/webhook/dawiid-ki')
+  for (const env of [{}, { AI_PROVIDER: '' }, { AI_PROVIDER: 'webhook' }, { AI_WEBHOOK_URL: '   ' }]) {
+    const w = anbieterAusUmgebung(env)
+    assert.deepEqual([w.name, w.url, w.geheimnis, w.modell], ['webhook', STANDARD_WEBHOOK_URL, undefined, null])
+  }
+  // das Geheimnis kommt weiter aus den Secrets (nie aus dem Code); eine gesetzte Adresse hat Vorrang
+  assert.equal(anbieterAusUmgebung({ AI_WEBHOOK_SECRET: ' s ' }).geheimnis, 's')
+  assert.equal(anbieterAusUmgebung({ AI_WEBHOOK_URL: 'https://anders.example/hook' }).url, 'https://anders.example/hook')
+  // ein gesetzter Anbieter „claude“ schaltet den Standard ab
+  assert.equal(anbieterAusUmgebung({ AI_PROVIDER: 'claude', ANTHROPIC_API_KEY: 'k' }).name, 'claude')
 })
 
 test('anbieterAusUmgebung: claude und webhook', () => {
@@ -749,7 +759,7 @@ test('HTTP: Fehler der Datenbank und der KI kommen als deutsche Meldung mit Stat
   assert.equal(r.status, 422)
   assert.deepEqual(await r.json(), { ok: false, fehler: 'Der Monat ist noch nicht abgeschlossen.' })
 
-  const ohneKi = await behandleAnfrage(anfrage({ person_id: PERSON, monat: '2026-09' }), { ...ENV, AI_PROVIDER: '' }, async (url) =>
+  const ohneKi = await behandleAnfrage(anfrage({ person_id: PERSON, monat: '2026-09' }), { ...ENV, ANTHROPIC_API_KEY: '' }, async (url) =>
     new Response(JSON.stringify(url.endsWith('analyse_eingabe') ? { eingabe: EINGABE, hash: 'h1' } : null), { status: 200 }))
   assert.equal(ohneKi.status, 503)
   assert.deepEqual(await ohneKi.json(), { ok: false, fehler: NICHT_EINGERICHTET })

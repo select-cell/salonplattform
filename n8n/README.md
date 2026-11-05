@@ -73,13 +73,15 @@ Die Einzelfälle: **anna** hat alle Daten, **berta** keinen Vormonat und keine e
 
    Die Zugangsdaten stehen bewusst nicht in der Datei.
 3. **Einzeln testen** (siehe unten), dann den Workflow **aktivieren**.
-4. In Supabase unter Edge Functions → Secrets setzen:
+4. **Die Adresse des Webhooks steht fest im Code** (`STANDARD_WEBHOOK_URL` in `supabase/functions/analyse-erstellen/analyse.ts`): `https://tobitest2008.app.n8n.cloud/webhook/dawiid-ki`. Dafür braucht es kein Secret und keinen Eintrag in Supabase. Ändert sich die Adresse, ändert man diese eine Zeile (oder setzt in Supabase optional `AI_WEBHOOK_URL`, das hat Vorrang).
+
+   Nur das **Geheimnis** gehört nicht in den Code, weil es im Repository sichtbar würde. Es ist der einzige Wert in Supabase (Edge Functions → Secrets):
 
    | Secret | Wert |
    |---|---|
-   | `AI_PROVIDER` | `webhook` |
-   | `AI_WEBHOOK_URL` | die **Production URL** des Knotens Webhook (`…/webhook/dawiid-ki`, nicht `webhook-test`), muss `https` sein |
-   | `AI_WEBHOOK_SECRET` | dasselbe Geheimnis wie in n8n |
+   | `AI_WEBHOOK_SECRET` | dasselbe Geheimnis wie in n8n (Header Auth) |
+
+   Ohne dieses Secret schickt die Plattform keinen Schlüssel mit; n8n lehnt die Anfrage dann ab („Der KI-Zugang wurde abgelehnt“). Soll der Webhook bewusst ohne Schlüssel laufen (nur zum Testen), im Knoten Webhook die Authentifizierung auf *None* stellen. Dann kann jeder, der die Adresse kennt, den Workflow auslösen und deine Anthropic-Kosten verursachen. Für den Betrieb also nicht empfohlen.
 
 5. In der Plattform als **Admin**: Leitung → Monatsabschluss → Monat abschließen → „Alle fehlenden erstellen“ (Sammellauf), je Person „Erstellen“ oder bei der Gesamtauswertung „Erstellen“. Die Agenda: Leitung → Agenda → „Mit KI formulieren“.
 
