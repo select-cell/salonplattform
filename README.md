@@ -1,6 +1,6 @@
 # Dawiid · Team-Plattform
 
-Web-Plattform für den Salon: Mitarbeiterinnen füllen monatlich die Verhaltens-Umfrage aus und sehen ihre Ergebnisse. Der Verantwortliche sieht alles im Detail. Der Admin pflegt Zugänge in Supabase.
+Web-Plattform für den Salon: Mitarbeiter füllen monatlich die Verhaltens-Umfrage aus und sehen ihre Ergebnisse. Der Verantwortliche sieht alles im Detail. Der Admin pflegt Zugänge in Supabase.
 
 Die vollständige Bauanleitung steht in [`docs/plattform-architektur.md`](docs/plattform-architektur.md).
 
@@ -16,6 +16,14 @@ Die vollständige Bauanleitung steht in [`docs/plattform-architektur.md`](docs/p
 | 4 | Abgabe-Status und Reminder-Popup | **fertig, in Supabase installiert** |
 | 5 | Chef-, Gäste- und Verantwortlichen-Umfrage | offen: die Fragen fehlen noch (Seiten sind als „Kommt bald“ vorbereitet) |
 | 6 | Jarvis | offen: braucht die n8n-Webhook-URL (Seite ist als „Kommt bald“ vorbereitet) |
+| 1.2 A | Marke (Logo hell/dunkel, Schriften), Seite „Info und Datenschutz“ | **fertig** |
+| 1.2 B | Zeiterfassung der Umfrage ([`docs/zeiterfassung.md`](docs/zeiterfassung.md)) | **fertig, in Supabase installiert** |
+| 1.2 C | PDF-Export, Monats- und Personenbericht ([`docs/pdf-export.md`](docs/pdf-export.md)) | **fertig, in Supabase installiert** |
+| 1.2 D | Kommentar-Auswertung ([`docs/kommentar-auswertung.md`](docs/kommentar-auswertung.md)) | **fertig, in Supabase installiert** |
+| 1.2 E | Monatsabschluss und KI-Einzelanalyse mit Faktencheck ([`docs/einzelanalyse.md`](docs/einzelanalyse.md)) | **fertig, in Supabase installiert**; die KI braucht noch Secrets |
+| 1.2 F | Fokus, Agenda, Termine, Mailversand ([`docs/agenda-termine.md`](docs/agenda-termine.md)) | **fertig, in Supabase installiert**; der Versand braucht noch Secrets, Resend und den Zeitplan |
+
+Was bei Version 1.2 noch zu tun ist (Secrets, Versand, Deploy-Reihenfolge), steht in [`docs/version-1.2-umsetzung.md`](docs/version-1.2-umsetzung.md).
 
 ### Was in der Umfrage noch fehlt
 
@@ -34,13 +42,22 @@ Das Nachtragen geht ohne Code, siehe „Inhalte der Umfrage pflegen“. Außerde
 ```
 src/                  React-App (pages, components, auth, lib, styles)
   components/umfrage/ Ablauf der Monatsumfrage (Schritte, Video-Pflicht, Notenskala)
+  components/auswertung/ Diagramme, Tabellen, PDF-Knopf, Zeit-Abschnitt
+  pages/app/leitung/  Leitung: Kommentare, Monatsabschluss, Fokus, Agenda, Termine (nur Admin)
+  pdf/                PDF-Berichte (react-pdf, wird erst beim Klick geladen)
+  config/brand.ts     Name, Slug, Logo und Farben der Marke an EINER Stelle
   lib/umfrage.ts      Ablauf, Prüfungen und Payload der Umfrage (ohne Oberfläche)
 supabase/
   migrations/         SQL-Migrationen, werden von der GitHub-Integration angewendet
-  tests/database/     pgTAP-Tests für Rechte und Verknüpfung (supabase test db)
+  functions/          Edge Functions: analyse-erstellen (KI), agenda-versand (Mails), je mit Tests
+  tests/database/     pgTAP-Tests (supabase test db)
+  tests/lokal/        dieselben Tests gegen ein lokales Postgres (npm run test:db)
+  versand_einrichten.sql   Zeitplan für die Mails (von Hand, enthält ein Geheimnis)
+  nach_dem_deploy.sql      alte Abgabe-Funktion sperren (von Hand, nach dem Deploy)
   email-vorlagen/     Magic-Link- und Einladungs-Mail auf Deutsch
   config.toml         Supabase-CLI
-docs/                 Architektur-Dokument
+tests/browser/        Playwright-Tests je Erweiterung (npm run test:browser)
+docs/                 Architektur, Version 1.2 und je ein Dokument je Erweiterung
 public/_redirects     SPA-Routing für Netlify
 netlify.toml          Build-Einstellungen und Sicherheits-Header
 ```
@@ -62,7 +79,7 @@ In die `.env` gehört **nur** der öffentliche anon-/publishable-Key. Den `servi
 
 ### 1. Tabellen (bereits installiert)
 
-Alle Migrationen aus `supabase/migrations/` sind am 3. Oktober 2026 im Projekt `hgtvlcucxzksvmvgvbgo` angewendet und dort unter denselben Versionsnummern verbucht wie die Dateinamen:
+Alle Migrationen aus `supabase/migrations/` sind im Projekt `hgtvlcucxzksvmvgvbgo` angewendet und dort unter denselben Versionsnummern verbucht wie die Dateinamen:
 
 | Migration | Inhalt |
 |---|---|
@@ -75,11 +92,17 @@ Alle Migrationen aus `supabase/migrations/` sind am 3. Oktober 2026 im Projekt `
 | `…_seed_dawiid_kriterien` | 100 Bewertungsstufen (5 je Verhalten) aus der bisherigen Umfrage |
 | `…_rituale_deaktivieren` | Rituale ausblenden (umkehrbar) |
 | `…_umfrage_entwicklung_pflicht` | Entwicklung des Monats mit Begründung ist Pflicht |
-| `…_ergebnisse_selbstbild_team` | Selbstbild-Kommentare in den Auswertungen, `team_dashboard` auch für Mitarbeiterinnen |
-| `…_mitarbeiterin_ohne_fremdkommentare` | Mitarbeiterinnen sehen keine Fremdbild-Kommentare |
+| `…_ergebnisse_selbstbild_team` | Selbstbild-Kommentare in den Auswertungen, `team_dashboard` auch für Mitarbeiter |
+| `…_mitarbeiterin_ohne_fremdkommentare` | Mitarbeiter sehen keine Fremdbild-Kommentare |
 | `…_stufennamen_verhalten_1` | Einheitliche Stufennamen (Bewusstsein … High Performer) |
 | `…_auswertungen` | `meine_ergebnisse`, `team_ergebnisse`, `person_ergebnisse`, `team_dashboard` |
 | `…_abgabe_status_reminder` | `abgabe_status`, `ueberfaellige_abgaben` (Reminder ab dem 4. Tag nach Fristende) |
+| `…_texte_kollegen` | Texte in der Datenbank: „Kollegen“ und „Teilnehmer“ statt der weiblichen Formen |
+| `…_zeiterfassung` | Version 1.2 B: Sitzungen, Herzschlag, `umfrage_einreichen_v3`, `zeit_auswertung` |
+| `…_kommentar_auswertung` | Version 1.2 D: `kommentar_auswertung`, Schalter `eigene_analyse_nur_admin` |
+| `…_pdf_export` | Version 1.2 C: `pdf_monatsbericht`, `pdf_personenbericht`, Export-Protokoll |
+| `…_monatsabschluss_analysen` | Version 1.2 E: Abschluss, Analysen, Faktencheck, Namen aus der KI-Eingabe entfernen |
+| `…_fokus_agenda_termine` | Version 1.2 F: Fokus, Agenda, Termine, Versandfunktionen (nur `service_role`) |
 
 Die Dateinamen entsprechen den verbuchten Versionen. Das ist wichtig: Die GitHub-Integration (Supabase → **Project Settings → Integrations → GitHub**, Supabase directory `supabase`, **Deploy to production**) vergleicht Versionen und führt nur neue Dateien aus. Würden Datei und Datenbank abweichen, liefe dieselbe Migration ein zweites Mal und scheiterte an „already exists“.
 
@@ -99,7 +122,7 @@ Supabase → **Authentication**:
 
 ### 3. Eigener E-Mail-Versand (nur für den Login per E-Mail-Link)
 
-Der eingebaute Supabase-Versand stellt nur an Mitglieder des Supabase-Teams zu und ist auf etwa 2 Mails pro Stunde begrenzt. Ohne eigenen Versand kommen die Magic Links bei den Mitarbeiterinnen nicht an.
+Der eingebaute Supabase-Versand stellt nur an Mitglieder des Supabase-Teams zu und ist auf etwa 2 Mails pro Stunde begrenzt. Ohne eigenen Versand kommen die Magic Links bei den Mitarbeitern nicht an.
 
 1. Konto bei [Resend](https://resend.com) anlegen (kostenloser Tarif reicht) und die Absender-Domain verifizieren.
 2. Supabase → **Authentication → Emails → SMTP Settings**: Custom SMTP aktivieren und die Resend-Zugangsdaten eintragen.
@@ -112,7 +135,7 @@ Für jede Person zwei Schritte, die Reihenfolge ist egal. Ein Trigger verknüpft
 **a) Person eintragen** (SQL-Editor oder Table Editor, Tabelle `personen`):
 
 ```sql
--- Mitarbeiterin, nimmt an der Teamumfrage teil
+-- Mitarbeiter, nimmt an der Teamumfrage teil
 insert into public.personen (salon_id, name, email, rolle, nimmt_an_teamumfrage)
 select id, 'Oksana Serafyn', 'oksana@beispiel.de', 'mitarbeiter', true
 from public.salons where name = 'Dawiid';
@@ -173,7 +196,7 @@ Danach ist nur noch `umfrage_einreichen_v2` (nur eingeloggt) erreichbar. Der Tes
 
 ### Wer sieht was in den Auswertungen?
 
-- **Mitarbeiterin:** eigenes Selbstbild und Fremdbild, Kommentare der Kollegen **ohne Absender**, das Team nur als Durchschnitt.
+- **Mitarbeiter:** eigenes Selbstbild und Fremdbild, Kommentare der Kollegen **ohne Absender**, das Team nur als Durchschnitt.
 - **Verantwortlicher und Admin:** Rangliste, Heatmap, jede Person im Detail, Einzelbewertungen **mit Absender**, Abgabe-Status und das Reminder-Popup.
 - Alle Kennzahlen werden in der Datenbank gerechnet (Selbstbild = eigene Note, Fremdbild = Schnitt der Kollegen, Differenz = Selbstbild − Fremdbild). Die Schwellen (0,3 / 2,5 / 3,5) stehen in der Tabelle `salons`.
 
@@ -189,11 +212,15 @@ Die Rechte stecken in Row Level Security und Datenbank-Funktionen. Die Routen-Sp
 
 ## Tests
 
-Die Datenbank ist mit pgTAP getestet (151 Tests): Verknüpfung von Login und Person, Constraints, wer was lesen darf, und die komplette Monatsumfrage (Monate, Fristen, Abgabe, alle Ablehnungsfälle, Nachtragen der Altdaten), die Auswertungen (inklusive Abgleich mit den Views und Anonymität der Kommentare) und der Reminder:
+| Was | Befehl | Umfang |
+|---|---|---|
+| Datenbank (pgTAP) | `supabase start && supabase test db`, lokal ohne Docker `npm run test:db` | 694 Prüfungen: Rechte, Verknüpfung, Umfrage, Auswertungen, Zeiterfassung, Kommentare, PDF, Analyse (Namen aus der Eingabe, Faktencheck), Agenda, Termine, Versand über die Zeitumstellung |
+| Edge Functions | `npm run test:functions` | 46 Tests der Logik (KI-Ablauf, Versand), Datenbank und Anbieter sind nachgebaut |
+| Hilfen im Frontend | `npm run test:unit` | 5 Tests (Zahlenlisten, Zeitbudget, Mail-Zustände) |
+| Browser (Playwright) | `npm run test:browser` | 280 Prüfungen je Erweiterung, auch mit echt erzeugten PDFs (poppler: A4, Schriften eingebettet, Fußzeile) |
+| Typen | `npm run typecheck` | |
 
-```bash
-supabase start && supabase test db
-```
+Das Supabase-Werkzeug im Browser-Test wird nachgebaut (es spricht nie mit der echten Datenbank). **Nicht live getestet**, weil dafür Schlüssel oder Netzzugang fehlten: die echte KI, der echte Versand über Resend und der Zeitplan (pg_cron). Das sind die ersten Punkte nach der Einrichtung.
 
 ## Deploy (Netlify)
 
