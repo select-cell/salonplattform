@@ -41,6 +41,8 @@ Ohne Einrichtung meldet die Seite „Die KI ist noch nicht eingerichtet.“; all
 
 **Webhook-Format:** POST mit `{ prompt_version, system, nachricht, eingabe }`; Antwort ein JSON-Objekt mit den sechs Schlüsseln (`zusammenfassung`, `staerken`, `entwicklungsfelder`, `gespraechsfragen`, `vereinbarungen_vorschlaege`, `kommentar_qualitaet_hinweis`), direkt oder unter `ausgabe`, `output`, `text` oder `antwort`.
 
+**Fertiger n8n-Workflow:** `n8n/dawiid-analyse.workflow.json` (Import, Einrichtung, drei Testanfragen und Anleitung zum Einzeltest in [n8n/README.md](../n8n/README.md)). Er ruft Claude auf, liest das JSON und zeigt schon beim Testen, welche Zahlen nicht in den Daten stehen.
+
 ## Datenschutz
 
 Feedbacktexte gehen **ohne Namen und ohne Absender** an den KI-Anbieter. Der Hinweis steht auf „Monatsabschluss“ und auf „Info und Datenschutz“. Mitarbeiter bekommen keine Analysen (`42501`). Ist `eigene_analyse_nur_admin` an, sehen Verantwortliche ihre eigene Analyse nicht.

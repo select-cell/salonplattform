@@ -1,0 +1,429 @@
+{
+  "name": "DAWIID Einzelanalyse (Claude)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## DAWIID: Einzelanalyse\nAntwortet auf die Anfrage der Edge Function **analyse-erstellen** (Plattform → n8n → Claude → Plattform).\n\n### Einrichten\n1. Zwei Zugangsdaten anlegen (Typ **Header Auth**):\n   - **DAWIID Webhook-Geheimnis**: Name `x-webhook-secret`, Wert = dein Geheimnis. Am Knoten **Webhook** auswählen.\n   - **Anthropic API Key**: Name `x-api-key`, Wert = dein Anthropic-Schlüssel. Am Knoten **Bei Claude anfragen** auswählen.\n2. Workflow **aktivieren** (Schalter oben rechts).\n3. In Supabase (Edge Functions → Secrets): `AI_PROVIDER` = `webhook`, `AI_WEBHOOK_URL` = die **Production URL** des Knotens Webhook (…/webhook/dawiid-analyse), `AI_WEBHOOK_SECRET` = dasselbe Geheimnis wie oben.\n\n### Einzeln testen\nDer Knoten **Webhook** enthält eine echte Beispielanfrage (angeheftet). Mit **Execute workflow** läuft alles bis Claude; jeden Knoten kannst du einzeln mit **Test step** wiederholen. Weitere Beispiele: Ordner `n8n/testanfragen` im Repo.",
+        "height": 600,
+        "width": 520,
+        "color": 4
+      },
+      "id": "d4a11d00-0000-4000-8000-000000000001",
+      "name": "Notiz Einrichten",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -620,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Was die Knoten tun\n- **Anfrage prüfen**: Felder da? Modell und Token-Grenze stehen oben im Code.\n- **Bei Claude anfragen**: schickt `system` und `nachricht` unverändert (der Prompt kommt aus der Plattform).\n- **Antwort lesen**: holt das JSON aus der Antwort und prüft Form und Anzahl der Punkte.\n- **Zahlencheck**: zeigt schon beim Testen, welche Zahlen nicht in den Daten stehen. Maßgeblich bleibt der Faktencheck der Datenbank.\n- Unter `meta` in der Antwort stehen die Hinweise. Die Plattform ignoriert sie.",
+        "height": 340,
+        "width": 520,
+        "color": 7
+      },
+      "id": "d4a11d00-0000-4000-8000-000000000002",
+      "name": "Notiz Knoten",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -620,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dawiid-analyse",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "d4a11d00-0000-4000-8000-000000000003",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "5b0f3c7e-9d1a-4c2e-8f3b-0d4a11d0a001"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Einstellungen (hier ändern)\nconst MODELL = 'claude-sonnet-5-5';\nconst MAX_TOKENS = 2000;\n// Nur zum Testen: Steht hier ein Text, ersetzt er den Prompt aus der Plattform. Maßgeblich bleibt der Prompt im Repo\n// (SYSTEM_PROMPT in supabase/functions/analyse-erstellen/analyse.ts). Danach wieder leer lassen.\nconst SYSTEM_UEBERSCHREIBEN = '';\n\nconst b = $input.first().json.body ?? {};\nconst fehler = [];\nif (typeof b.nachricht !== 'string' || !b.nachricht.trim()) fehler.push('nachricht fehlt');\nelse if (b.nachricht.length > 60000) fehler.push('nachricht ist zu lang');\nif (!SYSTEM_UEBERSCHREIBEN && (typeof b.system !== 'string' || !b.system.trim())) fehler.push('system fehlt');\nif (!b.eingabe || typeof b.eingabe !== 'object' || Array.isArray(b.eingabe)) fehler.push('eingabe fehlt');\n\nreturn [{\n  json: {\n    gueltig: fehler.length === 0,\n    fehler,\n    modell: MODELL,\n    max_tokens: MAX_TOKENS,\n    prompt_version: b.prompt_version ?? null,\n    system: SYSTEM_UEBERSCHREIBEN || b.system,\n    nachricht: b.nachricht,\n    eingabe: b.eingabe,\n  },\n}];\n"
+      },
+      "id": "d4a11d00-0000-4000-8000-000000000004",
+      "name": "Anfrage prüfen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4a11d00-0000-4000-8000-000000000005",
+              "leftValue": "={{ $json.gueltig }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4a11d00-0000-4000-8000-000000000006",
+      "name": "Gültig?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $json.modell, max_tokens: $json.max_tokens, system: $json.system, messages: [{ role: 'user', content: $json.nachricht }] }) }}",
+        "options": {
+          "timeout": 75000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "d4a11d00-0000-4000-8000-000000000007",
+      "name": "Bei Claude anfragen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        740,
+        -80
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Liest die Antwort von Anthropic und macht daraus die Antwort an die Plattform: { ausgabe, meta }.\nconst r = $input.first().json;\nconst anfrage = $('Anfrage prüfen').first().json;\nconst fertig = (code, body) => [{ json: { code, body } }];\n\n// Der Aufruf ist gescheitert (Zeitüberschreitung, keine Verbindung)\nif (r.error || r.statusCode === undefined) {\n  const detail = typeof r.error === 'string' ? r.error : (r.error?.message ?? 'Keine Verbindung zu Anthropic.');\n  return fertig(502, { fehler: 'Die KI ist nicht erreichbar.', detail });\n}\n\nconst status = Number(r.statusCode);\nconst k = r.body ?? {};\nconst detail = k?.error?.message ?? null;\nif (status === 429) return fertig(429, { fehler: 'Die KI ist gerade ausgelastet.', detail });\nif (status >= 400) return fertig(502, { fehler: 'Anthropic hat die Anfrage abgelehnt (Status ' + status + ').', detail });\n\nconst text = (k.content ?? []).filter((x) => x.type === 'text' && typeof x.text === 'string').map((x) => x.text).join('');\nif (!text.trim()) return fertig(502, { fehler: 'Anthropic hat keinen Text geliefert.', detail: k.stop_reason ?? null });\n\n// Wie die Edge Function: Code-Zaun entfernen, sonst das erste vollständige {...} suchen\nfunction ersteJsonStelle(t) {\n  const ohneZaun = t.replace(/```(?:json)?/gi, '');\n  try {\n    return JSON.parse(ohneZaun.trim());\n  } catch (e) {\n    // weiter\n  }\n  const start = ohneZaun.indexOf('{');\n  if (start < 0) throw new Error('kein JSON');\n  let tiefe = 0;\n  let inText = false;\n  let escape = false;\n  for (let i = start; i < ohneZaun.length; i++) {\n    const c = ohneZaun[i];\n    if (inText) {\n      if (escape) escape = false;\n      else if (c === '\\\\') escape = true;\n      else if (c === '\"') inText = false;\n    } else if (c === '\"') inText = true;\n    else if (c === '{') tiefe++;\n    else if (c === '}' && --tiefe === 0) return JSON.parse(ohneZaun.slice(start, i + 1));\n  }\n  throw new Error('JSON unvollständig');\n}\n\nconst hinweise = [];\nif (k.stop_reason === 'max_tokens') hinweise.push('Die Antwort wurde abgeschnitten (max_tokens). MAX_TOKENS in „Anfrage prüfen“ erhöhen.');\n\nlet ausgabe;\ntry {\n  ausgabe = ersteJsonStelle(text);\n} catch (e) {\n  // Die Plattform fragt dann selbst noch einmal nach (höchstens dreimal)\n  hinweise.push('Die Antwort ist kein gültiges JSON: ' + e.message);\n  ausgabe = text;\n}\n\n// Form prüfen (nur zur Orientierung; die Plattform prüft die Form beim Lesen selbst)\nif (typeof ausgabe === 'object' && ausgabe !== null && !Array.isArray(ausgabe)) {\n  if (typeof ausgabe.zusammenfassung !== 'string' || !ausgabe.zusammenfassung.trim()) hinweise.push('zusammenfassung fehlt');\n  const erwartet = { staerken: [2, 4], entwicklungsfelder: [2, 4], gespraechsfragen: [3, 4], vereinbarungen_vorschlaege: [2, 3] };\n  for (const [name, [min, max]] of Object.entries(erwartet)) {\n    const liste = ausgabe[name];\n    if (!Array.isArray(liste) || liste.length === 0) hinweise.push(name + ' fehlt oder ist leer');\n    else if (liste.length < min || liste.length > max) hinweise.push(name + ': ' + liste.length + ' Punkte (erwartet ' + min + ' bis ' + max + ')');\n  }\n  if (!('kommentar_qualitaet_hinweis' in ausgabe)) hinweise.push('kommentar_qualitaet_hinweis fehlt (wird als leer gewertet)');\n  if (/\\bKollege\\s+[A-Z]\\b/.test(JSON.stringify(ausgabe))) hinweise.push('Enthält eine Buchstaben-Bezeichnung wie „Kollege A“ (laut Prompt nicht erlaubt)');\n} else if (typeof ausgabe === 'object') {\n  hinweise.push('Die Antwort ist kein JSON-Objekt');\n}\n\nreturn fertig(200, {\n  ausgabe,\n  meta: {\n    modell: k.model ?? anfrage.modell,\n    prompt_version: anfrage.prompt_version,\n    stop_reason: k.stop_reason ?? null,\n    tokens: { eingabe: k.usage?.input_tokens ?? null, ausgabe: k.usage?.output_tokens ?? null },\n    hinweise,\n  },\n});\n"
+      },
+      "id": "d4a11d00-0000-4000-8000-000000000008",
+      "name": "Antwort lesen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        980,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Zahlencheck zur Orientierung: Jede Zahl im Text muss in den Daten vorkommen (1 bis 5 sind immer erlaubt).\n// Maßgeblich ist der Faktencheck der Datenbank; er läuft beim Speichern in der Plattform. Hier sieht man es schon beim Testen.\nconst item = $input.first().json;\nif (item.code !== 200 || typeof item.body.ausgabe !== 'object' || item.body.ausgabe === null) return [{ json: item }];\n\nconst eingabe = $('Anfrage prüfen').first().json.eingabe;\n\nfunction zahlenAus(text, ohneListennummern) {\n  let t = String(text);\n  if (ohneListennummern) t = t.replace(/^\\s*\\d+[.)]\\s+/gm, '');\n  return (t.match(/\\d+(?:[.,]\\d+)?/g) ?? []).map((x) => Math.abs(parseFloat(x.replace(',', '.'))));\n}\n\nfunction sammle(wert, ziel) {\n  if (typeof wert === 'number') ziel.push(Math.abs(wert));\n  else if (typeof wert === 'string') ziel.push(...zahlenAus(wert, false));\n  else if (Array.isArray(wert)) wert.forEach((x) => sammle(x, ziel));\n  else if (wert && typeof wert === 'object') Object.values(wert).forEach((x) => sammle(x, ziel));\n}\n\nconst erlaubt = [1, 2, 3, 4, 5];\nsammle(eingabe, erlaubt);\n\nconst texte = [];\n(function texteSammeln(w) {\n  if (typeof w === 'string') texte.push(w);\n  else if (Array.isArray(w)) w.forEach(texteSammeln);\n  else if (w && typeof w === 'object') Object.values(w).forEach(texteSammeln);\n})(item.body.ausgabe);\n\nconst fehlend = [];\nfor (const z of texte.flatMap((t) => zahlenAus(t, true))) {\n  if (!erlaubt.some((e) => Math.abs(e - z) < 1e-9)) {\n    const anzeige = String(z).replace('.', ',');\n    if (!fehlend.includes(anzeige)) fehlend.push(anzeige);\n  }\n}\n\nitem.body.meta.zahlen_nicht_in_daten = fehlend;\nitem.body.meta.faktencheck_orientierung = fehlend.length === 0 ? 'bestanden' : 'Abweichung';\nreturn [{ json: item }];\n"
+      },
+      "id": "d4a11d00-0000-4000-8000-000000000009",
+      "name": "Zahlencheck (Orientierung)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.body }}",
+        "options": {
+          "responseCode": "={{ $json.code }}"
+        }
+      },
+      "id": "d4a11d00-0000-4000-8000-000000000010",
+      "name": "Antwort senden",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1460,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"fehler\": \"Die Anfrage ist unvollständig.\", \"details\": $json.fehler } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "d4a11d00-0000-4000-8000-000000000011",
+      "name": "Anfrage ungültig",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        740,
+        140
+      ]
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n.example",
+            "content-type": "application/json",
+            "x-webhook-secret": "nur-zum-testen"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "prompt_version": "analyse-v1",
+            "system": "Du unterstützt die Leitung eines Friseursalons bei Mitarbeitergesprächen. Du bekommst die Auswertung einer Feedback-Umfrage (Selbstbild und Fremdbild, Noten von 1 bis 5) für eine Person. Alle Namen sind entfernt: Die bewertete Person heißt „die bewertete Person“, andere heißen „Kollege A“, „Kollege B“ und so weiter.\n\nFormuliere daraus eine sachliche, wertschätzende Gesprächsgrundlage auf Deutsch.\n\nRegeln:\n- Verwende ausschließlich Zahlen, die in den Daten stehen (Noten, Differenzen, Veränderungen, Anzahlen, Monat und Jahr). Rechne nichts selbst nach, runde nicht anders und erfinde keine Prozentwerte. Schreibe Zahlen im deutschen Format mit Komma, so wie in den Daten.\n- Nenne keine Namen und keine Buchstaben-Bezeichnungen wie „Kollege A“. Schreibe stattdessen „die Person“ oder „ein Kollege“. Verwende keine Pronomen wie „sie“ oder „er“ für die Person.\n- Gib Kommentare nur sinngemäß wieder und erfinde keine. Zitiere keine Kommentare wörtlich, wenn sie Namen oder Details verraten könnten, wer sie geschrieben hat.\n- Fehlen Daten (zum Beispiel kein Fremdbild oder kein Vormonat), sage das offen.\n- Keine Aussagen zu Gehalt, Kündigung, Gesundheit oder Recht. Keine Bewertung der Person als Mensch, nur des beobachteten Verhaltens.\n- Schreibe kurz und konkret. Die Leitung liest den Entwurf, bearbeitet ihn und gibt ihn frei.\n\nAntworte ausschließlich mit einem JSON-Objekt, ohne weiteren Text und ohne Code-Block, mit genau diesen Schlüsseln:\n{\n  \"zusammenfassung\": \"2 bis 4 Sätze\",\n  \"staerken\": [\"2 bis 4 Punkte\"],\n  \"entwicklungsfelder\": [\"2 bis 4 Punkte\"],\n  \"gespraechsfragen\": [\"3 bis 4 offene Fragen für das Gespräch\"],\n  \"vereinbarungen_vorschlaege\": [\"2 bis 3 konkrete Vorschläge\"],\n  \"kommentar_qualitaet_hinweis\": \"ein Satz, falls Kommentare auffallend kurz oder unspezifisch sind, sonst null\"\n}",
+            "nachricht": "Daten (JSON):\n{\"monat\":\"2026-09\",\"skala\":\"Noten von 1 (niedrig) bis 5 (hoch)\",\"staerken\":[{\"nr\":1,\"titel\":\"Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird.\",\"fremdbild\":3.5},{\"nr\":2,\"titel\":\"Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus.\",\"fremdbild\":2.5}],\"vormonat\":{\"monat\":\"2026-08\",\"differenz\":1,\"fremdbild\":2,\"selbstbild\":3,\"veraenderung_fremdbild\":1,\"veraenderung_selbstbild\":1},\"schwellen\":{\"hoch\":3.5,\"niedrig\":2.5,\"ausgewogen\":0.3},\"verhalten\":[{\"nr\":1,\"titel\":\"Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird.\",\"saeule\":\"Säule 1: Umgangsformen und Respekt\",\"differenz\":0.5,\"fremdbild\":3.5,\"selbstbild\":4,\"grundpfeiler\":\"Grundpfeiler 1: Philosophie\",\"stufe_fremdbild\":\"hoch\",\"anzahl_fremdbilder\":2,\"fremdbild_vormonat\":2,\"veraenderung_fremdbild\":1.5},{\"nr\":2,\"titel\":\"Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus.\",\"saeule\":\"Säule 1: Umgangsformen und Respekt\",\"differenz\":1.5,\"fremdbild\":2.5,\"selbstbild\":4,\"grundpfeiler\":\"Grundpfeiler 1: Philosophie\",\"stufe_fremdbild\":\"mittel\",\"anzahl_fremdbilder\":2,\"fremdbild_vormonat\":2,\"veraenderung_fremdbild\":0.5}],\"kennzahlen\":{\"differenz\":1,\"fremdbild\":3,\"einordnung\":\"Selbstüberschätzung\",\"selbstbild\":4,\"stufe_fremdbild\":\"mittel\"},\"beteiligung\":{\"erwartet\":4,\"abgegeben\":3},\"entwicklung\":{\"nennungen\":1,\"begruendungen\":[\"die bewertete Person kann Teams führen, meint Kollege E\"]},\"bewertete_person\":\"die bewertete Person\",\"eigene_kommentare\":[{\"nr\":1,\"note\":4,\"kommentar\":\"Ich, die bewertete Person, gebe mir viel Mühe\",\"verhalten\":\"Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird.\"},{\"nr\":2,\"note\":4,\"kommentar\":\"Das zweite Verhalten gelingt mir gut\",\"verhalten\":\"Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus.\"}],\"entwicklungsfelder\":[{\"nr\":2,\"titel\":\"Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus.\",\"fremdbild\":2.5},{\"nr\":1,\"titel\":\"Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird.\",\"fremdbild\":3.5}],\"kommentare_kollegen\":[{\"nr\":1,\"note\":3,\"kommentar\":\"die bewertete Person ist freundlich, sagt Kollege E; Kollege B sieht das auch. Mail: E-Mail-Adresse\",\"verhalten\":\"Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird.\"},{\"nr\":1,\"note\":4,\"kommentar\":\"die bewertete Person arbeitet sorgfältig, Kollege E weniger\",\"verhalten\":\"Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird.\"},{\"nr\":2,\"note\":2,\"kommentar\":\"Seit 47 Minuten zu spät, die bewertete Person Kunden warten\",\"verhalten\":\"Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus.\"}]}",
+            "eingabe": {
+              "monat": "2026-09",
+              "skala": "Noten von 1 (niedrig) bis 5 (hoch)",
+              "staerken": [
+                {
+                  "nr": 1,
+                  "titel": "Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird.",
+                  "fremdbild": 3.5
+                },
+                {
+                  "nr": 2,
+                  "titel": "Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus.",
+                  "fremdbild": 2.5
+                }
+              ],
+              "vormonat": {
+                "monat": "2026-08",
+                "differenz": 1,
+                "fremdbild": 2,
+                "selbstbild": 3,
+                "veraenderung_fremdbild": 1,
+                "veraenderung_selbstbild": 1
+              },
+              "schwellen": {
+                "hoch": 3.5,
+                "niedrig": 2.5,
+                "ausgewogen": 0.3
+              },
+              "verhalten": [
+                {
+                  "nr": 1,
+                  "titel": "Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird.",
+                  "saeule": "Säule 1: Umgangsformen und Respekt",
+                  "differenz": 0.5,
+                  "fremdbild": 3.5,
+                  "selbstbild": 4,
+                  "grundpfeiler": "Grundpfeiler 1: Philosophie",
+                  "stufe_fremdbild": "hoch",
+                  "anzahl_fremdbilder": 2,
+                  "fremdbild_vormonat": 2,
+                  "veraenderung_fremdbild": 1.5
+                },
+                {
+                  "nr": 2,
+                  "titel": "Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus.",
+                  "saeule": "Säule 1: Umgangsformen und Respekt",
+                  "differenz": 1.5,
+                  "fremdbild": 2.5,
+                  "selbstbild": 4,
+                  "grundpfeiler": "Grundpfeiler 1: Philosophie",
+                  "stufe_fremdbild": "mittel",
+                  "anzahl_fremdbilder": 2,
+                  "fremdbild_vormonat": 2,
+                  "veraenderung_fremdbild": 0.5
+                }
+              ],
+              "kennzahlen": {
+                "differenz": 1,
+                "fremdbild": 3,
+                "einordnung": "Selbstüberschätzung",
+                "selbstbild": 4,
+                "stufe_fremdbild": "mittel"
+              },
+              "beteiligung": {
+                "erwartet": 4,
+                "abgegeben": 3
+              },
+              "entwicklung": {
+                "nennungen": 1,
+                "begruendungen": [
+                  "die bewertete Person kann Teams führen, meint Kollege E"
+                ]
+              },
+              "bewertete_person": "die bewertete Person",
+              "eigene_kommentare": [
+                {
+                  "nr": 1,
+                  "note": 4,
+                  "kommentar": "Ich, die bewertete Person, gebe mir viel Mühe",
+                  "verhalten": "Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird."
+                },
+                {
+                  "nr": 2,
+                  "note": 4,
+                  "kommentar": "Das zweite Verhalten gelingt mir gut",
+                  "verhalten": "Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus."
+                }
+              ],
+              "entwicklungsfelder": [
+                {
+                  "nr": 2,
+                  "titel": "Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus.",
+                  "fremdbild": 2.5
+                },
+                {
+                  "nr": 1,
+                  "titel": "Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird.",
+                  "fremdbild": 3.5
+                }
+              ],
+              "kommentare_kollegen": [
+                {
+                  "nr": 1,
+                  "note": 3,
+                  "kommentar": "die bewertete Person ist freundlich, sagt Kollege E; Kollege B sieht das auch. Mail: E-Mail-Adresse",
+                  "verhalten": "Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird."
+                },
+                {
+                  "nr": 1,
+                  "note": 4,
+                  "kommentar": "die bewertete Person arbeitet sorgfältig, Kollege E weniger",
+                  "verhalten": "Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird."
+                },
+                {
+                  "nr": 2,
+                  "note": 2,
+                  "kommentar": "Seit 47 Minuten zu spät, die bewertete Person Kunden warten",
+                  "verhalten": "Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus."
+                }
+              ]
+            }
+          },
+          "webhookUrl": "https://n8n.example/webhook-test/dawiid-analyse",
+          "executionMode": "test"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Anfrage prüfen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anfrage prüfen": {
+      "main": [
+        [
+          {
+            "node": "Gültig?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gültig?": {
+      "main": [
+        [
+          {
+            "node": "Bei Claude anfragen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Anfrage ungültig",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bei Claude anfragen": {
+      "main": [
+        [
+          {
+            "node": "Antwort lesen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Antwort lesen": {
+      "main": [
+        [
+          {
+            "node": "Zahlencheck (Orientierung)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zahlencheck (Orientierung)": {
+      "main": [
+        [
+          {
+            "node": "Antwort senden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": true
+  },
+  "versionId": "d4a11d00-0000-4000-8000-0000000000ff",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

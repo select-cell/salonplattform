@@ -217,6 +217,7 @@ Die Rechte stecken in Row Level Security und Datenbank-Funktionen. Die Routen-Sp
 | Datenbank (pgTAP) | `supabase start && supabase test db`, lokal ohne Docker `npm run test:db` | 694 Prüfungen: Rechte, Verknüpfung, Umfrage, Auswertungen, Zeiterfassung, Kommentare, PDF, Analyse (Namen aus der Eingabe, Faktencheck), Agenda, Termine, Versand über die Zeitumstellung |
 | Edge Functions | `npm run test:functions` | 46 Tests der Logik (KI-Ablauf, Versand), Datenbank und Anbieter sind nachgebaut |
 | Hilfen im Frontend | `npm run test:unit` | 5 Tests (Zahlenlisten, Zeitbudget, Mail-Zustände) |
+| n8n-Workflow | `npm run test:n8n` | 17 Tests (Aufbau, Code-Knoten, Zusammenspiel mit der Edge Function) |
 | Browser (Playwright) | `npm run test:browser` | 280 Prüfungen je Erweiterung, auch mit echt erzeugten PDFs (poppler: A4, Schriften eingebettet, Fußzeile) |
 | Typen | `npm run typecheck` | |
 

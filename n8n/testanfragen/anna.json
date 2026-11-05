@@ -1,0 +1,126 @@
+{
+  "prompt_version": "analyse-v1",
+  "system": "Du unterstützt die Leitung eines Friseursalons bei Mitarbeitergesprächen. Du bekommst die Auswertung einer Feedback-Umfrage (Selbstbild und Fremdbild, Noten von 1 bis 5) für eine Person. Alle Namen sind entfernt: Die bewertete Person heißt „die bewertete Person“, andere heißen „Kollege A“, „Kollege B“ und so weiter.\n\nFormuliere daraus eine sachliche, wertschätzende Gesprächsgrundlage auf Deutsch.\n\nRegeln:\n- Verwende ausschließlich Zahlen, die in den Daten stehen (Noten, Differenzen, Veränderungen, Anzahlen, Monat und Jahr). Rechne nichts selbst nach, runde nicht anders und erfinde keine Prozentwerte. Schreibe Zahlen im deutschen Format mit Komma, so wie in den Daten.\n- Nenne keine Namen und keine Buchstaben-Bezeichnungen wie „Kollege A“. Schreibe stattdessen „die Person“ oder „ein Kollege“. Verwende keine Pronomen wie „sie“ oder „er“ für die Person.\n- Gib Kommentare nur sinngemäß wieder und erfinde keine. Zitiere keine Kommentare wörtlich, wenn sie Namen oder Details verraten könnten, wer sie geschrieben hat.\n- Fehlen Daten (zum Beispiel kein Fremdbild oder kein Vormonat), sage das offen.\n- Keine Aussagen zu Gehalt, Kündigung, Gesundheit oder Recht. Keine Bewertung der Person als Mensch, nur des beobachteten Verhaltens.\n- Schreibe kurz und konkret. Die Leitung liest den Entwurf, bearbeitet ihn und gibt ihn frei.\n\nAntworte ausschließlich mit einem JSON-Objekt, ohne weiteren Text und ohne Code-Block, mit genau diesen Schlüsseln:\n{\n  \"zusammenfassung\": \"2 bis 4 Sätze\",\n  \"staerken\": [\"2 bis 4 Punkte\"],\n  \"entwicklungsfelder\": [\"2 bis 4 Punkte\"],\n  \"gespraechsfragen\": [\"3 bis 4 offene Fragen für das Gespräch\"],\n  \"vereinbarungen_vorschlaege\": [\"2 bis 3 konkrete Vorschläge\"],\n  \"kommentar_qualitaet_hinweis\": \"ein Satz, falls Kommentare auffallend kurz oder unspezifisch sind, sonst null\"\n}",
+  "nachricht": "Daten (JSON):\n{\"monat\":\"2026-09\",\"skala\":\"Noten von 1 (niedrig) bis 5 (hoch)\",\"staerken\":[{\"nr\":1,\"titel\":\"Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird.\",\"fremdbild\":3.5},{\"nr\":2,\"titel\":\"Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus.\",\"fremdbild\":2.5}],\"vormonat\":{\"monat\":\"2026-08\",\"differenz\":1,\"fremdbild\":2,\"selbstbild\":3,\"veraenderung_fremdbild\":1,\"veraenderung_selbstbild\":1},\"schwellen\":{\"hoch\":3.5,\"niedrig\":2.5,\"ausgewogen\":0.3},\"verhalten\":[{\"nr\":1,\"titel\":\"Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird.\",\"saeule\":\"Säule 1: Umgangsformen und Respekt\",\"differenz\":0.5,\"fremdbild\":3.5,\"selbstbild\":4,\"grundpfeiler\":\"Grundpfeiler 1: Philosophie\",\"stufe_fremdbild\":\"hoch\",\"anzahl_fremdbilder\":2,\"fremdbild_vormonat\":2,\"veraenderung_fremdbild\":1.5},{\"nr\":2,\"titel\":\"Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus.\",\"saeule\":\"Säule 1: Umgangsformen und Respekt\",\"differenz\":1.5,\"fremdbild\":2.5,\"selbstbild\":4,\"grundpfeiler\":\"Grundpfeiler 1: Philosophie\",\"stufe_fremdbild\":\"mittel\",\"anzahl_fremdbilder\":2,\"fremdbild_vormonat\":2,\"veraenderung_fremdbild\":0.5}],\"kennzahlen\":{\"differenz\":1,\"fremdbild\":3,\"einordnung\":\"Selbstüberschätzung\",\"selbstbild\":4,\"stufe_fremdbild\":\"mittel\"},\"beteiligung\":{\"erwartet\":4,\"abgegeben\":3},\"entwicklung\":{\"nennungen\":1,\"begruendungen\":[\"die bewertete Person kann Teams führen, meint Kollege E\"]},\"bewertete_person\":\"die bewertete Person\",\"eigene_kommentare\":[{\"nr\":1,\"note\":4,\"kommentar\":\"Ich, die bewertete Person, gebe mir viel Mühe\",\"verhalten\":\"Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird.\"},{\"nr\":2,\"note\":4,\"kommentar\":\"Das zweite Verhalten gelingt mir gut\",\"verhalten\":\"Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus.\"}],\"entwicklungsfelder\":[{\"nr\":2,\"titel\":\"Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus.\",\"fremdbild\":2.5},{\"nr\":1,\"titel\":\"Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird.\",\"fremdbild\":3.5}],\"kommentare_kollegen\":[{\"nr\":1,\"note\":3,\"kommentar\":\"die bewertete Person ist freundlich, sagt Kollege E; Kollege B sieht das auch. Mail: E-Mail-Adresse\",\"verhalten\":\"Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird.\"},{\"nr\":1,\"note\":4,\"kommentar\":\"die bewertete Person arbeitet sorgfältig, Kollege E weniger\",\"verhalten\":\"Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird.\"},{\"nr\":2,\"note\":2,\"kommentar\":\"Seit 47 Minuten zu spät, die bewertete Person Kunden warten\",\"verhalten\":\"Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus.\"}]}",
+  "eingabe": {
+    "monat": "2026-09",
+    "skala": "Noten von 1 (niedrig) bis 5 (hoch)",
+    "staerken": [
+      {
+        "nr": 1,
+        "titel": "Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird.",
+        "fremdbild": 3.5
+      },
+      {
+        "nr": 2,
+        "titel": "Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus.",
+        "fremdbild": 2.5
+      }
+    ],
+    "vormonat": {
+      "monat": "2026-08",
+      "differenz": 1,
+      "fremdbild": 2,
+      "selbstbild": 3,
+      "veraenderung_fremdbild": 1,
+      "veraenderung_selbstbild": 1
+    },
+    "schwellen": {
+      "hoch": 3.5,
+      "niedrig": 2.5,
+      "ausgewogen": 0.3
+    },
+    "verhalten": [
+      {
+        "nr": 1,
+        "titel": "Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird.",
+        "saeule": "Säule 1: Umgangsformen und Respekt",
+        "differenz": 0.5,
+        "fremdbild": 3.5,
+        "selbstbild": 4,
+        "grundpfeiler": "Grundpfeiler 1: Philosophie",
+        "stufe_fremdbild": "hoch",
+        "anzahl_fremdbilder": 2,
+        "fremdbild_vormonat": 2,
+        "veraenderung_fremdbild": 1.5
+      },
+      {
+        "nr": 2,
+        "titel": "Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus.",
+        "saeule": "Säule 1: Umgangsformen und Respekt",
+        "differenz": 1.5,
+        "fremdbild": 2.5,
+        "selbstbild": 4,
+        "grundpfeiler": "Grundpfeiler 1: Philosophie",
+        "stufe_fremdbild": "mittel",
+        "anzahl_fremdbilder": 2,
+        "fremdbild_vormonat": 2,
+        "veraenderung_fremdbild": 0.5
+      }
+    ],
+    "kennzahlen": {
+      "differenz": 1,
+      "fremdbild": 3,
+      "einordnung": "Selbstüberschätzung",
+      "selbstbild": 4,
+      "stufe_fremdbild": "mittel"
+    },
+    "beteiligung": {
+      "erwartet": 4,
+      "abgegeben": 3
+    },
+    "entwicklung": {
+      "nennungen": 1,
+      "begruendungen": [
+        "die bewertete Person kann Teams führen, meint Kollege E"
+      ]
+    },
+    "bewertete_person": "die bewertete Person",
+    "eigene_kommentare": [
+      {
+        "nr": 1,
+        "note": 4,
+        "kommentar": "Ich, die bewertete Person, gebe mir viel Mühe",
+        "verhalten": "Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird."
+      },
+      {
+        "nr": 2,
+        "note": 4,
+        "kommentar": "Das zweite Verhalten gelingt mir gut",
+        "verhalten": "Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus."
+      }
+    ],
+    "entwicklungsfelder": [
+      {
+        "nr": 2,
+        "titel": "Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus.",
+        "fremdbild": 2.5
+      },
+      {
+        "nr": 1,
+        "titel": "Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird.",
+        "fremdbild": 3.5
+      }
+    ],
+    "kommentare_kollegen": [
+      {
+        "nr": 1,
+        "note": 3,
+        "kommentar": "die bewertete Person ist freundlich, sagt Kollege E; Kollege B sieht das auch. Mail: E-Mail-Adresse",
+        "verhalten": "Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird."
+      },
+      {
+        "nr": 1,
+        "note": 4,
+        "kommentar": "die bewertete Person arbeitet sorgfältig, Kollege E weniger",
+        "verhalten": "Bittet den Gast um Erlaubnis, bevor ein Kollege im Gespräch unterbrochen wird."
+      },
+      {
+        "nr": 2,
+        "note": 2,
+        "kommentar": "Seit 47 Minuten zu spät, die bewertete Person Kunden warten",
+        "verhalten": "Tritt vor dem Gast professionell auf und strahlt auch in anspruchsvollen Situationen Ruhe und Professionalität aus."
+      }
+    ]
+  }
+}
