@@ -22,7 +22,7 @@ Die vollständige Bauanleitung steht in [`docs/plattform-architektur.md`](docs/p
 | 1.2 D | Kommentar-Auswertung ([`docs/kommentar-auswertung.md`](docs/kommentar-auswertung.md)) | **fertig, in Supabase installiert** |
 | 1.2 E | Monatsabschluss und KI-Einzelanalyse mit Faktencheck ([`docs/einzelanalyse.md`](docs/einzelanalyse.md)) | **fertig, in Supabase installiert**; die KI braucht noch Secrets |
 | 1.2 F | Fokus, Agenda, Termine, Mailversand ([`docs/agenda-termine.md`](docs/agenda-termine.md)) | **fertig, in Supabase installiert**; der Versand braucht noch Secrets, Resend und den Zeitplan |
-| 1.3 | KI nur für den Admin, Sammellauf, Gesamtauswertung des Teams, Agenda mit KI, ein n8n-Webhook für alle KI-Aufgaben ([`docs/einzelanalyse.md`](docs/einzelanalyse.md), [`n8n/README.md`](n8n/README.md)) | **fertig**; der n8n-Workflow braucht noch Import, Zugangsdaten und Secrets |
+| 1.3 | KI nur für den Admin, Sammellauf, Gesamtauswertung des Teams, Agenda mit KI, ein n8n-Webhook für alle KI-Aufgaben, vom Browser des Admins direkt aufgerufen ([`docs/einzelanalyse.md`](docs/einzelanalyse.md), [`n8n/README.md`](n8n/README.md)). **Zum Übertragen auf andere Plattformen:** [`docs/MASTER-KI-TEAMMEETING.md`](docs/MASTER-KI-TEAMMEETING.md) | **fertig**; der n8n-Workflow braucht noch Import und die Anthropic-Zugangsdaten (kein Secret in Supabase nötig) |
 
 Was bei Version 1.2 noch zu tun ist (Secrets, Versand, Deploy-Reihenfolge), steht in [`docs/version-1.2-umsetzung.md`](docs/version-1.2-umsetzung.md).
 
